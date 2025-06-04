@@ -32,25 +32,25 @@ Issues = "https://github.com/Zichen/gem/issues"
 Source = "https://github.com/Zichen/gem"
 
 [tool.hatch.version]
-path = "src/gem/__about__.py"
+path = "gem/__about__.py"
 
 [tool.hatch.envs.types]
 extra-dependencies = [
   "mypy>=1.0.0",
 ]
 [tool.hatch.envs.types.scripts]
-check = "mypy --install-types --non-interactive {args:src/gem tests}"
+check = "mypy --install-types --non-interactive {args:gem tests}"
 
 [tool.coverage.run]
 source_pkgs = ["gem", "tests"]
 branch = true
 parallel = true
 omit = [
-  "src/gem/__about__.py",
+  "gem/__about__.py",
 ]
 
 [tool.coverage.paths]
-gem = ["src/gem", "*/gem/src/gem"]
+gem = ["gem", "*/gem/gem"]
 tests = ["tests", "*/gem/tests"]
 
 [tool.coverage.report]
