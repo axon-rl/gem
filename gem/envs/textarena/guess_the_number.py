@@ -17,11 +17,13 @@ class GuessTheNumberEnv(MultiTurnEnv):
         self.max_turns = max_turns
 
     def get_task_prefix(self) -> str:
+        example_action = self.sample_random_action()
         return (
             f"You are playing Guess The Number.\n"
             f"You have to guess the number between {self.min_number} and {self.max_number} (inclusive) within {self.max_turns} turns.\n"
             "As you enter your guess, the game will provide you with hints such as the target number is 'higher' or 'lower'.\n"
-            "You may provide your response in any manner. Only the number that is wrapped inside \\boxed{} will be considered as your guess. For example, \\boxed{5}.\n"
+            "You may provide your response in any manner. Only the number that is wrapped inside \\boxed{} will be considered as your guess."
+            f" For example, {example_action}.\n"
             "As you play, the history of your guesses will be appended below. Use the information to complete the game before you run out of guesses.\n"
         )
 

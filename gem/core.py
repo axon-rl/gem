@@ -77,3 +77,21 @@ class ObservationWrapper(Env):
         """
         del obs
         raise NotImplementedError
+
+class EnvWrapper(Env):
+    def __init__(self, env: Env):
+        super().__init__()
+        self.env = env
+
+    def step(
+            self, action: ActType
+            ) -> Tuple[WrapperObsType, SupportsFloat, bool, bool, dict[str, Any]]:
+        return self.env.step(action)    
+
+    def reset(
+            self, seed: Optional[int] = None
+            ) -> Tuple[WrapperObsType, dict[str, Any]]:
+        return self.env.reset(seed)
+
+    def observation(self, obs: ObsType) -> WrapperObsType:
+        return self.env.observation(obs)
