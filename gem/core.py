@@ -31,6 +31,7 @@ class Env(abc.ABC):
             info (dict): Contains auxiliary diagnostic information (helpful for debugging, learning, and logging).
         """
 
+    @abc.abstractmethod
     def reset(self, seed: Optional[int] = None) -> Tuple[ObsType, dict[str, Any]]:
         """Resets the environment to an initial internal state, returning an initial observation and info.
 
@@ -43,3 +44,36 @@ class Env(abc.ABC):
         """
         if seed is not None:
             self._np_random, self._np_random_seed = seeding.np_random(seed)
+
+
+WrapperObsType = TypeVar("WrapperObsType")
+
+
+class ObservationWrapper(Env):
+    def __init__(self, env: Env):
+        super().__init__()
+        self.env = env
+
+    def step(
+        self, action: ActType
+    ) -> Tuple[WrapperObsType, SupportsFloat, bool, bool, dict[str, Any]]:
+        obs, reward, terminated, truncated, info = self.env.step(action)
+        return self.observation(obs), reward, terminated, truncated, info
+
+    def reset(
+        self, seed: Optional[int] = None
+    ) -> Tuple[WrapperObsType, dict[str, Any]]:
+        obs, info = self.env.reset(seed)
+        return self.observation(obs), info
+
+    def observation(self, obs: ObsType) -> WrapperObsType:
+        """Wraps the observation.
+
+        Args:
+            obs (ObsType): Original observation.
+
+        Returns:
+            WrapperObsType: Wrapped observation.
+        """
+        del obs
+        raise NotImplementedError

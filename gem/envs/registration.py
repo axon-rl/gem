@@ -6,24 +6,20 @@ from typing import Any, Callable, Dict, List, Union
 
 from gem import Env
 
-ENV_REGISTRY: Dict[str, Callable] = {}
-
 
 @dataclass
 class EnvSpec:
     """A specification for creating environments."""
 
     id: str
-    entry_point: Callable
+    entry_point: Union[Callable, str]
     kwargs: Dict[str, Any] = field(default_factory=dict)
 
-    def make(self, **kwargs) -> Any:
-        """Create an environment instance."""
-        all_kwargs = {**self.kwargs, **kwargs}
-        return self.entry_point(**all_kwargs)
+
+ENV_REGISTRY: Dict[str, EnvSpec] = {}
 
 
-def register(id: str, entry_point: Callable, **kwargs: Any):
+def register(id: str, entry_point: Union[Callable, str], **kwargs: Any):
     """Register an environment with a given ID."""
     if id in ENV_REGISTRY:
         raise ValueError(f"Environment {id} already registered.")
@@ -51,13 +47,13 @@ def make(env_id: Union[str, List[str]], **kwargs) -> Env:
         module_path, class_name = env_spec.entry_point.split(":")
         try:
             module = importlib.import_module(module_path)
-            env_class = getattr(module, class_name)
+            env_class: Callable = getattr(module, class_name)
         except (ModuleNotFoundError, AttributeError) as e:
             raise ImportError(
                 f"Could not import {module_path}.{class_name}. Error: {e}"
             )
     else:
-        env_class = env_spec.entry_point
+        env_class: Callable = env_spec.entry_point
 
     env = env_class(**{**env_spec.kwargs, **kwargs})
 

@@ -176,6 +176,7 @@ cython_debug/
 # PyPI configuration file
 .pypirc
 
+.vscode
 output
 evals/game/data*
 evals/game/wandb*
