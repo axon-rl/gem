@@ -40,7 +40,7 @@ def remove_boxed(s: Optional[str]):
             return None
 
 
-def extract_boxed_answer(solution: str) -> Optional[str]:
+def extract_last_boxed_answer(solution: str) -> Optional[str]:
     """Extract the answer from inside a LaTeX \\boxed{} command"""
     extracted_solution = last_boxed_only_string(solution)
     return remove_boxed(extracted_solution)

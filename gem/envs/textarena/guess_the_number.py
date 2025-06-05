@@ -1,11 +1,11 @@
-"""Guess the number game environment"""
+"""Guess the number game environment."""
 
 import random
 from typing import Any, Optional, Tuple
 
 from gem.envs.multi_turn import MultiTurnEnv
 from gem.utils.constants import TERMINAL_STATE
-from gem.utils.parsing import extract_boxed_answer
+from gem.utils.parsing import extract_last_boxed_answer
 
 
 class GuessTheNumberEnv(MultiTurnEnv):
@@ -38,7 +38,7 @@ class GuessTheNumberEnv(MultiTurnEnv):
     def step(self, action: str) -> Tuple[str, float, bool, bool, dict[str, Any]]:
         self.turn_count += 1
 
-        clean_action = extract_boxed_answer(action)
+        clean_action = extract_last_boxed_answer(action)
         try:
             player_guess = int(clean_action) if clean_action else None
         except Exception:

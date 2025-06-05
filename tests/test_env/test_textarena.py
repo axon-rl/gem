@@ -8,7 +8,7 @@ from gem.wrappers.stateful_observation import (ChatTemplatedObservation,
 
 
 def test():
-    env: MultiTurnEnv = gem.make("ta:GuessTheNumber-v0", max_turns=5)
+    env: MultiTurnEnv = gem.make("ta:GuessTheNumber-v0", max_turns=3)
     policy = lambda _: env.sample_random_action()
     run_and_print_episode(env, policy)
 
