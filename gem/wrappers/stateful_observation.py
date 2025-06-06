@@ -16,9 +16,9 @@ def maybe_add_new_line(text: str):
 class ConcatenatedObservation(ObservationWrapper):
     def __init__(self, env: MultiTurnEnv, max_history_length: Optional[int] = None):
         super().__init__(env)
-        assert isinstance(
-            env, MultiTurnEnv
-        ), "ConcatenatedObservation wrapper only supports MultiTurnEnv"
+        assert hasattr(env, "get_task_prefix" and "get_task_suffix"), (
+            "The environment must implement get_task_prefix and get_task_suffix methods."
+        )
         self.env = env
         self.max_history_length = max_history_length
         self.obs_queue = deque(maxlen=max_history_length)
@@ -33,9 +33,9 @@ class ConcatenatedObservation(ObservationWrapper):
     ) -> Tuple[str, SupportsFloat, bool, bool, dict[str, Any]]:
         obs, reward, terminated, truncated, info = self.env.step(action)
         self.obs_queue.append(obs)
-        return self._get_wrapped_obs(), reward, terminated, truncated, info
+        return self.observation(), reward, terminated, truncated, info
 
-    def _get_wrapped_obs(self) -> str:
+    def observation(self) -> str:
         wrapped_obs = self.env.get_task_prefix()
         for obs in self.obs_queue:
             wrapped_obs += maybe_add_new_line(obs)
@@ -66,6 +66,9 @@ class ChatTemplatedObservation(ConcatenatedObservation):
         obs, reward, terminated, truncated, info = self.env.step(action)
         self.obs_queue.append(obs)
         self.act_queue.append(action)
+        return self.observation(), reward, terminated, truncated, info
+
+    def observation(self):
 
         obs_list = [self.env.get_task_prefix()] + list(self.obs_queue)[:-1]
         act_list = list(self.act_queue)
@@ -83,5 +86,4 @@ class ChatTemplatedObservation(ConcatenatedObservation):
             tokenize=False,
             add_generation_prompt=True,
         )
-
-        return wrapped_obs, reward, terminated, truncated, info
+        return wrapped_obs

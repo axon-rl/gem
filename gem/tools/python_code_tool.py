@@ -1,5 +1,5 @@
 # Adapted from https://github.com/TIGER-AI-Lab/verl-tool
-from .base import BaseTool, register_tool
+from .base_tool import BaseTool
 import regex as re
 import subprocess
 import os
@@ -121,7 +121,6 @@ def execute_python(code: str, timeout: int=TIMEOUT) -> Tuple[str, bool]:
         pass
     return result, has_error
 
-@register_tool
 class PythonCodeTool(BaseTool):
     tool_type = "python_code"
     timeout = TIMEOUT
