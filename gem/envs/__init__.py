@@ -50,14 +50,6 @@ register(
     duplicate_numbers=False,
 )
 register(
-    "ta:Mastermind-v0-extreme",
-    "gem.envs.textarena.mastermind:MastermindEnv",
-    code_length=6,
-    num_numbers=12,
-    max_turns=50,
-    duplicate_numbers=True,
-)
-register(
     "ta:Mastermind-v0-random",
     "gem.envs.textarena.mastermind:MastermindEnv",
     code_length=None,
@@ -72,6 +64,23 @@ register(
     num_numbers=6,
     max_turns=20,
     duplicate_numbers=False,
+)
+# Minesweeper
+register(
+    "ta:Minesweeper-v0",
+    "gem.envs.textarena.minesweeper:MinesweeperEnv",
+    rows=8,
+    cols=8,
+    num_mines=10,
+    max_turns=100,
+)
+register(
+    "ta:Minesweeper-v0-easy",
+    "gem.envs.textarena.minesweeper:MinesweeperEnv",
+    rows=5,
+    cols=5,
+    num_mines=3,
+    max_turns=10,
 )
 
 # Register datasets from ReasoningGym

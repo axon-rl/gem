@@ -15,6 +15,7 @@ class GuessTheNumberEnv(MultiTurnEnv):
         self.min_number = min_number
         self.max_number = max_number
         self.max_turns = max_turns
+        self.reset()
 
     def get_task_prefix(self) -> str:
         return (

@@ -23,6 +23,7 @@ class MastermindEnv(MultiTurnEnv):
         self.duplicate_numbers = duplicate_numbers
         self.max_turns = max_turns
         self.is_random = code_length is None or num_numbers is None
+        self.reset()
 
     def get_task_prefix(self) -> str:
         return (
