@@ -21,7 +21,8 @@ class GuessTheNumberEnv(MultiTurnEnv):
             f"You are playing Guess The Number.\n"
             f"You have to guess the number between {self.min_number} and {self.max_number} (inclusive) within {self.max_turns} turns.\n"
             "As you enter your guess, the game will provide you with hints such as the target number is 'higher' or 'lower'.\n"
-            "You may provide your response in any manner. Only the number that is wrapped inside \\boxed{} will be considered as your guess. For example, \\boxed{5}.\n"
+            "You may provide your response in any manner. Only the number that is wrapped inside \\boxed{} will be considered as your guess,"
+            f" for example, {self.example_action}.\n"
             "As you play, the history of your guesses will be appended below. Use the information to complete the game before you run out of guesses.\n"
         )
 
@@ -33,6 +34,7 @@ class GuessTheNumberEnv(MultiTurnEnv):
         self.game_number = random.randint(self.min_number, self.max_number)
         self.guessed_numbers = set()
         self.turn_count = 0
+        self.example_action = self.sample_random_action()
         return self.get_task_prefix() + self.get_task_suffix(), {}
 
     def step(self, action: str) -> Tuple[str, float, bool, bool, dict[str, Any]]:
