@@ -46,7 +46,10 @@ class Env(abc.ABC):
             self._np_random, self._np_random_seed = seeding.np_random(seed)
 
 
-WrapperObsType = TypeVar("WrapperObsType")
+class Wrapper(Env):
+    def __init__(self, env: Env):
+        self.env = env
+
 
 class EnvWrapper(Env, abc.ABC):
     def __init__(self, env: Env):
@@ -57,6 +60,7 @@ class EnvWrapper(Env, abc.ABC):
             if not attr.startswith("_") and not hasattr(self, attr):
                 setattr(self, attr, getattr(env, attr))
 
+WrapperObsType = TypeVar("WrapperObsType")
 
 class ObservationWrapper(EnvWrapper):
     def __init__(self, env: Env):

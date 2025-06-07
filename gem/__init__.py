@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: MIT
 
 from gem.core import Env, ObservationWrapper
-from gem.envs.registration import make, register
+from gem.envs.registration import make, make_vec, register
 
 __all__ = [
     # core classes
@@ -11,5 +11,6 @@ __all__ = [
     "ObservationWrapper",
     # registration
     "make",
+    "make_vec",
     "register",
 ]

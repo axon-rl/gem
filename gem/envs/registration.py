@@ -2,9 +2,12 @@
 
 import importlib
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Union
+from functools import partial
+from typing import Any, Callable, Dict, Optional, Sequence, Union
 
 from gem import Env
+from gem.core import Wrapper
+from gem.vector.sync_vector_env import SyncVectorEnv
 
 
 @dataclass
@@ -37,7 +40,7 @@ def pprint_registry_detailed():
             print(f"      Kwargs: {env_spec.kwargs}")
 
 
-def make(env_id: Union[str, List[str]], **kwargs) -> Env:
+def make(env_id: str, **kwargs) -> Env:
     if env_id not in ENV_REGISTRY:
         raise ValueError(f"Environment {env_id} not found in registry.")
 
@@ -60,4 +63,29 @@ def make(env_id: Union[str, List[str]], **kwargs) -> Env:
     env.env_id = env_id
     env.entry_point = env_spec.entry_point
 
+    return env
+
+
+def make_vec(
+    env_id,
+    num_envs: int = 1,
+    wrappers: Optional[Sequence[Wrapper]] = None,
+    vec_kwargs: Optional[Sequence[dict]] = None,
+    **kwargs,
+) -> SyncVectorEnv:
+    def create_single_env(idx: int) -> Env:
+        if vec_kwargs is not None:
+            _kwargs = vec_kwargs[idx]
+        else:
+            _kwargs = {}
+        single_env = make(env_id, **_kwargs)
+        if wrappers is None:
+            return single_env
+        for wrapper in wrappers:
+            single_env = wrapper(single_env)
+        return single_env
+
+    env = SyncVectorEnv(
+        env_fns=[partial(create_single_env, i) for i in range(num_envs)],
+    )
     return env
