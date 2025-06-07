@@ -78,6 +78,7 @@ def make_vec(
             _kwargs = vec_kwargs[idx]
         else:
             _kwargs = {}
+        _kwargs.update(**kwargs)
         single_env = make(env_id, **_kwargs)
         if wrappers is None:
             return single_env

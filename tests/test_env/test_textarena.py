@@ -24,6 +24,21 @@ def test(env_name: str = "ta:GuessTheNumber-v0"):
     wrapped_env = ChatTemplatedObservation(env, tokenizer)
     run_and_print_episode(wrapped_env, policy)
 
+    print("\n" * 5)
+    num_envs = 8
+    ta_vec_env = gem.make_vec(
+        "ta:GuessTheNumber-v0",
+        num_envs=num_envs,
+        wrappers=[ConcatenatedObservation],
+        max_turns=3,
+    )
+    run_and_print_episode(
+        ta_vec_env,
+        lambda _: [env.sample_random_action()] * num_envs,
+        ignore_done=True,
+        max_steps=20,
+    )
+
 
 if __name__ == "__main__":
     fire.Fire(test)
