@@ -24,19 +24,20 @@ def test(env_name: str = "ta:GuessTheNumber-v0"):
     wrapped_env = ChatTemplatedObservation(env, tokenizer)
     run_and_print_episode(wrapped_env, policy)
 
-    print("\n" * 5)
-    num_envs = 8
+    print("\n" * 5, "BATCH EPISODE: VECTORIZED ENV")
+    num_envs = 2
     ta_vec_env = gem.make_vec(
-        "ta:GuessTheNumber-v0",
+        env_name,
         num_envs=num_envs,
         wrappers=[ConcatenatedObservation],
         max_turns=3,
     )
+
     run_and_print_episode(
         ta_vec_env,
-        lambda _: [env.sample_random_action()] * num_envs,
+        lambda _: [env.sample_random_action() for _ in range(num_envs)],
         ignore_done=True,
-        max_steps=20,
+        max_steps=5,
     )
 
 
@@ -44,7 +45,7 @@ if __name__ == "__main__":
     fire.Fire(test)
 
     """Run with:
-        python -m tests.test_env.test_textarena --env_name ta:GuessTheNumber-v0
+        python -m tests.test_env.test_textarena --env_name ta:GuessTheNumber-v0-sanitycheck
         python -m tests.test_env.test_textarena --env_name ta:Mastermind-v0
         python -m tests.test_env.test_textarena --env_name ta:Minesweeper-v0
     """

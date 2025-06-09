@@ -1,5 +1,7 @@
 """Debugging utils."""
 
+from pprint import pprint
+
 import numpy as np
 
 
@@ -11,29 +13,33 @@ def run_and_print_episode(env, policy, ignore_done: bool = False, max_steps: int
         step_count += 1
         action = policy(obs)
         next_obs, reward, terminated, truncated, _ = env.step(action)
-        done = terminated | truncated
 
-        print(terminated, truncated)
-        if isinstance(done, np.ndarray):
-            done = done.all()
+        print("=" * 30)
         print(
             "-" * 10,
             "observation",
             "-" * 10,
         )
-        print(obs)
+        pprint(obs)
         print(
             "-" * 10,
             "action",
             "-" * 10,
         )
-        print(action)
+        pprint(action)
         print(
             "-" * 10,
             "reward",
             "-" * 10,
         )
-        print(reward)
+        pprint(reward)
+
+        done = terminated | truncated
+
+        print("terminated: ", terminated, "truncated: ", truncated)
+        if isinstance(done, np.ndarray):
+            done = done.all()
+
         print("=" * 30)
         obs = next_obs
 

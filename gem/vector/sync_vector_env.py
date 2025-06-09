@@ -1,5 +1,7 @@
-"""Vectorized environments for parallel data generation."""
+"""Synchronous (for loop) vectorized environment execution."""
 
+from copy import deepcopy
+from enum import Enum
 from typing import Any, Callable, Optional, Sequence, Tuple, TypeVar, Union
 
 import numpy as np
@@ -9,14 +11,26 @@ from gem.core import ActType, Env, ObsType
 ArrayType = TypeVar("ArrayType")
 
 
-class SyncVectorEnv(Env):
-    """Defaults to SAME_STEP AutoresetMode, see https://farama.org/Vector-Autoreset-Mode."""
+class AutoresetMode(Enum):
+    """Enum representing the different autoreset modes, next step and same step."""
 
-    def __init__(self, env_fns: Sequence[Callable[[], Env]]) -> None:
+    NEXT_STEP = "NextStep"
+    SAME_STEP = "SameStep"
+
+
+class SyncVectorEnv(Env):
+    """Defaults to NEXT_STEP AutoresetMode, see https://farama.org/Vector-Autoreset-Mode."""
+
+    def __init__(
+        self,
+        env_fns: Sequence[Callable[[], Env]],
+        autoreset_mode: Union[str, AutoresetMode] = AutoresetMode.SAME_STEP,
+    ) -> None:
         super().__init__()
         self.env_fns = env_fns
         self.envs = [env_fn() for env_fn in env_fns]
         self.num_envs = len(env_fns)
+        self.autoreset_mode = autoreset_mode
 
         # Initialize attributes used in `step` and `reset`
         self._env_obs = [None for _ in range(self.num_envs)]
@@ -24,6 +38,7 @@ class SyncVectorEnv(Env):
         self._rewards = np.zeros((self.num_envs,), dtype=np.float64)
         self._terminations = np.zeros((self.num_envs,), dtype=np.bool_)
         self._truncations = np.zeros((self.num_envs,), dtype=np.bool_)
+        self._autoreset_envs = np.zeros((self.num_envs,), dtype=np.bool_)
 
     def step(self, actions: Sequence[ActType]) -> Tuple[
         Sequence[ObsType],
@@ -33,21 +48,40 @@ class SyncVectorEnv(Env):
         dict[str, Any],
     ]:
         for i, action in enumerate(actions):
-            (
-                self._env_obs[i],
-                self._rewards[i],
-                self._terminations[i],
-                self._truncations[i],
-                env_info,
-            ) = self.envs[i].step(action)
+            if self.autoreset_mode == AutoresetMode.NEXT_STEP:
+                if self._autoreset_envs[i]:
+                    self._env_obs[i], env_info = self.envs[i].reset()
+                    self._rewards[i] = 0.0
+                    self._terminations[i] = False
+                    self._truncations[i] = False
+                else:
+                    (
+                        self._env_obs[i],
+                        self._rewards[i],
+                        self._terminations[i],
+                        self._truncations[i],
+                        env_info,
+                    ) = self.envs[i].step(action)
+            elif self.autoreset_mode == AutoresetMode.SAME_STEP:
+                (
+                    self._env_obs[i],
+                    self._rewards[i],
+                    self._terminations[i],
+                    self._truncations[i],
+                    env_info,
+                ) = self.envs[i].step(action)
 
-            if self._terminations[i] or self._truncations[i]:
-                self._env_obs[i], env_info = self.envs[i].reset()
+                if self._terminations[i] or self._truncations[i]:
+                    self._env_obs[i], env_info = self.envs[i].reset()
+            else:
+                raise ValueError
 
             del env_info
 
+        self._autoreset_envs = np.logical_or(self._terminations, self._truncations)
+
         return (
-            self._env_obs,
+            deepcopy(self._env_obs),
             np.copy(self._rewards),
             np.copy(self._terminations),
             np.copy(self._truncations),
@@ -69,4 +103,6 @@ class SyncVectorEnv(Env):
             self._env_obs[i], env_info = env.reset(seed=single_seed)
             del env_info  # TODO: Ignore info for now, because most envs do not need extra info.
 
-        return self._env_obs, {}
+        self._autoreset_envs = np.zeros((self.num_envs,), dtype=np.bool_)
+
+        return deepcopy(self._env_obs), {}

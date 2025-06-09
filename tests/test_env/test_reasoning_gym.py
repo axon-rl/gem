@@ -1,10 +1,11 @@
+import fire
 import reasoning_gym
 
 import gem
 from gem.utils.debug import run_and_print_episode
 
 
-def test():
+def test(env_name: str = "rg:leg_counting"):
     data = reasoning_gym.create_dataset("leg_counting", size=5, seed=42)
 
     for i, x in enumerate(data):
@@ -26,7 +27,7 @@ def test():
     num_envs = 8
     base_seed = 42
     rg_vec_env = gem.make_vec(
-        "rg:leg_counting",
+        env_name,
         num_envs=num_envs,
         vec_kwargs=[{"seed": base_seed + i} for i in range(num_envs)],
         size=int(1e9),
@@ -37,4 +38,8 @@ def test():
 
 
 if __name__ == "__main__":
-    test()
+    fire.Fire(test)
+
+    """Run with:
+        python -m tests.test_env.test_reasoning_gym --env_name rg:leg_counting
+    """
