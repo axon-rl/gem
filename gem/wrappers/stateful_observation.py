@@ -16,9 +16,9 @@ def maybe_add_new_line(text: str):
 class ConcatenatedObservation(ObservationWrapper):
     def __init__(self, env: MultiTurnEnv, max_history_length: Optional[int] = None):
         super().__init__(env)
-        assert hasattr(env, "get_task_prefix" and "get_task_suffix"), (
-            "The environment must implement get_task_prefix and get_task_suffix methods."
-        )
+        assert hasattr(
+            env, "get_task_prefix" and "get_task_suffix"
+        ), "The environment must implement get_task_prefix and get_task_suffix methods."
         self.env = env
         self.max_history_length = max_history_length
         self.obs_queue = deque(maxlen=max_history_length)

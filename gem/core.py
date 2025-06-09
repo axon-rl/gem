@@ -60,7 +60,9 @@ class EnvWrapper(Env, abc.ABC):
             if not attr.startswith("_") and not hasattr(self, attr):
                 setattr(self, attr, getattr(env, attr))
 
+
 WrapperObsType = TypeVar("WrapperObsType")
+
 
 class ObservationWrapper(EnvWrapper):
     def __init__(self, env: Env):
@@ -89,5 +91,3 @@ class ObservationWrapper(EnvWrapper):
         """
         del obs
         raise NotImplementedError
-
-

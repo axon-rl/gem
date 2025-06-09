@@ -1,8 +1,8 @@
 """Mastermind game environment"""
 
 import random
-from typing import Any, Optional, Tuple, List
 import re
+from typing import Any, List, Optional, Tuple
 
 from gem.envs.multi_turn import MultiTurnEnv
 from gem.utils.constants import TERMINAL_STATE
@@ -60,7 +60,11 @@ class MastermindEnv(MultiTurnEnv):
         matches = list(action_search_pattern.finditer(action))
         clean_action = matches[-1] if matches else None
         try:
-            player_guess = list(map(int, clean_action.group(1).split())) if clean_action is not None else None
+            player_guess = (
+                list(map(int, clean_action.group(1).split()))
+                if clean_action is not None
+                else None
+            )
         except Exception:
             player_guess = None
 
@@ -69,7 +73,11 @@ class MastermindEnv(MultiTurnEnv):
         else:
             length_correct, black_pegs, white_pegs = self._evaluate_guess(player_guess)
             if self.turn_count >= self.max_turns:
-                reward = -1 if not length_correct else (black_pegs + 0.5 * white_pegs) / self.code_length
+                reward = (
+                    -1
+                    if not length_correct
+                    else (black_pegs + 0.5 * white_pegs) / self.code_length
+                )
                 return TERMINAL_STATE, reward, True, True, {}
 
             if len(player_guess) != self.code_length:
@@ -92,11 +100,17 @@ class MastermindEnv(MultiTurnEnv):
         return next_obs, reward, terminated, truncated, {}
 
     def sample_random_action(self):
-        return "\\boxed{" + " ".join(map(str, random.sample(range(1, self.num_numbers + 1), self.code_length))) + "}"
+        return (
+            "\\boxed{"
+            + " ".join(
+                map(
+                    str, random.sample(range(1, self.num_numbers + 1), self.code_length)
+                )
+            )
+            + "}"
+        )
 
-    def _evaluate_guess(
-        self, player_guess: List[int]
-    ) -> Tuple[int, int]:
+    def _evaluate_guess(self, player_guess: List[int]) -> Tuple[int, int]:
         """
         Evaluates the player's guess and returns the number of black and white pegs.
         Black peg: correct digit in the correct position.

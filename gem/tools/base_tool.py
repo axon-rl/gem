@@ -1,11 +1,9 @@
-from concurrent.futures import ThreadPoolExecutor
-from tqdm import tqdm
-
 class BaseTool:
     tool_type = "base"
+
     def __init__(self, num_workers=1):
         self.num_workers = num_workers
-    
+
     def execute_action(self, action):
         """
         Execute the action on the environment and return the observation.
@@ -16,4 +14,3 @@ class BaseTool:
             valid: Whether the action is valid
         """
         raise NotImplementedError("Subclass must implement this method")
-        

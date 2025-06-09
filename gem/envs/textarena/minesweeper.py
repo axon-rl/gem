@@ -1,17 +1,21 @@
 """Mine Sweeper game environment."""
 
 import random
-from typing import Any, Optional, Tuple
 import re
-import numpy as np
 from collections import deque
+from typing import Any, Optional, Tuple
+
+import numpy as np
 
 from gem.envs.multi_turn import MultiTurnEnv
 from gem.utils.constants import TERMINAL_STATE
 
+
 class MinesweeperEnv(MultiTurnEnv):
 
-    def __init__(self, rows: int = 8, cols: int = 8, num_mines: int = 10, max_turns: int = 20):
+    def __init__(
+        self, rows: int = 8, cols: int = 8, num_mines: int = 10, max_turns: int = 20
+    ):
         super().__init__()
         self.rows = rows
         self.cols = cols
@@ -58,7 +62,9 @@ class MinesweeperEnv(MultiTurnEnv):
     def step(self, action: str) -> Tuple[str, float, bool, bool, dict[str, Any]]:
         self.turn_count += 1
 
-        action_search_pattern = re.compile(r"\\boxed{([a-zA-Z]+)\s(\d+)\s(\d+)}") # e.g. \\boxed{reveal 3 2}
+        action_search_pattern = re.compile(
+            r"\\boxed{([a-zA-Z]+)\s(\d+)\s(\d+)}"
+        )  # e.g. \\boxed{reveal 3 2}
         matches = list(action_search_pattern.finditer(action))
         clean_action = matches[-1] if matches else None
         try:
@@ -75,7 +81,7 @@ class MinesweeperEnv(MultiTurnEnv):
                 num_revealed = np.sum(self.revealed)
                 reward = num_revealed / (self.rows * self.cols - self.num_mines)
                 return TERMINAL_STATE, reward, True, True, {}
-            
+
             if not (0 <= row < self.rows and 0 <= col < self.cols):
                 next_obs = f"At turn {self.turn_count}, you chose cell ({row}, {col}), which is outside the bounds of the grid."
                 reward, terminated, truncated = -0.1, False, False
@@ -110,7 +116,7 @@ class MinesweeperEnv(MultiTurnEnv):
                     next_obs = f"At turn {self.turn_count}, you chose to flag cell ({row}, {col}), which has already been revealed."
                     reward, terminated, truncated = -0.1, False, False
                 else:
-                    self.flags[row][col] = not self.flags[row][col] # Toggle flag
+                    self.flags[row][col] = not self.flags[row][col]  # Toggle flag
                     next_obs = (
                         f"At turn {self.turn_count}, you "
                         f"{'added' if self.flags[row][col] else 'removed'} "
@@ -175,15 +181,16 @@ class MinesweeperEnv(MultiTurnEnv):
                 self.grid[r][c] = mine_count
 
     def _update_grid(self, row: int, col: int):
-        queue = deque([(row, col)]) # Start with the initial cell in the queue
-        self.revealed[row][col] = True # Mark the initial cell as revealed immediately
+        queue = deque([(row, col)])  # Start with the initial cell in the queue
+        self.revealed[row][col] = True  # Mark the initial cell as revealed immediately
 
         while queue:
             current_row, current_col = queue.popleft()
 
             # Check it's not a mine
-            assert self.grid[current_row][current_col] != -1, (
-                f"Env error: Hit mine at ({current_row}, {current_col}) - this should not happen.")
+            assert (
+                self.grid[current_row][current_col] != -1
+            ), f"Env error: Hit mine at ({current_row}, {current_col}) - this should not happen."
 
             # If the cell has no adjacent mines, add its neighbors to the queue
             if self.grid[current_row][current_col] == 0:
@@ -202,17 +209,14 @@ class MinesweeperEnv(MultiTurnEnv):
                         current_col + dc,
                     )
                     # Only add to the queue if within bounds and not revealed or flagged
-                    if (
-                        0 <= neighbor_row < self.rows
-                        and 0 <= neighbor_col < self.cols
-                    ):
+                    if 0 <= neighbor_row < self.rows and 0 <= neighbor_col < self.cols:
                         if (
                             not self.revealed[neighbor_row][neighbor_col]
                             and not self.flags[neighbor_row][neighbor_col]
                         ):
-                            self.revealed[neighbor_row][neighbor_col] = (
-                                True  # Mark as revealed when adding to queue
-                            )
+                            self.revealed[neighbor_row][
+                                neighbor_col
+                            ] = True  # Mark as revealed when adding to queue
                             queue.append((neighbor_row, neighbor_col))
 
     def _is_solved(self) -> bool:
@@ -254,6 +258,3 @@ class MinesweeperEnv(MultiTurnEnv):
                         row_str += " . "
             board_str += row_str + "\n"
         return board_str
-
-    
-

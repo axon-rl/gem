@@ -1,5 +1,5 @@
-from transformers import AutoTokenizer
 import fire
+from transformers import AutoTokenizer
 
 import gem
 from gem.envs.multi_turn import MultiTurnEnv
@@ -48,4 +48,3 @@ if __name__ == "__main__":
         python -m tests.test_env.test_textarena --env_name ta:Mastermind-v0
         python -m tests.test_env.test_textarena --env_name ta:Minesweeper-v0
     """
-

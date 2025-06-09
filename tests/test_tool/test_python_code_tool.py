@@ -1,29 +1,30 @@
 #!/usr/bin/env python
 
 # Adapted from https://github.com/TIGER-AI-Lab/verl-tool
-import json
-import requests
-import fire
 import logging
-import sys
 import os
 import random
+import sys
 
+import fire
 from transformers import AutoTokenizer
 
 import gem
 from gem.envs.multi_turn import MultiTurnEnv
 from gem.utils.debug import run_and_print_episode
-from gem.wrappers.stateful_observation import ChatTemplatedObservation, ConcatenatedObservation
+from gem.wrappers.stateful_observation import (ChatTemplatedObservation,
+                                               ConcatenatedObservation)
 
 # Add parent directory to path to import PistonTool
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from gem.envs.textarena.guess_the_number import GuessTheNumberEnv
-from gem.tools.tool_env_wrapper import ToolEnvWrapper
 from gem.tools.python_code_tool import PythonCodeTool
+from gem.tools.tool_env_wrapper import ToolEnvWrapper
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
 logger = logging.getLogger(__name__)
 
 TEST_ACTIONS = [
@@ -34,6 +35,7 @@ TEST_ACTIONS = [
     """```<python>import time\ntime.sleep(30)\nprint('Hello from Python!')</python> ... <python>print('Hello again!')</python>``` ...""",
     """```<python>prnit('Hello from Python!')</python> ...""",
 ]
+
 
 def test_single_action():
     env = GuessTheNumberEnv()
@@ -49,6 +51,7 @@ def test_single_action():
         print(f"Terminated: {terminated}")
         print(f"Truncated: {truncated}")
         print(f"Info: {info}\n")
+
 
 def test_episode():
     env: MultiTurnEnv = gem.make("ta:GuessTheNumber-v0", max_turns=3)
@@ -77,10 +80,13 @@ def main():
         python -m tests.test_tool.test_python_code_tool single_action
         python -m tests.test_tool.test_python_code_tool episode
     """
-    fire.Fire({
-        "single_action": test_single_action,
-        "episode": test_episode,
-    })
+    fire.Fire(
+        {
+            "single_action": test_single_action,
+            "episode": test_episode,
+        }
+    )
+
 
 if __name__ == "__main__":
     main()
