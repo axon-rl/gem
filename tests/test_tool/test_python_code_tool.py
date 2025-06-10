@@ -21,7 +21,6 @@ from gem.wrappers.stateful_observation import (ChatTemplatedObservation,
 # Add parent directory to path to import PistonTool
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from gem.envs.textarena.guess_the_number import GuessTheNumberEnv
 from gem.tools.python_code_tool import PythonCodeTool
 from gem.tools.tool_env_wrapper import ToolEnvWrapper
 
@@ -78,9 +77,7 @@ def test_episode(env_name: str = "ta:GuessTheNumber-v0"):
 
     print("\n" * 5, "BATCH EPISODE: SYNC VECTORIZED ENV")
     num_envs = 3
-    tool_env_wrapper = partial(
-        ToolEnvWrapper, tools=[tool], max_tool_uses=3
-    )
+    tool_env_wrapper = partial(ToolEnvWrapper, tools=[tool], max_tool_uses=3)
     ta_vec_env = gem.make_vec(
         env_name,
         num_envs=num_envs,
@@ -110,7 +107,10 @@ def test_episode(env_name: str = "ta:GuessTheNumber-v0"):
         max_steps=5,
     )
 
-def test_llm_episode(env_name: str = "ta:GuessTheNumber-v0", model_name: str = "Qwen/Qwen3-0.6B-Base"):
+
+def test_llm_episode(
+    env_name: str = "ta:GuessTheNumber-v0", model_name: str = "Qwen/Qwen3-0.6B-Base"
+):
     """Test episode with LLM observation and Python code tool."""
     env: MultiTurnEnv = gem.make(env_name, max_turns=3)
     llm = LLM(
@@ -122,8 +122,11 @@ def test_llm_episode(env_name: str = "ta:GuessTheNumber-v0", model_name: str = "
         max_tokens=100,
         top_p=0.95,
     )
+
     def policy(obs):
-        assert isinstance(obs, str), f"Observation should be a string but is {type(obs)}."
+        assert isinstance(
+            obs, str
+        ), f"Observation should be a string but is {type(obs)}."
         response = llm.generate(
             [obs],
             sampling_params=sampling_params,
@@ -134,9 +137,11 @@ def test_llm_episode(env_name: str = "ta:GuessTheNumber-v0", model_name: str = "
         action = response[0].outputs[0].text
         print(f"LLM ACTION: {action!r}")
         return action
-    
+
     def batch_policy(obss):
-        assert isinstance(obss, List), f"Observation should be a string but is {type(obss)}."
+        assert isinstance(
+            obss, List
+        ), f"Observation should be a string but is {type(obss)}."
         response = llm.generate(
             obss,
             sampling_params=sampling_params,
@@ -147,7 +152,7 @@ def test_llm_episode(env_name: str = "ta:GuessTheNumber-v0", model_name: str = "
         actions = [r.outputs[0].text for r in response]
         print(f"LLM ACTION: {actions!r}")
         return actions
-    
+
     tool = PythonCodeTool()
 
     print("\n" * 5, "EPISODE 1: DEFAULT OBSERVATION")
@@ -167,9 +172,7 @@ def test_llm_episode(env_name: str = "ta:GuessTheNumber-v0", model_name: str = "
 
     print("\n" * 5, "BATCH EPISODE: SYNC VECTORIZED ENV")
     num_envs = 3
-    tool_env_wrapper = partial(
-        ToolEnvWrapper, tools=[tool], max_tool_uses=3
-    )
+    tool_env_wrapper = partial(ToolEnvWrapper, tools=[tool], max_tool_uses=3)
     ta_vec_env = gem.make_vec(
         env_name,
         num_envs=num_envs,
@@ -186,9 +189,9 @@ def test_llm_episode(env_name: str = "ta:GuessTheNumber-v0", model_name: str = "
 
 def main():
     """Run with:
-        python -m tests.test_tool.test_python_code_tool single_action --env_name ta:GuessTheNumber-v0
-        python -m tests.test_tool.test_python_code_tool episode --env_name ta:GuessTheNumber-v0
-        python -m tests.test_tool.test_python_code_tool llm_episode --env_name ta:GuessTheNumber-v0 --model_name Qwen/Qwen3-0.6B-Base
+    python -m tests.test_tool.test_python_code_tool single_action --env_name ta:GuessTheNumber-v0
+    python -m tests.test_tool.test_python_code_tool episode --env_name ta:GuessTheNumber-v0
+    python -m tests.test_tool.test_python_code_tool llm_episode --env_name ta:GuessTheNumber-v0 --model_name Qwen/Qwen3-0.6B-Base
     """
     fire.Fire(
         {

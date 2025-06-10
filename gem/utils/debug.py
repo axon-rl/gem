@@ -1,10 +1,9 @@
 """Debugging utils."""
 
+import time
 from pprint import pprint
 
 import numpy as np
-import time
-import asyncio
 
 
 def run_and_print_episode(env, policy, ignore_done: bool = False, max_steps: int = 1e9):
@@ -54,7 +53,9 @@ def run_and_print_episode(env, policy, ignore_done: bool = False, max_steps: int
     print(f"----TIME: {time.time() - start_time:.2f} seconds")
 
 
-async def run_and_print_episode_async(env, policy, ignore_done: bool = False, max_steps: int = 1e9):
+async def run_and_print_episode_async(
+    env, policy, ignore_done: bool = False, max_steps: int = 1e9
+):
     start_time = time.time()
     obs, _ = await env.reset()
     done = False

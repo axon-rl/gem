@@ -1,28 +1,24 @@
 #!/usr/bin/env python
 
 # Adapted from https://github.com/TIGER-AI-Lab/verl-tool
+import asyncio
 import logging
 import os
 import random
 import sys
 from functools import partial
 from typing import List
-import asyncio
-import fire
 
-from transformers import AutoTokenizer
+import fire
 from vllm import LLM, SamplingParams
 
 import gem
-from gem.envs.multi_turn import MultiTurnEnv
 from gem.utils.debug import run_and_print_episode_async
-from gem.wrappers.stateful_observation import (ChatTemplatedObservation,
-                                               ConcatenatedObservation)
+from gem.wrappers.stateful_observation import ConcatenatedObservation
 
 # Add parent directory to path to import PistonTool
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from gem.envs.textarena.guess_the_number import GuessTheNumberEnv
 from gem.tools.python_code_tool import PythonCodeTool
 from gem.tools.tool_env_wrapper import ToolEnvWrapper
 
@@ -43,9 +39,7 @@ TEST_ACTIONS = [
 
 async def test_episode(env_name: str = "ta:GuessTheNumber-v0"):
     tool = PythonCodeTool()
-    tool_env_wrapper = partial(
-        ToolEnvWrapper, tools=[tool], max_tool_uses=3
-    )
+    tool_env_wrapper = partial(ToolEnvWrapper, tools=[tool], max_tool_uses=3)
 
     print("\n" * 5, "BATCH EPISODE: ASYNC VECTORIZED ENV")
     num_envs = 3
@@ -63,7 +57,10 @@ async def test_episode(env_name: str = "ta:GuessTheNumber-v0"):
         max_steps=5,
     )
 
-async def test_llm_episode(env_name: str = "ta:GuessTheNumber-v0", model_name: str = "Qwen/Qwen3-0.6B-Base"):
+
+async def test_llm_episode(
+    env_name: str = "ta:GuessTheNumber-v0", model_name: str = "Qwen/Qwen3-0.6B-Base"
+):
     """Test episode with LLM observation and Python code tool."""
     llm = LLM(
         model=model_name,
@@ -74,8 +71,11 @@ async def test_llm_episode(env_name: str = "ta:GuessTheNumber-v0", model_name: s
         max_tokens=100,
         top_p=0.95,
     )
+
     def batch_policy(obss):
-        assert isinstance(obss, List), f"Observation should be a string but is {type(obss)}."
+        assert isinstance(
+            obss, List
+        ), f"Observation should be a string but is {type(obss)}."
         response = llm.generate(
             obss,
             sampling_params=sampling_params,
@@ -86,11 +86,9 @@ async def test_llm_episode(env_name: str = "ta:GuessTheNumber-v0", model_name: s
         actions = [r.outputs[0].text for r in response]
         print(f"LLM ACTION: {actions!r}")
         return actions
-    
+
     tool = PythonCodeTool()
-    tool_env_wrapper = partial(
-        ToolEnvWrapper, tools=[tool], max_tool_uses=3
-    )
+    tool_env_wrapper = partial(ToolEnvWrapper, tools=[tool], max_tool_uses=3)
     print("\n" * 5, "BATCH EPISODE: ASYNC VECTORIZED ENV")
     num_envs = 3
     ta_vec_env = gem.make_vec(
@@ -110,9 +108,10 @@ async def test_llm_episode(env_name: str = "ta:GuessTheNumber-v0", model_name: s
 
 def main():
     """Run with:
-        python -m tests.test_tool.test_async episode --env_name ta:GuessTheNumber-v0
-        python -m tests.test_tool.test_async llm_episode --env_name ta:GuessTheNumber-v0 --model_name Qwen/Qwen3-0.6B-Base
+    python -m tests.test_tool.test_async episode --env_name ta:GuessTheNumber-v0
+    python -m tests.test_tool.test_async llm_episode --env_name ta:GuessTheNumber-v0 --model_name Qwen/Qwen3-0.6B-Base
     """
+
     def run_test_episode(*args, **kwargs):
         asyncio.run(test_episode(*args, **kwargs))
 
