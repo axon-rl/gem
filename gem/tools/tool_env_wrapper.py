@@ -24,7 +24,7 @@ class ToolEnvWrapper(EnvWrapper):
         return self.env.reset(seed=seed)
 
     def step(
-        self, action: str, verbose: bool = True
+        self, action: str, verbose: bool = False
     ) -> Tuple[str, SupportsFloat, bool, bool, dict[str, Any]]:
         # try to execute the action with each tool
         for tool in self.tools:

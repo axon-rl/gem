@@ -185,8 +185,7 @@ def test_llm_episode(env_name: str = "ta:GuessTheNumber-v0", model_name: str = "
 
 
 def main():
-    """Main entry point for the test script
-    Run with:
+    """Run with:
         python -m tests.test_tool.test_python_code_tool single_action --env_name ta:GuessTheNumber-v0
         python -m tests.test_tool.test_python_code_tool episode --env_name ta:GuessTheNumber-v0
         python -m tests.test_tool.test_python_code_tool llm_episode --env_name ta:GuessTheNumber-v0 --model_name Qwen/Qwen3-0.6B-Base

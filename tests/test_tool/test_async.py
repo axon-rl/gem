@@ -65,7 +65,6 @@ async def test_episode(env_name: str = "ta:GuessTheNumber-v0"):
 
 async def test_llm_episode(env_name: str = "ta:GuessTheNumber-v0", model_name: str = "Qwen/Qwen3-0.6B-Base"):
     """Test episode with LLM observation and Python code tool."""
-    env: MultiTurnEnv = gem.make(env_name, max_turns=3)
     llm = LLM(
         model=model_name,
     )
@@ -110,8 +109,7 @@ async def test_llm_episode(env_name: str = "ta:GuessTheNumber-v0", model_name: s
 
 
 def main():
-    """Main entry point for the test script
-    Run with:
+    """Run with:
         python -m tests.test_tool.test_async episode --env_name ta:GuessTheNumber-v0
         python -m tests.test_tool.test_async llm_episode --env_name ta:GuessTheNumber-v0 --model_name Qwen/Qwen3-0.6B-Base
     """
