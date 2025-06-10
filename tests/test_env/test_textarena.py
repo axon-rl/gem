@@ -25,7 +25,7 @@ def test(env_name: str = "ta:GuessTheNumber-v0"):
     run_and_print_episode(wrapped_env, policy)
 
     print("\n" * 5, "BATCH EPISODE: VECTORIZED ENV")
-    num_envs = 2
+    num_envs = 3
     ta_vec_env = gem.make_vec(
         env_name,
         num_envs=num_envs,
