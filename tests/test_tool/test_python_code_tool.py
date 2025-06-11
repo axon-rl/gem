@@ -19,7 +19,6 @@ from gem.wrappers.stateful_observation import (ChatTemplatedObservation,
 # Add parent directory to path to import PistonTool
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from gem.envs.textarena.guess_the_number import GuessTheNumberEnv
 from gem.tools.python_code_tool import PythonCodeTool
 from gem.tools.tool_env_wrapper import ToolEnvWrapper
 
@@ -76,9 +75,7 @@ def test_episode(env_name: str = "ta:GuessTheNumber-v0"):
 
     print("\n" * 5, "BATCH EPISODE: VECTORIZED ENV")
     num_envs = 3
-    tool_env_wrapper = partial(
-        ToolEnvWrapper, tools=[tool], max_tool_uses=3
-    )
+    tool_env_wrapper = partial(ToolEnvWrapper, tools=[tool], max_tool_uses=3)
     ta_vec_env = gem.make_vec(
         env_name,
         num_envs=num_envs,

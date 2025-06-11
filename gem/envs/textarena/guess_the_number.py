@@ -10,7 +10,9 @@ from gem.utils.parsing import extract_last_boxed_answer
 
 class GuessTheNumberEnv(MultiTurnEnv):
 
-    def __init__(self, min_number: int = 1, max_number: int = 20, max_turns: int = 20):
+    def __init__(
+        self, min_number: int = 1, max_number: int = 20, max_turns: int = 20, **_
+    ):
         super().__init__()
         self.min_number = min_number
         self.max_number = max_number
@@ -48,7 +50,7 @@ class GuessTheNumberEnv(MultiTurnEnv):
             player_guess = None
 
         if not player_guess:
-            return TERMINAL_STATE, -1, True, self.turn_count == self.max_turns, {}
+            return TERMINAL_STATE, -0.1, True, self.turn_count == self.max_turns, {}
         else:
             if self.turn_count >= self.max_turns:
                 distance = abs(player_guess - self.game_number)
@@ -57,10 +59,10 @@ class GuessTheNumberEnv(MultiTurnEnv):
 
             if player_guess < self.min_number or player_guess > self.max_number:
                 next_obs = f"At turn {self.turn_count}, you guessed {player_guess}, which is outside the range specified."
-                reward, terminated, truncated = -0.1, False, False
+                reward, terminated, truncated = -0.05, False, False
             elif player_guess in self.guessed_numbers:
                 next_obs = f"At turn {self.turn_count}, you guessed {player_guess}, which has been already guessed before."
-                reward, terminated, truncated = -0.1, False, False
+                reward, terminated, truncated = -0.05, False, False
             else:
                 self.guessed_numbers.add(player_guess)
                 if player_guess == self.game_number:
@@ -69,7 +71,7 @@ class GuessTheNumberEnv(MultiTurnEnv):
                 else:
                     hint = "lower" if player_guess > self.game_number else "higher"
                     next_obs = f"At turn {self.turn_count}, you guessed {player_guess}, and the target number is {hint} than {player_guess}."
-                    reward, terminated, truncated = 0.1, False, False
+                    reward, terminated, truncated = 0, False, False
         return next_obs, reward, terminated, truncated, {}
 
     def sample_random_action(self):

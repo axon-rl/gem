@@ -103,6 +103,8 @@ class SyncVectorEnv(Env):
             self._env_obs[i], env_info = env.reset(seed=single_seed)
             del env_info  # TODO: Ignore info for now, because most envs do not need extra info.
 
+        self._terminations = np.zeros((self.num_envs,), dtype=np.bool_)
+        self._truncations = np.zeros((self.num_envs,), dtype=np.bool_)
         self._autoreset_envs = np.zeros((self.num_envs,), dtype=np.bool_)
 
         return deepcopy(self._env_obs), {}
