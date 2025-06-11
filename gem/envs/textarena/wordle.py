@@ -4,6 +4,7 @@ import random
 import re
 from typing import Any, List, Optional, Tuple
 
+import nltk
 from nltk.corpus import words
 
 from gem.envs.multi_turn import MultiTurnEnv
@@ -21,6 +22,7 @@ class WordleEnv(MultiTurnEnv):
         max_turns: Optional[int] = 20,
     ):
         super().__init__()
+        nltk.download("words")
         self.word_length = word_length
         self.hardcore = hardcore
         self.only_real_words = only_real_words
