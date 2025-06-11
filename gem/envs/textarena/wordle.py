@@ -9,7 +9,6 @@ from nltk.corpus import words
 
 from gem.envs.multi_turn import MultiTurnEnv
 from gem.utils.constants import TERMINAL_STATE
-from gem.utils.parsing import extract_last_boxed_answer
 
 
 class WordleEnv(MultiTurnEnv):
@@ -28,7 +27,7 @@ class WordleEnv(MultiTurnEnv):
         self.only_real_words = only_real_words
         self.max_turns = max_turns
         self.is_random = word_length is None
-        self.all_words = words.words('en') if hardcore else words.words('en-basic')
+        self.all_words = words.words("en") if hardcore else words.words("en-basic")
         self.reset()
 
     def get_task_prefix(self) -> str:
@@ -52,7 +51,9 @@ class WordleEnv(MultiTurnEnv):
         if self.is_random:
             self.word_length = random.randint(3, 6)
         available_words = [
-            word for word in self.all_words if len(word) == self.word_length and word.isalpha() and word.islower()
+            word
+            for word in self.all_words
+            if len(word) == self.word_length and word.isalpha() and word.islower()
         ]
         self.secret_word = random.choice(available_words).upper()
         self.previous_guesses = set()
@@ -82,7 +83,8 @@ class WordleEnv(MultiTurnEnv):
                 reward = (
                     -0.1
                     if not length_correct
-                    else (feedback.count("G") + 0.5 * feedback.count("Y")) / self.word_length
+                    else (feedback.count("G") + 0.5 * feedback.count("Y"))
+                    / self.word_length
                 )
                 return TERMINAL_STATE, reward, True, True, {}
 
@@ -107,11 +109,9 @@ class WordleEnv(MultiTurnEnv):
                     reward, terminated, truncated = 0, False, False
         return next_obs, reward, terminated, truncated, {}
 
-    
     def sample_random_action(self):
         """Samples a random word"""
         return f"\\boxed{{{random.choice(self.all_words).upper()}}}"
-
 
     def _evaluate_guess(self, player_guess: str) -> List[str]:
         """Evaluates the player's guess against the secret word"""
