@@ -48,7 +48,7 @@ class MastermindEnv(MultiTurnEnv):
         available_numbers = list(range(1, self.num_numbers + 1))
         sample_fn = random.choices if self.duplicate_numbers else random.sample
         self.game_code = sample_fn(available_numbers, k=self.code_length)
-        self.guessed_numbers = set()
+        self.previous_guesses = set()
         self.turn_count = 0
         self.example_action = self.sample_random_action()
         return self.get_task_prefix() + self.get_task_suffix(), {}
@@ -69,12 +69,12 @@ class MastermindEnv(MultiTurnEnv):
             player_guess = None
 
         if not player_guess:
-            return TERMINAL_STATE, -1, True, self.turn_count == self.max_turns, {}
+            return TERMINAL_STATE, -0.1, True, self.turn_count == self.max_turns, {}
         else:
             length_correct, black_pegs, white_pegs = self._evaluate_guess(player_guess)
             if self.turn_count >= self.max_turns:
                 reward = (
-                    -1
+                    -0.1
                     if not length_correct
                     else (black_pegs + 0.5 * white_pegs) / self.code_length
                 )
@@ -82,21 +82,21 @@ class MastermindEnv(MultiTurnEnv):
 
             if len(player_guess) != self.code_length:
                 next_obs = f"At turn {self.turn_count}, you guessed {player_guess} which has {len(player_guess)} entires but the code has length {self.code_length}."
-                reward, terminated, truncated = -0.1, False, False
+                reward, terminated, truncated = -0.05, False, False
             elif any(num < 1 or num > self.num_numbers for num in player_guess):
                 next_obs = f"At turn {self.turn_count}, you guessed {player_guess}, which has numbers outside the range 1 to {self.num_numbers}."
-                reward, terminated, truncated = -0.1, False, False
-            elif tuple(player_guess) in self.guessed_numbers:
+                reward, terminated, truncated = -0.05, False, False
+            elif tuple(player_guess) in self.previous_guesses:
                 next_obs = f"At turn {self.turn_count}, you guessed {player_guess}, which has been already guessed before."
-                reward, terminated, truncated = -0.1, False, False
+                reward, terminated, truncated = -0.05, False, False
             else:
-                self.guessed_numbers.add(tuple(player_guess))
+                self.previous_guesses.add(tuple(player_guess))
                 if black_pegs == self.code_length:
                     next_obs = f"Congratulations! You guessed the correct code {self.game_code} in {self.turn_count} turns."
                     reward, terminated, truncated = 1, True, False
                 else:
                     next_obs = f"At turn {self.turn_count}, you guessed {player_guess}. This guess recieves {black_pegs} black peg(s) and {white_pegs} white peg(s)."
-                    reward, terminated, truncated = 0.1, False, False
+                    reward, terminated, truncated = 0, False, False
         return next_obs, reward, terminated, truncated, {}
 
     def sample_random_action(self):

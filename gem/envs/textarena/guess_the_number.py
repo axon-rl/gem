@@ -35,7 +35,7 @@ class GuessTheNumberEnv(MultiTurnEnv):
     def reset(self, seed: Optional[int] = None) -> Tuple[str, dict[str, Any]]:
         super().reset(seed)
         self.game_number = random.randint(self.min_number, self.max_number)
-        self.guessed_numbers = set()
+        self.previous_guesses = set()
         self.turn_count = 0
         self.example_action = self.sample_random_action()
         return self.get_task_prefix() + self.get_task_suffix(), {}
@@ -60,11 +60,11 @@ class GuessTheNumberEnv(MultiTurnEnv):
             if player_guess < self.min_number or player_guess > self.max_number:
                 next_obs = f"At turn {self.turn_count}, you guessed {player_guess}, which is outside the range specified."
                 reward, terminated, truncated = -0.05, False, False
-            elif player_guess in self.guessed_numbers:
+            elif player_guess in self.previous_guesses:
                 next_obs = f"At turn {self.turn_count}, you guessed {player_guess}, which has been already guessed before."
                 reward, terminated, truncated = -0.05, False, False
             else:
-                self.guessed_numbers.add(player_guess)
+                self.previous_guesses.add(player_guess)
                 if player_guess == self.game_number:
                     next_obs = f"Congratulations! You guessed the correct number {self.game_number} in {self.turn_count} turns."
                     reward, terminated, truncated = 1, True, False

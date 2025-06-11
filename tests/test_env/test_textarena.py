@@ -48,4 +48,5 @@ if __name__ == "__main__":
         python -m tests.test_env.test_textarena --env_name ta:GuessTheNumber-v0-sanitycheck
         python -m tests.test_env.test_textarena --env_name ta:Mastermind-v0
         python -m tests.test_env.test_textarena --env_name ta:Minesweeper-v0
+        python -m tests.test_env.test_textarena --env_name ta:Wordle-v0
     """

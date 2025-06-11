@@ -82,6 +82,31 @@ register(
     num_mines=3,
     max_turns=10,
 )
+# Wordle
+register(
+    "ta:Wordle-v0",
+    "gem.envs.textarena.wordle:WordleEnv",
+    word_length=5,
+    hardcore=False,
+    only_real_words=True,
+    max_turns=8,
+)
+register(
+    "ta:Wordle-v0-random",
+    "gem.envs.textarena.wordle:WordleEnv",
+    word_length=None,
+    hardcore=False,
+    only_real_words=True,
+    max_turns=8,
+)
+register(
+    "ta:Wordle-v0-lenient",
+    "gem.envs.textarena.wordle:WordleEnv",
+    word_length=5,
+    hardcore=False,
+    only_real_words=False,
+    max_turns=8,
+)
 
 # # Register datasets from ReasoningGym
 # for name in rg.factory.DATASETS.keys():
