@@ -9,6 +9,7 @@ from gem import Env
 from gem.core import Wrapper
 from gem.vector.async_vector_env import AsyncVectorEnv
 from gem.vector.sync_vector_env import SyncVectorEnv
+from gem.vector.vector_env import VectorEnv
 
 
 @dataclass
@@ -74,7 +75,7 @@ def make_vec(
     vec_kwargs: Optional[Sequence[dict]] = None,
     async_mode: bool = False,
     **kwargs,
-) -> SyncVectorEnv:
+) -> VectorEnv:
     def create_single_env(idx: int) -> Env:
         if vec_kwargs is not None:
             _kwargs = vec_kwargs[idx]

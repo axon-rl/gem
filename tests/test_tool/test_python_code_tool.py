@@ -10,7 +10,6 @@ from typing import List
 
 import fire
 from transformers import AutoTokenizer
-from vllm import LLM, SamplingParams
 
 import gem
 from gem.envs.multi_turn import MultiTurnEnv
@@ -91,27 +90,29 @@ def test_episode(env_name: str = "ta:GuessTheNumber-v0"):
         max_steps=5,
     )
 
-    print("\n" * 5, "BATCH EPISODE 2: ASYNC VECTORIZED ENV")
-    num_envs = 3
-    ta_vec_env = gem.make_vec(
-        env_name,
-        num_envs=num_envs,
-        wrappers=[tool_env_wrapper, ConcatenatedObservation],
-        max_turns=3,
-        async_mode=True,
-    )
-    run_and_print_episode(
-        ta_vec_env,
-        policy=lambda _: [random.choice([TEST_ACTIONS[4]]) for _ in range(num_envs)],
-        ignore_done=True,
-        max_steps=5,
-    )
+    # print("\n" * 5, "BATCH EPISODE 2: ASYNC VECTORIZED ENV")
+    # num_envs = 3
+    # ta_vec_env = gem.make_vec(
+    #     env_name,
+    #     num_envs=num_envs,
+    #     wrappers=[tool_env_wrapper, ConcatenatedObservation],
+    #     max_turns=3,
+    #     async_mode=True,
+    # )
+    # run_and_print_episode(
+    #     ta_vec_env,
+    #     policy=lambda _: [random.choice([TEST_ACTIONS[4]]) for _ in range(num_envs)],
+    #     ignore_done=True,
+    #     max_steps=5,
+    # )
 
 
 def test_llm_episode(
     env_name: str = "ta:GuessTheNumber-v0", model_name: str = "Qwen/Qwen3-0.6B-Base"
 ):
     """Test episode with LLM observation and Python code tool."""
+    from vllm import LLM, SamplingParams
+
     env: MultiTurnEnv = gem.make(env_name, max_turns=3)
     llm = LLM(
         model=model_name,

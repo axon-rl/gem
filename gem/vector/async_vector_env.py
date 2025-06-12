@@ -1,34 +1,16 @@
+"""Asynchronous vectorized environment execution."""
+
 import asyncio
 from copy import deepcopy
-from typing import Any, Callable, Optional, Sequence, Tuple, Union
+from typing import Any, Optional, Sequence, Tuple, Union
 
 import numpy as np
 
-from gem.core import ActType, Env, ObsType
-from gem.vector.sync_vector_env import ArrayType, AutoresetMode
+from gem.core import ActType, ObsType
+from gem.vector.sync_vector_env import ArrayType, AutoresetMode, SyncVectorEnv
 
 
-class AsyncVectorEnv(Env):
-    """Asynchronous vectorized environment execution."""
-
-    def __init__(
-        self,
-        env_fns: Sequence[Callable[[], Env]],
-        autoreset_mode: Union[str, AutoresetMode] = AutoresetMode.SAME_STEP,
-    ) -> None:
-        super().__init__()
-        self.env_fns = env_fns
-        self.envs = [env_fn() for env_fn in env_fns]
-        self.num_envs = len(env_fns)
-        self.autoreset_mode = autoreset_mode
-
-        # Initialize attributes used in `step` and `reset`
-        self._env_obs = [None for _ in range(self.num_envs)]
-        self._observations = [None]
-        self._rewards = np.zeros((self.num_envs,), dtype=np.float64)
-        self._terminations = np.zeros((self.num_envs,), dtype=np.bool_)
-        self._truncations = np.zeros((self.num_envs,), dtype=np.bool_)
-        self._autoreset_envs = np.zeros((self.num_envs,), dtype=np.bool_)
+class AsyncVectorEnv(SyncVectorEnv):
 
     async def _execute_step_in_thread(
         self, env_idx: int, action: ActType

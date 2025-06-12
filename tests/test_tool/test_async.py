@@ -10,7 +10,6 @@ from functools import partial
 from typing import List
 
 import fire
-from vllm import LLM, SamplingParams
 
 import gem
 from gem.utils.debug import run_and_print_episode_async
@@ -62,6 +61,8 @@ async def test_llm_episode(
     env_name: str = "ta:GuessTheNumber-v0", model_name: str = "Qwen/Qwen3-0.6B-Base"
 ):
     """Test episode with LLM observation and Python code tool."""
+    from vllm import LLM, SamplingParams
+
     llm = LLM(
         model=model_name,
     )

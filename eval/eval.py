@@ -163,9 +163,9 @@ async def eval(
 
 if __name__ == "__main__":
     """Run with:
-    python -m gem.eval.eval --env_name ta:GuessTheNumber-v0 --model_name Qwen/Qwen3-0.6B --num_episodes 30 --batch_size 5 --print_episodes True
-    python -m gem.eval.eval --env_name ta:GuessTheNumber-v0 --model_name Qwen/Qwen3-0.6B --print_episodes True
-    python -m gem.eval.eval --env_name ta:GuessTheNumber-v0 --model_name GAIR/ToRL-1.5B --print_episodes True
+    python -m eval.eval --env_name ta:GuessTheNumber-v0 --model_name Qwen/Qwen3-0.6B --num_episodes 30 --batch_size 5 --print_episodes True
+    python -m eval.eval --env_name ta:GuessTheNumber-v0 --model_name Qwen/Qwen3-0.6B --print_episodes True
+    python -m eval.eval --env_name ta:GuessTheNumber-v0 --model_name GAIR/ToRL-1.5B --print_episodes True
     """
 
     def run_eval(*args, **kwargs):
