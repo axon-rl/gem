@@ -127,10 +127,6 @@ if __name__ == "__main__":
     print(f"{ans1} == {ans7}: {verify(ans1, ans7)}")  # >> False
 
     ans1 = parse("1")
-    # ans2 = parse(2)
+    # ans2 = parse(2) # >> `TypeError: expected string or bytes-like object`
     ans3 = parse("2k+2")
     ans4 = parse("\\frac9{19}")
-
-    print(
-        f"{ans1} == {ans2}: {verify(ans1, ans2)}"
-    )  # >> `TypeError: expected string or bytes-like object`
