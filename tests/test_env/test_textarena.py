@@ -1,5 +1,6 @@
-import fire
 from functools import partial
+
+import fire
 from transformers import AutoTokenizer
 
 import gem
@@ -39,7 +40,6 @@ def test(env_name: str = "ta:GuessTheNumber-v0"):
         ignore_done=True,
         max_steps=5,
     )
-
 
 
 if __name__ == "__main__":

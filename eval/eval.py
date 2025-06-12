@@ -2,13 +2,9 @@
 
 # Adapted from https://github.com/TIGER-AI-Lab/verl-tool
 import logging
-import os
-import sys
 import time
 from functools import partial
 from pprint import pprint
-from typing import List
-import random
 from typing import List, Optional
 
 import fire
@@ -16,10 +12,9 @@ import numpy as np
 from vllm import LLM, SamplingParams
 
 import gem
-from gem.wrappers.stateful_observation import ChatTemplatedObservation
-
 from gem.tools.python_code_tool import PythonCodeTool
 from gem.tools.tool_env_wrapper import ToolEnvWrapper
+from gem.wrappers.stateful_observation import ChatTemplatedObservation
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
@@ -33,12 +28,16 @@ TEST_ACTIONS = [
     """```<python>\nprint('Hello from Python!')</python> ... <python>print('Hello again!')</python>``` ...""",
     """```<python>import time\ntime.sleep(30)\nprint('Hello from Python!')</python> ... <python>print('Hello again!')</python>``` ...""",
     """```<python>prnit('Hello from Python!')</python> ...""",
-    "\\boxed{30}"
+    "\\boxed{30}",
 ]
 
 
 def collect_episodes(
-    env, policy, num_episodes: int = 10, print_episodes: bool = False, tool_wrapper_depth: Optional[int] = None
+    env,
+    policy,
+    num_episodes: int = 10,
+    print_episodes: bool = False,
+    tool_wrapper_depth: Optional[int] = None,
 ):
     num_envs = env.num_envs
     episode_count = 0
@@ -155,7 +154,9 @@ def eval(
     tool = PythonCodeTool(timeout=5)
     wrappers = []
     if enable_python_tool:
-        tool_env_wrapper = partial(ToolEnvWrapper, tools=[tool], max_tool_uses=max_tool_uses)
+        tool_env_wrapper = partial(
+            ToolEnvWrapper, tools=[tool], max_tool_uses=max_tool_uses
+        )
         wrappers.append(tool_env_wrapper)
     chat_wrapper = partial(ChatTemplatedObservation, tokenizer=llm.get_tokenizer())
     wrappers.append(chat_wrapper)

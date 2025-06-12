@@ -14,7 +14,12 @@ from gem.utils.constants import TERMINAL_STATE
 class MinesweeperEnv(Env):
 
     def __init__(
-        self, rows: int = 8, cols: int = 8, num_mines: int = 10, max_turns: int = 20, **_
+        self,
+        rows: int = 8,
+        cols: int = 8,
+        num_mines: int = 10,
+        max_turns: int = 20,
+        **_,
     ):
         super().__init__()
         self.rows = rows
@@ -24,8 +29,8 @@ class MinesweeperEnv(Env):
         self.reset()
 
     def _get_instructions(self) -> str:
-        example_reveal = self.sample_random_action(reveal_or_flag='reveal')
-        example_flag = self.sample_random_action(reveal_or_flag='flag')
+        example_reveal = self.sample_random_action(reveal_or_flag="reveal")
+        example_flag = self.sample_random_action(reveal_or_flag="flag")
         reveal_r = int(example_reveal.split(" ")[1])
         reveal_c = int(example_reveal.split(" ")[2].split("}")[0])
         flag_r = int(example_flag.split(" ")[1])

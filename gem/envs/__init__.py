@@ -110,6 +110,7 @@ register(
 
 # Register math dataset environments
 from datasets import load_dataset
+
 register(
     "math:MATH500-v0",
     "gem.envs.math_env:MathEnv",

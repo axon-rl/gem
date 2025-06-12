@@ -3,8 +3,7 @@
 from collections import deque
 from typing import Any, Optional, SupportsFloat, Tuple
 
-from gem.core import ObservationWrapper
-from gem.core import Env
+from gem.core import Env, ObservationWrapper
 
 
 def maybe_add_new_line(text: str):
@@ -18,7 +17,9 @@ class ConcatenatedObservation(ObservationWrapper):
         super().__init__(env)
         self.env = env
         self.max_history_length = max_history_length
-        self.obs_queue = deque(maxlen=max_history_length + 1 if max_history_length else None) 
+        self.obs_queue = deque(
+            maxlen=max_history_length + 1 if max_history_length else None
+        )
 
     def reset(self, seed: Optional[int] = None) -> Tuple[str, dict[str, Any]]:
         self.obs_queue.clear()
@@ -41,12 +42,12 @@ class ConcatenatedObservation(ObservationWrapper):
 
 
 class ChatTemplatedObservation(ObservationWrapper):
-    def __init__(
-        self, env: Env, tokenizer, max_history_length: Optional[int] = None
-    ):
+    def __init__(self, env: Env, tokenizer, max_history_length: Optional[int] = None):
         super().__init__(env)
         self.tokenizer = tokenizer
-        self.obs_queue = deque(maxlen=max_history_length + 1 if max_history_length else None) 
+        self.obs_queue = deque(
+            maxlen=max_history_length + 1 if max_history_length else None
+        )
         self.act_queue = deque(maxlen=max_history_length)
 
     def reset(self, seed: Optional[int] = None) -> Tuple[str, dict[str, Any]]:

@@ -2,9 +2,7 @@
 
 # Adapted from https://github.com/TIGER-AI-Lab/verl-tool
 import logging
-import os
 import random
-import sys
 from functools import partial
 from typing import List
 
@@ -12,11 +10,10 @@ import fire
 from transformers import AutoTokenizer
 
 import gem
-from gem.utils.debug import run_and_print_episode
-from gem.wrappers.stateful_observation import ChatTemplatedObservation
-
 from gem.tools.python_code_tool import PythonCodeTool
 from gem.tools.tool_env_wrapper import ToolEnvWrapper
+from gem.utils.debug import run_and_print_episode
+from gem.wrappers.stateful_observation import ChatTemplatedObservation
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
@@ -158,7 +155,6 @@ def test_llm_episode(
         ignore_done=True,
         max_steps=5,
     )
-
 
 
 if __name__ == "__main__":

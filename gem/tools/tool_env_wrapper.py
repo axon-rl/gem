@@ -30,7 +30,6 @@ class ToolEnvWrapper(EnvWrapper):
         obs = f"{obs}\n{tool_instructions}"
         return obs, info
 
-
     def step(
         self, action: str, verbose: bool = False
     ) -> Tuple[str, SupportsFloat, bool, bool, dict[str, Any]]:
@@ -61,5 +60,7 @@ class ToolEnvWrapper(EnvWrapper):
                 f"Tool {tool.tool_type} has reached its maximum usage limit of {self.max_tool_uses}. "
                 + observation
             )
-        print(f"Tool use counter: {self.tool_use_counter}, Max tool uses: {self.max_tool_uses}")
+        print(
+            f"Tool use counter: {self.tool_use_counter}, Max tool uses: {self.max_tool_uses}"
+        )
         return observation, reward, terminated, truncated, info

@@ -45,11 +45,9 @@ class Env(abc.ABC):
         if seed is not None:
             self._np_random, self._np_random_seed = seeding.np_random(seed)
 
-
     def sample_random_action(self) -> str:
         """Samples a random action given the current state."""
         raise NotImplementedError
-        
 
 
 class Wrapper(Env):

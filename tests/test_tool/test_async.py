@@ -3,9 +3,6 @@
 # Adapted from https://github.com/TIGER-AI-Lab/verl-tool
 import asyncio
 import logging
-import os
-import random
-import sys
 from functools import partial
 from typing import List
 
@@ -13,11 +10,10 @@ import fire
 from transformers import AutoTokenizer
 
 import gem
-from gem.utils.debug import run_and_print_episode_async
-from gem.wrappers.stateful_observation import ChatTemplatedObservation
-
 from gem.tools.python_code_tool import PythonCodeTool
 from gem.tools.tool_env_wrapper import ToolEnvWrapper
+from gem.utils.debug import run_and_print_episode_async
+from gem.wrappers.stateful_observation import ChatTemplatedObservation
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
@@ -42,7 +38,6 @@ async def test_episode(env_name: str = "ta:GuessTheNumber-v0"):
     tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen3-0.6B-Base")
     chat_wrapper = partial(ChatTemplatedObservation, tokenizer=tokenizer)
 
-
     print("\n" * 5, "BATCH EPISODE: ASYNC VECTORIZED ENV")
     num_envs = 3
     ta_vec_env = gem.make_vec(
@@ -58,7 +53,6 @@ async def test_episode(env_name: str = "ta:GuessTheNumber-v0"):
         ignore_done=True,
         max_steps=5,
     )
-
 
 
 async def test_llm_episode(
@@ -112,8 +106,8 @@ async def test_llm_episode(
     )
 
 
-
 if __name__ == "__main__":
+
     def run_test_episode(*args, **kwargs):
         asyncio.run(test_episode(*args, **kwargs))
 

@@ -5,6 +5,7 @@ from pprint import pprint
 
 import numpy as np
 
+
 def ppprint(x):
     if isinstance(x, (list, tuple)):
         for i, item in enumerate(x):

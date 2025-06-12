@@ -105,7 +105,7 @@ class WordleEnv(Env):
                     next_obs += " ".join(player_guess) + "\n"
                     next_obs += " ".join(feedback)
                     reward, terminated, truncated = 0, False, False
-        
+
         if not terminated:
             next_obs += "\nEnter your next guess."
         return next_obs, reward, terminated, truncated, {}
