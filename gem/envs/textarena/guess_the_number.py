@@ -53,8 +53,11 @@ class GuessTheNumberEnv(MultiTurnEnv):
             return TERMINAL_STATE, -0.1, True, self.turn_count == self.max_turns, {}
         else:
             if self.turn_count >= self.max_turns:
-                distance = abs(player_guess - self.game_number)
-                reward = 1 - (distance / (self.max_number - self.min_number))
+                if player_guess < self.min_number or player_guess > self.max_number:
+                    reward = -0.1
+                else:
+                    distance = abs(player_guess - self.game_number)
+                    reward = 1 - (distance / (self.max_number - self.min_number))
                 return TERMINAL_STATE, reward, True, True, {}
 
             if player_guess < self.min_number or player_guess > self.max_number:
