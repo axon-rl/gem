@@ -7,14 +7,14 @@ from typing import Any, Optional, Tuple
 
 import numpy as np
 
-from gem.envs.multi_turn import MultiTurnEnv
+from gem.core import Env
 from gem.utils.constants import TERMINAL_STATE
 
 
-class MinesweeperEnv(MultiTurnEnv):
+class MinesweeperEnv(Env):
 
     def __init__(
-        self, rows: int = 8, cols: int = 8, num_mines: int = 10, max_turns: int = 20
+        self, rows: int = 8, cols: int = 8, num_mines: int = 10, max_turns: int = 20, **_
     ):
         super().__init__()
         self.rows = rows
@@ -23,11 +23,13 @@ class MinesweeperEnv(MultiTurnEnv):
         self.max_turns = max_turns
         self.reset()
 
-    def get_task_prefix(self) -> str:
-        reveal_r = int(self.example_reveal.split(" ")[1])
-        reveal_c = int(self.example_reveal.split(" ")[2].split("}")[0])
-        flag_r = int(self.example_flag.split(" ")[1])
-        flag_c = int(self.example_flag.split(" ")[2].split("}")[0])
+    def _get_instructions(self) -> str:
+        example_reveal = self.sample_random_action(reveal_or_flag='reveal')
+        example_flag = self.sample_random_action(reveal_or_flag='flag')
+        reveal_r = int(example_reveal.split(" ")[1])
+        reveal_c = int(example_reveal.split(" ")[2].split("}")[0])
+        flag_r = int(example_flag.split(" ")[1])
+        flag_c = int(example_flag.split(" ")[2].split("}")[0])
         return (
             f"You are playing the Minesweeper game.\n"
             "The objective of the game is to reveal all cells that do not contain mines.\n"
@@ -36,17 +38,15 @@ class MinesweeperEnv(MultiTurnEnv):
             "- 'flag': Place or remove a flag on a specific cell to mark it as a potential mine.\n"
             "To submit your move, type the command followed by the row and column in \\boxed{}.\n"
             "For example:\n"
-            f"- {self.example_reveal} to reveal the cell in Row {reveal_r}, Column {reveal_c}.\n"
-            f"- {self.example_flag} to place or remove a flag on the cell in Row {flag_r}, Column {flag_c}.\n"
+            f"- {example_reveal} to reveal the cell in Row {reveal_r}, Column {reveal_c}.\n"
+            f"- {example_flag} to place or remove a flag on the cell in Row {flag_r}, Column {flag_c}.\n"
             "The current board layout is shown below. Cells that are unrevealed are represented by a dot ('.'), revealed numbers show the count of adjacent mines, and flagged cells are marked with an 'F'.\n"
             "Use logic and deduction to avoid revealing cells with mines!\n"
             "Be mindful not to choose revealed or flagged cells.\n"
             "Here is the current board layout:\n"
             f"{self._render_board(is_start=True)}\n"
+            "Enter your first guess to start the game.\n"
         )
-
-    def get_task_suffix(self) -> str:
-        return "Enter your guess."
 
     def reset(self, seed: Optional[int] = None) -> Tuple[str, dict[str, Any]]:
         super().reset(seed)
@@ -55,9 +55,7 @@ class MinesweeperEnv(MultiTurnEnv):
         self.flags = [[False for _ in range(self.cols)] for _ in range(self.rows)]
         self.first_reveal = True  # Track if it's the first move to ensure playability
         self.turn_count = 0
-        self.example_reveal = self.sample_random_action(reveal_or_flag="reveal")
-        self.example_flag = self.sample_random_action(reveal_or_flag="flag")
-        return self.get_task_prefix() + self.get_task_suffix(), {}
+        return self._get_instructions(), {}
 
     def step(self, action: str) -> Tuple[str, float, bool, bool, dict[str, Any]]:
         self.turn_count += 1
@@ -130,6 +128,8 @@ class MinesweeperEnv(MultiTurnEnv):
                 next_obs = f"At turn {self.turn_count}, you chose an invalid action '{action_type}'. Valid actions are 'reveal' or 'flag'."
                 reward, terminated, truncated = -0.1, False, False
 
+            if not terminated:
+                next_obs += "\nEnter your next guess."
             return next_obs, reward, terminated, truncated, {}
 
     def sample_random_action(self, reveal_or_flag=None) -> str:

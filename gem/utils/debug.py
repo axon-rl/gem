@@ -5,6 +5,15 @@ from pprint import pprint
 
 import numpy as np
 
+def ppprint(x):
+    if isinstance(x, (list, tuple)):
+        for i, item in enumerate(x):
+            print("-" * 5, f"{i+1}/{len(x)}:")
+            pprint(item)
+            print("")
+    else:
+        pprint(x)
+
 
 def run_and_print_episode(env, policy, ignore_done: bool = False, max_steps: int = 1e9):
     start_time = time.time()
@@ -17,24 +26,25 @@ def run_and_print_episode(env, policy, ignore_done: bool = False, max_steps: int
         next_obs, reward, terminated, truncated, _ = env.step(action)
 
         print("=" * 30)
+        print(f"Step {step_count}")
         print(
             "-" * 10,
             "observation",
             "-" * 10,
         )
-        pprint(obs)
+        ppprint(obs)
         print(
             "-" * 10,
             "action",
             "-" * 10,
         )
-        pprint(action)
+        ppprint(action)
         print(
             "-" * 10,
             "reward",
             "-" * 10,
         )
-        pprint(reward)
+        ppprint(reward)
 
         done = terminated | truncated
 
@@ -66,6 +76,7 @@ async def run_and_print_episode_async(
         next_obs, reward, terminated, truncated, _ = await env.step(action)
 
         print("=" * 30)
+        print(f"Step {step_count}")
         print(
             "-" * 10,
             "observation",

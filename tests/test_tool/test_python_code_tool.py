@@ -12,13 +12,8 @@ import fire
 from transformers import AutoTokenizer
 
 import gem
-from gem.envs.multi_turn import MultiTurnEnv
 from gem.utils.debug import run_and_print_episode
-from gem.wrappers.stateful_observation import (ChatTemplatedObservation,
-                                               ConcatenatedObservation)
-
-# Add parent directory to path to import PistonTool
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from gem.wrappers.stateful_observation import ChatTemplatedObservation
 
 from gem.tools.python_code_tool import PythonCodeTool
 from gem.tools.tool_env_wrapper import ToolEnvWrapper
@@ -37,10 +32,12 @@ TEST_ACTIONS = [
     """```<python>prnit('Hello from Python!')</python> ...""",
 ]
 
+SLEEP_ACTION = TEST_ACTIONS[4]  # Action that sleeps for 30 seconds
+
 
 def test_single_action(env_name: str = "ta:GuessTheNumber-v0"):
-    env: MultiTurnEnv = gem.make(env_name, max_turns=3)
-    tool = PythonCodeTool()
+    env = gem.make(env_name, max_turns=3)
+    tool = PythonCodeTool(timeout=2)
     env = ToolEnvWrapper(env, tools=[tool])
     obs, info = env.reset()
     for i, test_action in enumerate(TEST_ACTIONS):
@@ -55,20 +52,15 @@ def test_single_action(env_name: str = "ta:GuessTheNumber-v0"):
 
 
 def test_episode(env_name: str = "ta:GuessTheNumber-v0"):
-    env: MultiTurnEnv = gem.make(env_name, max_turns=3)
+    env = gem.make(env_name, max_turns=3)
     policy = lambda _: random.choice(TEST_ACTIONS)
-    tool = PythonCodeTool()
+    tool = PythonCodeTool(timeout=2)
 
-    print("\n" * 5, "EPISODE 1: DEFAULT OBSERVATION")
+    print("\n" * 5, "EPISODE: DEFAULT OBSERVATION")
     wrapped_env = ToolEnvWrapper(env, tools=[tool], max_tool_uses=3)
     run_and_print_episode(wrapped_env, policy)
 
-    print("\n" * 5, "EPISODE 2: CONCATENATED OBSERVATION")
-    wrapped_env = ToolEnvWrapper(env, tools=[tool], max_tool_uses=3)
-    wrapped_env = ConcatenatedObservation(wrapped_env)
-    run_and_print_episode(wrapped_env, policy)
-
-    print("\n" * 5, "EPISODE 3: CHAT TEMPLATE OBSERVATION")
+    print("\n" * 5, "EPISODE 2: CHAT TEMPLATE OBSERVATION")
     tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen3-0.6B-Base")
     wrapped_env = ToolEnvWrapper(env, tools=[tool], max_tool_uses=3)
     wrapped_env = ChatTemplatedObservation(wrapped_env, tokenizer)
@@ -77,34 +69,19 @@ def test_episode(env_name: str = "ta:GuessTheNumber-v0"):
     print("\n" * 5, "BATCH EPISODE: SYNC VECTORIZED ENV")
     num_envs = 3
     tool_env_wrapper = partial(ToolEnvWrapper, tools=[tool], max_tool_uses=3)
+    chat_wrapper = partial(ChatTemplatedObservation, tokenizer=tokenizer)
     ta_vec_env = gem.make_vec(
         env_name,
         num_envs=num_envs,
-        wrappers=[tool_env_wrapper, ConcatenatedObservation],
+        wrappers=[tool_env_wrapper, chat_wrapper],
         max_turns=3,
     )
     run_and_print_episode(
         ta_vec_env,
-        policy=lambda _: [random.choice([TEST_ACTIONS[4]]) for _ in range(num_envs)],
+        policy=lambda _: [SLEEP_ACTION for _ in range(num_envs)],
         ignore_done=True,
         max_steps=5,
     )
-
-    # print("\n" * 5, "BATCH EPISODE 2: ASYNC VECTORIZED ENV")
-    # num_envs = 3
-    # ta_vec_env = gem.make_vec(
-    #     env_name,
-    #     num_envs=num_envs,
-    #     wrappers=[tool_env_wrapper, ConcatenatedObservation],
-    #     max_turns=3,
-    #     async_mode=True,
-    # )
-    # run_and_print_episode(
-    #     ta_vec_env,
-    #     policy=lambda _: [random.choice([TEST_ACTIONS[4]]) for _ in range(num_envs)],
-    #     ignore_done=True,
-    #     max_steps=5,
-    # )
 
 
 def test_llm_episode(
@@ -113,7 +90,7 @@ def test_llm_episode(
     """Test episode with LLM observation and Python code tool."""
     from vllm import LLM, SamplingParams
 
-    env: MultiTurnEnv = gem.make(env_name, max_turns=3)
+    env = gem.make(env_name, max_turns=3)
     llm = LLM(
         model=model_name,
     )
@@ -133,10 +110,10 @@ def test_llm_episode(
             sampling_params=sampling_params,
             use_tqdm=False,
         )
-        print(f"LLM OBSERVATION: {obs!r}")
-        print(f"LLM RESPONSE: {response}")
+        # print(f"LLM OBSERVATION: {obs!r}")
+        # print(f"LLM RESPONSE: {response}")
         action = response[0].outputs[0].text
-        print(f"LLM ACTION: {action!r}")
+        # print(f"LLM ACTION: {action!r}")
         return action
 
     def batch_policy(obss):
@@ -154,30 +131,25 @@ def test_llm_episode(
         print(f"LLM ACTION: {actions!r}")
         return actions
 
-    tool = PythonCodeTool()
+    tool = PythonCodeTool(timeout=2)
 
-    print("\n" * 5, "EPISODE 1: DEFAULT OBSERVATION")
+    print("\n" * 5, "EPISODE: DEFAULT OBSERVATION")
     wrapped_env = ToolEnvWrapper(env, tools=[tool], max_tool_uses=3)
     run_and_print_episode(wrapped_env, policy)
 
-    print("\n" * 5, "EPISODE 2: CONCATENATED OBSERVATION")
+    print("\n" * 5, "EPISODE 2: CHAT TEMPLATE OBSERVATION")
     wrapped_env = ToolEnvWrapper(env, tools=[tool], max_tool_uses=3)
-    wrapped_env = ConcatenatedObservation(wrapped_env)
-    run_and_print_episode(wrapped_env, policy)
-
-    print("\n" * 5, "EPISODE 3: CHAT TEMPLATE OBSERVATION")
-    tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen3-0.6B-Base")
-    wrapped_env = ToolEnvWrapper(env, tools=[tool], max_tool_uses=3)
-    wrapped_env = ChatTemplatedObservation(wrapped_env, tokenizer)
+    wrapped_env = ChatTemplatedObservation(wrapped_env, tokenizer=llm.get_tokenizer())
     run_and_print_episode(wrapped_env, policy)
 
     print("\n" * 5, "BATCH EPISODE: SYNC VECTORIZED ENV")
     num_envs = 3
     tool_env_wrapper = partial(ToolEnvWrapper, tools=[tool], max_tool_uses=3)
+    chat_wrapper = partial(ChatTemplatedObservation, tokenizer=llm.get_tokenizer())
     ta_vec_env = gem.make_vec(
         env_name,
         num_envs=num_envs,
-        wrappers=[tool_env_wrapper, ConcatenatedObservation],
+        wrappers=[tool_env_wrapper, chat_wrapper],
         max_turns=3,
     )
     run_and_print_episode(
@@ -188,12 +160,8 @@ def test_llm_episode(
     )
 
 
-def main():
-    """Run with:
-    python -m tests.test_tool.test_python_code_tool single_action --env_name ta:GuessTheNumber-v0
-    python -m tests.test_tool.test_python_code_tool episode --env_name ta:GuessTheNumber-v0
-    python -m tests.test_tool.test_python_code_tool llm_episode --env_name ta:GuessTheNumber-v0 --model_name Qwen/Qwen3-0.6B-Base
-    """
+
+if __name__ == "__main__":
     fire.Fire(
         {
             "single_action": test_single_action,
@@ -201,7 +169,12 @@ def main():
             "llm_episode": test_llm_episode,
         }
     )
+    print(f"\n\nAll tests run.")
 
-
-if __name__ == "__main__":
-    main()
+    """Run with:
+    python -m tests.test_tool.test_python_code_tool single_action --env_name ta:GuessTheNumber-v0
+    python -m tests.test_tool.test_python_code_tool episode --env_name ta:GuessTheNumber-v0
+    python -m tests.test_tool.test_python_code_tool llm_episode --env_name ta:GuessTheNumber-v0 --model_name Qwen/Qwen3-0.6B-Base
+    python -m tests.test_tool.test_python_code_tool episode --env_name math:MATH500-v0
+    python -m tests.test_tool.test_python_code_tool llm_episode --env_name math:MATH500-v0 --model_name Qwen/Qwen3-0.6B-Base
+    """

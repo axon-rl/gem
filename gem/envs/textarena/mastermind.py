@@ -4,11 +4,11 @@ import random
 import re
 from typing import Any, List, Optional, Tuple
 
-from gem.envs.multi_turn import MultiTurnEnv
+from gem.core import Env
 from gem.utils.constants import TERMINAL_STATE
 
 
-class MastermindEnv(MultiTurnEnv):
+class MastermindEnv(Env):
 
     def __init__(
         self,
@@ -16,6 +16,7 @@ class MastermindEnv(MultiTurnEnv):
         num_numbers: Optional[int] = 6,
         duplicate_numbers: Optional[bool] = False,
         max_turns: Optional[int] = 20,
+        **_,
     ):
         super().__init__()
         self.code_length = code_length
@@ -25,7 +26,7 @@ class MastermindEnv(MultiTurnEnv):
         self.is_random = code_length is None or num_numbers is None
         self.reset()
 
-    def get_task_prefix(self) -> str:
+    def _get_instructions(self) -> str:
         return (
             f"You are playing Mastermind.\n"
             f"You have to guess the secret {self.code_length} digit code within {self.max_turns} turns.\n"
@@ -33,12 +34,10 @@ class MastermindEnv(MultiTurnEnv):
             f"Duplicate numbers are {'allowed' if self.duplicate_numbers else 'not allowed'}.\n"
             "After you enter your guess, I will say mark your guess with black and white pegs, where a black peg indicates a correct digit in the correct position, while a white peg indicates a correct digit in the wrong position.\n"
             "After thinking, format your final answer inside \\boxed{...},"
-            f" for example, {self.example_action}.\n"
+            f" for example, {self.sample_random_action()}.\n"
             "As you play, the history of your guesses will be appended below. Use the information to complete the game before you run out of guesses.\n"
+            "Enter your first guess to start the game.\n"
         )
-
-    def get_task_suffix(self) -> str:
-        return "Enter your guess."
 
     def reset(self, seed: Optional[int] = None) -> Tuple[str, dict[str, Any]]:
         super().reset(seed)
@@ -50,8 +49,7 @@ class MastermindEnv(MultiTurnEnv):
         self.game_code = sample_fn(available_numbers, k=self.code_length)
         self.previous_guesses = set()
         self.turn_count = 0
-        self.example_action = self.sample_random_action()
-        return self.get_task_prefix() + self.get_task_suffix(), {}
+        return self._get_instructions(), {}
 
     def step(self, action: str) -> Tuple[str, float, bool, bool, dict[str, Any]]:
         self.turn_count += 1
@@ -97,6 +95,9 @@ class MastermindEnv(MultiTurnEnv):
                 else:
                     next_obs = f"At turn {self.turn_count}, you guessed {player_guess}. This guess recieves {black_pegs} black peg(s) and {white_pegs} white peg(s)."
                     reward, terminated, truncated = 0, False, False
+
+        if not terminated:
+            next_obs += "\nEnter your next guess."
         return next_obs, reward, terminated, truncated, {}
 
     def sample_random_action(self):

@@ -156,7 +156,9 @@ def execute_python(code: str, timeout: int = TIMEOUT) -> Tuple[str, bool]:
 
 class PythonCodeTool(BaseTool):
     tool_type = "python_code"
-    timeout = TIMEOUT
+
+    def __init__(self, timeout: int = TIMEOUT):
+        self.timeout = timeout
 
     def _parse_action(self, action: str) -> Tuple[str, bool]:
         """
@@ -180,6 +182,12 @@ class PythonCodeTool(BaseTool):
         parsed_code = "\n".join([code.strip() for code in all_valid_python_code])
 
         return parsed_code, True
+
+    def instruction_string(self) -> str:
+        return (
+            "You can execute Python code by wrapping it in <python>...</python> tags or "
+            "using ```python...``` code blocks. "
+        )
 
     def execute_action(self, action):
         """

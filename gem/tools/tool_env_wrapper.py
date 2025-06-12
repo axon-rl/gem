@@ -10,7 +10,7 @@ class ToolEnvWrapper(EnvWrapper):
         env: Env,
         tools: List[BaseTool],
         tool_use_reward: float = 0.1,
-        max_tool_uses: Optional[int] = None,
+        max_tool_uses: Optional[int] = 10,
     ):
         super().__init__(env)
         self.tools = tools
@@ -21,7 +21,15 @@ class ToolEnvWrapper(EnvWrapper):
 
     def reset(self, seed: Optional[int] = None) -> Tuple[str, dict[str, Any]]:
         self.tool_use_counter = 0
-        return self.env.reset(seed=seed)
+        obs, info = self.env.reset(seed=seed)
+        tool_instructions = "\n".join(
+            [tool.instruction_string() for tool in self.tools]
+        )
+        if len(tool_instructions) > 1:
+            tool_instructions = f"{obs}\n\nAvailable tools:\n{tool_instructions}"
+        obs = f"{obs}\n{tool_instructions}"
+        return obs, info
+
 
     def step(
         self, action: str, verbose: bool = False
@@ -53,4 +61,5 @@ class ToolEnvWrapper(EnvWrapper):
                 f"Tool {tool.tool_type} has reached its maximum usage limit of {self.max_tool_uses}. "
                 + observation
             )
+        print(f"Tool use counter: {self.tool_use_counter}, Max tool uses: {self.max_tool_uses}")
         return observation, reward, terminated, truncated, info

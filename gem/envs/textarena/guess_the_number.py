@@ -3,12 +3,12 @@
 import random
 from typing import Any, Optional, Tuple
 
-from gem.envs.multi_turn import MultiTurnEnv
+from gem.core import Env
 from gem.utils.constants import TERMINAL_STATE
 from gem.utils.parsing import extract_last_boxed_answer
 
 
-class GuessTheNumberEnv(MultiTurnEnv):
+class GuessTheNumberEnv(Env):
 
     def __init__(
         self, min_number: int = 1, max_number: int = 20, max_turns: int = 20, **_
@@ -19,26 +19,23 @@ class GuessTheNumberEnv(MultiTurnEnv):
         self.max_turns = max_turns
         self.reset()
 
-    def get_task_prefix(self) -> str:
+    def _get_instructions(self) -> str:
         return (
             f"You are playing Guess The Number.\n"
             f"You have to guess the number between {self.min_number} and {self.max_number} (inclusive) within {self.max_turns} turns.\n"
             "As you enter your guess, the game will provide you with hints such as the target number is 'higher' or 'lower'.\n"
             "You may provide your response in any manner. Only the number that is wrapped inside \\boxed{} will be considered as your guess,"
-            f" for example, {self.example_action}.\n"
+            f" for example, {self.sample_random_action()}.\n"
             "As you play, the history of your guesses will be appended below. Use the information to complete the game before you run out of guesses.\n"
+            "Enter your first guess to start the game.\n"
         )
-
-    def get_task_suffix(self) -> str:
-        return "Enter your guess."
 
     def reset(self, seed: Optional[int] = None) -> Tuple[str, dict[str, Any]]:
         super().reset(seed)
         self.game_number = random.randint(self.min_number, self.max_number)
         self.previous_guesses = set()
         self.turn_count = 0
-        self.example_action = self.sample_random_action()
-        return self.get_task_prefix() + self.get_task_suffix(), {}
+        return self._get_instructions(), {}
 
     def step(self, action: str) -> Tuple[str, float, bool, bool, dict[str, Any]]:
         self.turn_count += 1
@@ -75,6 +72,9 @@ class GuessTheNumberEnv(MultiTurnEnv):
                     hint = "lower" if player_guess > self.game_number else "higher"
                     next_obs = f"At turn {self.turn_count}, you guessed {player_guess}, and the target number is {hint} than {player_guess}."
                     reward, terminated, truncated = 0, False, False
+
+        if not terminated:
+            next_obs += "\nEnter your next guess."
         return next_obs, reward, terminated, truncated, {}
 
     def sample_random_action(self):

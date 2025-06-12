@@ -74,15 +74,23 @@ def make_vec(
     wrappers: Optional[Sequence[Wrapper]] = None,
     vec_kwargs: Optional[Sequence[dict]] = None,
     async_mode: bool = False,
+    seed: int = 0,
     **kwargs,
 ) -> VectorEnv:
     def create_single_env(idx: int) -> Env:
+        # set vec specific kwargs
         if vec_kwargs is not None:
             _kwargs = vec_kwargs[idx]
         else:
             _kwargs = {}
+        # set different seed for each environment in vec
+        if "seed" not in _kwargs:
+            _kwargs["seed"] = seed + idx
+        # update with additional kwargs
         _kwargs.update(**kwargs)
+        # create the environment
         single_env = make(env_id, **_kwargs)
+        # apply wrappers if provided
         if wrappers is None:
             return single_env
         for wrapper in wrappers:
