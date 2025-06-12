@@ -6,7 +6,7 @@ from gem.utils.debug import run_and_print_episode
 
 
 def test(env_name: str = "rg:leg_counting"):
-    data = reasoning_gym.create_dataset("leg_counting", size=5, seed=42)
+    data = reasoning_gym.create_dataset(env_name.removeprefix("rg:"), size=5, seed=42)
 
     for i, x in enumerate(data):
         q = x["question"]
@@ -18,7 +18,7 @@ def test(env_name: str = "rg:leg_counting"):
 
     # Test env & reset
     print("\n" * 5)
-    rg_env = gem.make("rg:leg_counting", seed=10, size=int(1e9))
+    rg_env = gem.make(env_name, seed=10, size=int(1e9))
     for _ in range(10):
         run_and_print_episode(rg_env, lambda _: "\\boxed{30}")
 
