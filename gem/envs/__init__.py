@@ -112,7 +112,7 @@ register(
 from datasets import load_dataset
 
 register(
-    "math:MATH500-v0",
+    "eval:MATH500",
     "gem.envs.math_env:MathEnv",
     # dataset_name="axon-rl/Eval-MATH500",
     # split="test",
