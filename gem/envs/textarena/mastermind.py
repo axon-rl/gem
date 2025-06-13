@@ -9,13 +9,13 @@ from gem.utils.constants import TERMINAL_STATE
 
 
 class MastermindEnv(MultiTurnEnv):
-
     def __init__(
         self,
         code_length: Optional[int] = 4,
         num_numbers: Optional[int] = 6,
         duplicate_numbers: Optional[bool] = False,
         max_turns: Optional[int] = 20,
+        **_,
     ):
         super().__init__()
         self.code_length = code_length
@@ -80,7 +80,7 @@ class MastermindEnv(MultiTurnEnv):
                 )
                 return TERMINAL_STATE, reward, True, True, {}
 
-            if len(player_guess) != self.code_length:
+            if not length_correct:
                 next_obs = f"At turn {self.turn_count}, you guessed {player_guess} which has {len(player_guess)} entires but the code has length {self.code_length}."
                 reward, terminated, truncated = -0.05, False, False
             elif any(num < 1 or num > self.num_numbers for num in player_guess):
@@ -120,6 +120,9 @@ class MastermindEnv(MultiTurnEnv):
         Returns: Tuple[int, int]: Number of black and white pegs.
         """
         length_correct = len(player_guess) == self.code_length
+        if not length_correct:  # not need for evaluation
+            return length_correct, None, None
+
         black_pegs = 0
         white_pegs = 0
 
