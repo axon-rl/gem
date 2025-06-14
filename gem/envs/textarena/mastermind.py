@@ -8,6 +8,7 @@ from gem.core import Env
 from gem.utils.constants import TERMINAL_STATE
 
 
+
 class MastermindEnv(Env):
 
     def __init__(
@@ -78,7 +79,7 @@ class MastermindEnv(Env):
                 )
                 return TERMINAL_STATE, reward, True, True, {}
 
-            if len(player_guess) != self.code_length:
+            if not length_correct:
                 next_obs = f"At turn {self.turn_count}, you guessed {player_guess} which has {len(player_guess)} entires but the code has length {self.code_length}."
                 reward, terminated, truncated = -0.05, False, False
             elif any(num < 1 or num > self.num_numbers for num in player_guess):
@@ -121,6 +122,9 @@ class MastermindEnv(Env):
         Returns: Tuple[int, int]: Number of black and white pegs.
         """
         length_correct = len(player_guess) == self.code_length
+        if not length_correct:  # not need for evaluation
+            return length_correct, None, None
+
         black_pegs = 0
         white_pegs = 0
 
