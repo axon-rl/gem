@@ -114,9 +114,9 @@ from datasets import load_dataset
 register(
     "eval:MATH500",
     "gem.envs.math_env:MathEnv",
-    # dataset_name="axon-rl/Eval-MATH500",
-    # split="test",
-    dataset=load_dataset("axon-rl/Eval-MATH500"),
+    dataset_name="axon-rl/Eval-MATH500",
+    split="test",
+    # dataset=load_dataset("axon-rl/Eval-MATH500"),
     question_key="problem",
     answer_key="answer",
 )

@@ -5,6 +5,7 @@ import logging
 import random
 from functools import partial
 from typing import List
+import random
 
 import fire
 from transformers import AutoTokenizer
@@ -29,7 +30,7 @@ TEST_ACTIONS = [
     """```<python>prnit('Hello from Python!')</python> ...""",
 ]
 
-SLEEP_ACTION = TEST_ACTIONS[4]  # Action that sleeps for 30 seconds
+SLEEP_ACTION = """```<python>import time\ntime.sleep(30)\nprint('Hello from Python!')</python> ... <python>print('Hello again!')</python>``` ..."""
 
 
 def test_single_action(env_name: str = "ta:GuessTheNumber-v0"):
@@ -63,21 +64,42 @@ def test_episode(env_name: str = "ta:GuessTheNumber-v0"):
     wrapped_env = WRAPPER_FACTORY["concat_chat"](wrapped_env, tokenizer=tokenizer)
     run_and_print_episode(wrapped_env, policy)
 
-    print("\n" * 5, "BATCH EPISODE: SYNC VECTORIZED ENV")
-    num_envs = 3
+    print("\n" * 5, "BATCH EPISODE 1: SYNC ECTORIZED ENV")
+    num_envs = 4
     tool_env_wrapper = partial(ToolEnvWrapper, tools=[tool], max_tool_uses=3)
     chat_wrapper = partial(WRAPPER_FACTORY["concat_chat"], tokenizer=tokenizer)
     ta_vec_env = gem.make_vec(
         env_name,
         num_envs=num_envs,
         wrappers=[tool_env_wrapper, chat_wrapper],
+        async_mode=False,
         max_turns=3,
     )
     run_and_print_episode(
         ta_vec_env,
+        # policy=lambda _: [random.choice(TEST_ACTIONS) for _ in range(num_envs)],
         policy=lambda _: [SLEEP_ACTION for _ in range(num_envs)],
         ignore_done=True,
         max_steps=5,
+    )
+
+    print("\n" * 5, "BATCH EPISODE 2: ASYNC VECTORIZED ENV")
+    num_envs = 4
+    tool_env_wrapper = partial(ToolEnvWrapper, tools=[tool], max_tool_uses=3)
+    chat_wrapper = partial(WRAPPER_FACTORY["concat_chat"], tokenizer=tokenizer)
+    ta_vec_env = gem.make_vec(
+        env_name,
+        num_envs=num_envs,
+        wrappers=[tool_env_wrapper, chat_wrapper],
+        async_mode=True,
+        max_turns=3,
+    )
+    run_and_print_episode(
+        ta_vec_env,
+        # policy=lambda _: [random.choice(TEST_ACTIONS) for _ in range(num_envs)],
+        policy=lambda _: [SLEEP_ACTION for _ in range(num_envs)],
+        ignore_done=True,
+        max_steps=2,
     )
 
 
@@ -139,21 +161,22 @@ def test_llm_episode(
     wrapped_env = WRAPPER_FACTORY["concat_chat"](wrapped_env, tokenizer=llm.get_tokenizer())
     run_and_print_episode(wrapped_env, policy)
 
-    print("\n" * 5, "BATCH EPISODE: SYNC VECTORIZED ENV")
-    num_envs = 3
+    print("\n" * 5, "BATCH EPISODE 1: SYNC VECTORIZED ENV")
+    num_envs = 4
     tool_env_wrapper = partial(ToolEnvWrapper, tools=[tool], max_tool_uses=3)
     chat_wrapper = partial(WRAPPER_FACTORY["concat_chat"], tokenizer=llm.get_tokenizer())
     ta_vec_env = gem.make_vec(
         env_name,
         num_envs=num_envs,
         wrappers=[tool_env_wrapper, chat_wrapper],
+        async_mode=False,
         max_turns=3,
     )
     run_and_print_episode(
         ta_vec_env,
         policy=batch_policy,
         ignore_done=True,
-        max_steps=5,
+        max_steps=2,
     )
 
 

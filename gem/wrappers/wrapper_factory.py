@@ -40,8 +40,11 @@ WRAPPER_FACTORY = {
 def get_wrapper_fns(wrappers: str, tokenizer=None):
     """Get a list of wrapper functions based on the provided wrapper names."""
     wrapper_fns = []
+    print(f"Wrappers requested: {wrappers}")
     if wrappers:
-        for w in wrappers.split(","):
+        wrappers = wrappers.split(",")
+        print(f"Wrappers: {wrapper_fns}")
+        for w in wrappers:
             wrapper_fn = WRAPPER_FACTORY[w]
             if w == "concat_chat" and tokenizer is not None:
                 wrapper_fn = partial(wrapper_fn, tokenizer=tokenizer)
