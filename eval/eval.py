@@ -6,6 +6,7 @@ import time
 from functools import partial
 from pprint import pprint
 from typing import List, Optional
+import random
 
 import fire
 import numpy as np
@@ -15,6 +16,7 @@ import gem
 from gem.tools.python_code_tool import PythonCodeTool
 from gem.tools.tool_env_wrapper import ToolEnvWrapper
 from gem.wrappers.stateful_observation import ChatTemplatedObservation
+from gem.wrappers.episode_tracking_wrapper import EpisodeTrackingWrapper
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
@@ -37,46 +39,35 @@ def collect_episodes(
     policy,
     num_episodes: int = 10,
     print_episodes: bool = False,
-    tool_wrapper_depth: Optional[int] = None,
 ):
     num_envs = env.num_envs
     episode_count = 0
     episode_rewards = []
     episode_accuracies = []
     episode_lengths = []
-    env_rewards = [[] for _ in range(num_envs)]
-    env_steps = [0 for _ in range(num_envs)]
-    tool_uses = []
+    episode_tool_uses = []
     obs, _ = env.reset()
     done = False
     step_count = 0
     while True:
         step_count += 1
         action = policy(obs)
-        next_obs, reward, terminated, truncated, _ = env.step(action)
+        next_obs, reward, terminated, truncated, info = env.step(action)
         done = terminated | truncated
 
         for i in range(num_envs):
-            env_rewards[i].append(reward[i])
-            env_steps[i] += 1
             if done[i]:
                 episode_count += 1
-                episode_rewards.append(np.sum(env_rewards[i]))
-                env_rewards[i] = []
+                episode_rewards.append(info[i]["prev_ep_cumulative_rewards"])
                 episode_accuracies.append(reward[i] == 1.0)
-                episode_lengths.append(env_steps[i])
-                env_steps[i] = 0
-                if tool_wrapper_depth is not None:
-                    _env = env.envs[i]
-                    for j in range(tool_wrapper_depth):
-                        _env = _env.env
-                    tool_uses.append(_env.tool_use_counter)
-                    print(type(_env), _env.tool_use_counter)
+                episode_lengths.append(info[i]["prev_ep_step_counter"])
+                if "prev_ep_tool_use_counter" in info[i]:
+                    episode_tool_uses.append(info[i]["prev_ep_tool_use_counter"])
 
         if print_episodes:
             print("=" * 30)
             print(
-                f"Step {env_steps[0]} (Episodes collected so far: {episode_count}/{num_episodes})"
+                f"Step {info[0]['step_counter']} (Episodes collected so far: {episode_count}/{num_episodes})"
             )
             print(
                 "-" * 10,
@@ -96,7 +87,7 @@ def collect_episodes(
                 "-" * 10,
             )
             pprint(reward[0])
-            print(f"terminated: {terminated[0]}, truncated: {truncated[0]}")
+            print(f"terminated: {terminated[0]}, truncated: {truncated[0]}, correct: {reward[0] == 1.0}")
             print(
                 "-" * 10,
                 "next observation",
@@ -110,7 +101,7 @@ def collect_episodes(
         if episode_count >= num_episodes:
             break
 
-    return episode_rewards, episode_lengths, episode_accuracies, tool_uses
+    return episode_rewards, episode_lengths, episode_accuracies, episode_tool_uses
 
 
 def eval(
@@ -121,14 +112,14 @@ def eval(
     max_turns: int = 3,
     max_tool_uses: int = 10,
     temperature: float = 0.7,
-    print_episodes: bool = False,
+    print_episodes: bool = True,
     enable_python_tool: bool = True,
     max_tokens: int = 3000,
 ):
     """Test episode with LLM observation and Python code tool."""
-    llm = LLM(
-        model=model_name,
-    )
+    # llm = LLM(
+    #     model=model_name,
+    # )
     sampling_params = SamplingParams(
         n=1,
         temperature=temperature,
@@ -139,7 +130,7 @@ def eval(
         assert isinstance(
             obss, List
         ), f"Observation should be a string but is {type(obss)}."
-        # return [random.choice(TEST_ACTIONS) for _ in range(len(obss))]
+        return [random.choice(TEST_ACTIONS) for _ in range(len(obss))]
         response = llm.generate(
             obss,
             sampling_params=sampling_params,
@@ -158,8 +149,12 @@ def eval(
             ToolEnvWrapper, tools=[tool], max_tool_uses=max_tool_uses
         )
         wrappers.append(tool_env_wrapper)
-    chat_wrapper = partial(ChatTemplatedObservation, tokenizer=llm.get_tokenizer())
+    # chat_wrapper = partial(ChatTemplatedObservation, tokenizer=llm.get_tokenizer())
+    from transformers import AutoTokenizer
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    chat_wrapper = partial(ChatTemplatedObservation, tokenizer=tokenizer)
     wrappers.append(chat_wrapper)
+    wrappers.append(EpisodeTrackingWrapper)
     ta_vec_env = gem.make_vec(
         env_name,
         num_envs=batch_size,
@@ -173,27 +168,38 @@ def eval(
         policy=batch_policy,
         num_episodes=num_episodes,
         print_episodes=print_episodes,
-        tool_wrapper_depth=1 if enable_python_tool else None,
     )
-    print("\n" * 5, "EVALUATION RESULTS")
-    print(f"----ENV: {env_name}")
-    print(f"----MODEL: {model_name}")
-    print(f"----NUM EPISODES: {len(episode_rewards)}")
-    print(f"----EPISODE REWARD: {np.mean(episode_rewards)} ({episode_rewards})")
-    print(f"----EPISODE ACCURACY: {np.mean(episode_accuracies)} ({episode_accuracies})")
-    print(f"----EPISODE LENGTH: {np.mean(episode_lengths)} ({episode_lengths})")
+
+    # Print eval results
+    width = 50
+    header = " EVALUATION RESULTS "
+    print("\n" + "=" * width)
+    print(f"{header:=^{width}}")
+    print("=" * width)
+    # Configuration
+    print(f"  {'Environment:':<20} {env_name}")
+    print(f"  {'Model:':<20} {model_name}")
+    print(f"  {'Num Episodes:':<20} {len(episode_rewards)}")
+    print("-" * width)
+    # Metrics
+    print(f"  {'Cumulative reward:':<20} {np.mean(episode_rewards):.2f} ({episode_rewards})")
+    print(f"  {'Accuracy:':<20} {np.mean(episode_accuracies):.2f} ({episode_accuracies})")
+    print(f"  {'Episode Length:':<20} {np.mean(episode_lengths):.2f} ({episode_lengths})")
     if tool_uses:
-        print(f"----TOOL USES: {np.mean(tool_uses)} ({tool_uses})")
-    print(f"----TIME: {time.time() - start_time:.2f} seconds\n\n")
+        print(f"  {'Tool Uses:':<20} {np.mean(tool_uses):.2f} ({tool_uses})")
+    print("-" * width)
+    print(f"  {'Time Taken:':<20} {time.time() - start_time:.2f} seconds")
+    print("=" * width + "\n")
 
 
 if __name__ == "__main__":
     fire.Fire(eval)
 
     """Run with:
-    python -m eval.eval --env_name ta:GuessTheNumber-v0 --model_name Qwen/Qwen3-0.6B --num_episodes 30 --batch_size 5 --print_episodes True
-    python -m eval.eval --env_name ta:GuessTheNumber-v0 --model_name Qwen/Qwen3-0.6B --print_episodes True
-    python -m eval.eval --env_name ta:GuessTheNumber-v0 --model_name GAIR/ToRL-1.5B --print_episodes True
-    python -m eval.eval --env_name math:MATH500-v0 --model_name GAIR/ToRL-1.5B --print_episodes True --num_episodes 100 --batch_size 3 --temperature 0.0 --enable_python_tool False --max_tokens 100
-    python -m eval.eval --env_name math:MATH500-v0 --model_name GAIR/ToRL-1.5B --print_episodes True --num_episodes 20 --batch_size 3 --temperature 0.0 --max_tokens 100
+    python -m eval.eval --env_name ta:GuessTheNumber-v0 --model_name Qwen/Qwen3-0.6B --num_episodes 30 --batch_size 5
+    python -m eval.eval --env_name ta:GuessTheNumber-v0 --model_name Qwen/Qwen3-0.6B
+    python -m eval.eval --env_name ta:GuessTheNumber-v0 --model_name GAIR/ToRL-1.5B
+    python -m eval.eval --env_name eval:MATH500 --model_name GAIR/ToRL-1.5B --temperature 0.0 --num_episodes 100 --batch_size 3 --enable_python_tool False --max_tokens 100
+    python -m eval.eval --env_name eval:MATH500 --model_name GAIR/ToRL-1.5B --temperature 0.0 --num_episodes 20 --batch_size 3 --max_tokens 100
+    python -m eval.eval --env_name eval:MATH500 --model_name VerlTool/torl-deep_math-fsdp_agent-qwen2.5-math-1.5b-grpo-n16-b128-t1.0-lr1e-6-320-step --temperature 0.0 --num_episodes 20 --batch_size 3 --max_tokens 100
     """
