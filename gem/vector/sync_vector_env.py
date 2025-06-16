@@ -21,7 +21,7 @@ class SyncVectorEnv(VectorEnv):
         for i, action in enumerate(actions):
             if self.autoreset_mode == AutoresetMode.NEXT_STEP:
                 if self._autoreset_envs[i]:
-                    self._env_obs[i], env_info = self.envs[i].reset()
+                    self._env_obs[i], self._env_infos[i] = self.envs[i].reset()
                     self._rewards[i] = 0.0
                     self._terminations[i] = False
                     self._truncations[i] = False
@@ -31,7 +31,7 @@ class SyncVectorEnv(VectorEnv):
                         self._rewards[i],
                         self._terminations[i],
                         self._truncations[i],
-                        env_info,
+                        self._env_infos[i],
                     ) = self.envs[i].step(action)
             elif self.autoreset_mode == AutoresetMode.SAME_STEP:
                 (
@@ -39,15 +39,13 @@ class SyncVectorEnv(VectorEnv):
                     self._rewards[i],
                     self._terminations[i],
                     self._truncations[i],
-                    env_info,
+                    self._env_infos[i],
                 ) = self.envs[i].step(action)
 
                 if self._terminations[i] or self._truncations[i]:
-                    self._env_obs[i], env_info = self.envs[i].reset()
+                    self._env_obs[i], self._env_infos[i] = self.envs[i].reset()
             else:
                 raise ValueError
-
-            del env_info
 
         self._autoreset_envs = np.logical_or(self._terminations, self._truncations)
 
@@ -56,7 +54,7 @@ class SyncVectorEnv(VectorEnv):
             np.copy(self._rewards),
             np.copy(self._terminations),
             np.copy(self._truncations),
-            {},
+            deepcopy(self._env_infos),
         )
 
     def reset(
@@ -71,11 +69,10 @@ class SyncVectorEnv(VectorEnv):
         ), f"If seeds are passed as a list the length must match num_envs={self.num_envs} but got length={len(seed)}."
 
         for i, (env, single_seed) in enumerate(zip(self.envs, seed)):
-            self._env_obs[i], env_info = env.reset(seed=single_seed)
-            del env_info  # TODO: Ignore info for now, because most envs do not need extra info.
+            self._env_obs[i], self._env_infos[i] = env.reset(seed=single_seed)
 
         self._terminations = np.zeros((self.num_envs,), dtype=np.bool_)
         self._truncations = np.zeros((self.num_envs,), dtype=np.bool_)
         self._autoreset_envs = np.zeros((self.num_envs,), dtype=np.bool_)
 
-        return deepcopy(self._env_obs), {}
+        return deepcopy(self._env_obs), deepcopy(self._env_infos)

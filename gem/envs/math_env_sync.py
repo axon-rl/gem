@@ -2,7 +2,6 @@
 
 import logging
 from typing import Any, Optional, SupportsFloat, Tuple
-import random
 
 from datasets import Dataset, DatasetDict, load_dataset
 from math_verify import parse, verify
@@ -49,7 +48,7 @@ class MathEnv(Env):
                 )
         assert isinstance(dataset, Dataset), f"Expected a Dataset, got {type(dataset)}"
         self.dataset = dataset.shuffle(seed=self.seed)
-        self.dataset_length = len(self.dataset)
+        self.dataset_iter = iter(self.dataset)
 
     def step(
         self, action: str
@@ -65,8 +64,15 @@ class MathEnv(Env):
     def reset(self, seed: Optional[None] = None) -> Tuple[str, dict[str, Any]]:
         """Sample a question from the dataset."""
         del seed
-        idx = random.randint(0, self.dataset_length - 1)
-        data = self.dataset[idx]
+
+        try:
+            data = next(self.dataset_iter)
+        except StopIteration:
+            self.dataset = self.dataset.shuffle(seed=self.seed)
+            self.dataset_iter = iter(self.dataset)
+            data = next(self.dataset_iter)
+
+        # print(f"Sampled data: {data}")
 
         self.first_obs = data[self.question_key]
         self.answer = data[self.answer_key]

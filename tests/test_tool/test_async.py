@@ -5,6 +5,7 @@ import asyncio
 import logging
 from functools import partial
 from typing import List
+import random
 
 import fire
 from transformers import AutoTokenizer
@@ -21,15 +22,15 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 TEST_ACTIONS = [
-    """<python>print('Hello from Python!')</python> ...""",
-    """Dummy action""",
-    """<python>import sys\n\nprint('Hello from Python!')\nprint(f'Arguments: {sys.argv[1:]}')\nfor i in range(5):\n    print(f'Number {i}')</python> ...""",
-    """```<python>\nprint('Hello from Python!')</python> ... <python>print('Hello again!')</python>``` ...""",
+    # """<python>print('Hello from Python!')</python> ...""",
+    # """Dummy action""",
+    # """<python>import sys\n\nprint('Hello from Python!')\nprint(f'Arguments: {sys.argv[1:]}')\nfor i in range(5):\n    print(f'Number {i}')</python> ...""",
+    # """```<python>\nprint('Hello from Python!')</python> ... <python>print('Hello again!')</python>``` ...""",
     """```<python>import time\ntime.sleep(30)\nprint('Hello from Python!')</python> ... <python>print('Hello again!')</python>``` ...""",
-    """```<python>prnit('Hello from Python!')</python> ...""",
+    """\\boxed{30}"""
 ]
 
-SLEEP_ACTION = TEST_ACTIONS[4]  # Action that sleeps for 30 seconds
+# SLEEP_ACTION = TEST_ACTIONS[4]  # Action that sleeps for 30 seconds
 
 
 async def test_episode(env_name: str = "ta:GuessTheNumber-v0"):
@@ -49,7 +50,8 @@ async def test_episode(env_name: str = "ta:GuessTheNumber-v0"):
     )
     await run_and_print_episode_async(
         ta_vec_env,
-        policy=lambda _: [SLEEP_ACTION for _ in range(num_envs)],
+        # policy=lambda _: [SLEEP_ACTION for _ in range(num_envs)],
+        policy=lambda _: [random.choice(TEST_ACTIONS) for _ in range(num_envs)],
         ignore_done=True,
         max_steps=5,
     )
@@ -125,6 +127,6 @@ if __name__ == "__main__":
     """Run with:
     python -m tests.test_tool.test_async episode --env_name ta:GuessTheNumber-v0
     python -m tests.test_tool.test_async llm_episode --env_name ta:GuessTheNumber-v0 --model_name Qwen/Qwen3-0.6B-Base
-    python -m tests.test_tool.test_async episode --env_name --env_name math:MATH500-v0
-    python -m tests.test_tool.test_async llm_episode --env_name math:MATH500-v0 --model_name Qwen/Qwen3-0.6B-Base
+    python -m tests.test_tool.test_async episode --env_name --env_name eval:MATH500
+    python -m tests.test_tool.test_async llm_episode --env_name eval:MATH500 --model_name Qwen/Qwen3-0.6B-Base
     """
