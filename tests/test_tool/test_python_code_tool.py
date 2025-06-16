@@ -179,6 +179,24 @@ def test_llm_episode(
         max_steps=2,
     )
 
+    # print("\n" * 5, "BATCH EPISODE 2: ASYNC VECTORIZED ENV")
+    # num_envs = 4
+    # tool_env_wrapper = partial(ToolEnvWrapper, tools=[tool], max_tool_uses=3)
+    # chat_wrapper = partial(WRAPPER_FACTORY["concat_chat"], tokenizer=llm.get_tokenizer())
+    # ta_vec_env = gem.make_vec(
+    #     env_name,
+    #     num_envs=num_envs,
+    #     wrappers=[tool_env_wrapper, chat_wrapper],
+    #     async_mode=True,
+    #     max_turns=3,
+    # )
+    # run_and_print_episode(
+    #     ta_vec_env,
+    #     policy=batch_policy,
+    #     ignore_done=True,
+    #     max_steps=2,
+    # )
+
 
 if __name__ == "__main__":
     fire.Fire(
