@@ -69,6 +69,7 @@ class ChatTemplatedObservation(ObservationWrapper):
         assert len(self.act_queue) == len(self.obs_queue) - 1, (
             f"Action queue should be one shorter than observation queue, but got: "
             f"{len(self.obs_queue)=}, {len(self.act_queue)=}."
+            f"\n{self.obs_queue=}\n{self.act_queue=}"
         )
 
         obs_list = list(self.obs_queue)[:-1]
