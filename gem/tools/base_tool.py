@@ -20,5 +20,6 @@ class BaseTool:
             observation: The observation after executing the action
             done: Whether the trajectory is done
             valid: Whether the action is valid
+            info: Additional information about the action execution
         """
         raise NotImplementedError("Subclass must implement this method")

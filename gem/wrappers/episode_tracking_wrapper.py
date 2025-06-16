@@ -1,11 +1,13 @@
-"""An environment wrapper for tracking episode statistics.
+"""An environment wrapper for tracking episode statistics,
+e.g. step count and cumulative rewards.
 Note: Must be used as the outermost wrapper.
 """
 
 from collections import deque
 from typing import Any, Optional, SupportsFloat, Tuple
 
-from gem.core import Env, EnvWrapper, ActType, WrapperObsType
+from gem.core import Env, EnvWrapper, ActType
+from gem.wrappers.observation_wrapper import WrapperObsType
 
 class EpisodeTrackingWrapper(EnvWrapper):
     def __init__(self, env: Env):

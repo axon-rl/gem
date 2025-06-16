@@ -63,35 +63,3 @@ class EnvWrapper(Env, abc.ABC):
         for attr in dir(env):
             if not attr.startswith("_") and not hasattr(self, attr):
                 setattr(self, attr, getattr(env, attr))
-
-
-WrapperObsType = TypeVar("WrapperObsType")
-
-
-class ObservationWrapper(EnvWrapper):
-    def __init__(self, env: Env):
-        super().__init__(env)
-
-    def step(
-        self, action: ActType
-    ) -> Tuple[WrapperObsType, SupportsFloat, bool, bool, dict[str, Any]]:
-        obs, reward, terminated, truncated, info = self.env.step(action)
-        return self.observation(obs), reward, terminated, truncated, info
-
-    def reset(
-        self, seed: Optional[int] = None
-    ) -> Tuple[WrapperObsType, dict[str, Any]]:
-        obs, info = self.env.reset(seed)
-        return self.observation(obs), info
-
-    def observation(self, obs: ObsType) -> WrapperObsType:
-        """Wraps the observation.
-
-        Args:
-            obs (ObsType): Original observation.
-
-        Returns:
-            WrapperObsType: Wrapped observation.
-        """
-        del obs
-        raise NotImplementedError

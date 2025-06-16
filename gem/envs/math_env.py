@@ -72,7 +72,7 @@ class MathEnv(Env):
             self.dataset_iter = iter(self.dataset)
             data = next(self.dataset_iter)
 
-        print(f"Sampled data: {data}")
+        # print(f"Sampled data: {data}")
 
         self.first_obs = data[self.question_key]
         self.answer = data[self.answer_key]

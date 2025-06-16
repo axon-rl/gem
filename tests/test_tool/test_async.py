@@ -3,17 +3,15 @@
 # Adapted from https://github.com/TIGER-AI-Lab/verl-tool
 import asyncio
 import logging
-from functools import partial
 from typing import List
+import random
 
 import fire
 from transformers import AutoTokenizer
 
 import gem
-from gem.tools.python_code_tool import PythonCodeTool
-from gem.tools.tool_env_wrapper import ToolEnvWrapper
 from gem.utils.debug import run_and_print_episode_async
-from gem.wrappers.stateful_observation import ChatTemplatedObservation
+from gem.wrappers.wrapper_factory import get_wrapper_fns
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
@@ -21,35 +19,35 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 TEST_ACTIONS = [
-    """<python>print('Hello from Python!')</python> ...""",
+    # """<python>print('Hello from Python!')</python> ...""",
     """Dummy action""",
-    """<python>import sys\n\nprint('Hello from Python!')\nprint(f'Arguments: {sys.argv[1:]}')\nfor i in range(5):\n    print(f'Number {i}')</python> ...""",
-    """```<python>\nprint('Hello from Python!')</python> ... <python>print('Hello again!')</python>``` ...""",
+    # """<python>import sys\n\nprint('Hello from Python!')\nprint(f'Arguments: {sys.argv[1:]}')\nfor i in range(5):\n    print(f'Number {i}')</python> ...""",
+    # """```<python>\nprint('Hello from Python!')</python> ... <python>print('Hello again!')</python>``` ...""",
     """```<python>import time\ntime.sleep(30)\nprint('Hello from Python!')</python> ... <python>print('Hello again!')</python>``` ...""",
-    """```<python>prnit('Hello from Python!')</python> ...""",
+    # """```<python>prnit('Hello from Python!')</python> ...""",
+    "\\boxed{30}",
 ]
 
-SLEEP_ACTION = TEST_ACTIONS[4]  # Action that sleeps for 30 seconds
+SLEEP_ACTION = """```<python>import time\ntime.sleep(30)\nprint('Hello from Python!')</python> ... <python>print('Hello again!')</python>``` ..."""
 
 
 async def test_episode(env_name: str = "ta:GuessTheNumber-v0"):
-    tool = PythonCodeTool(timeout=2)
-    tool_env_wrapper = partial(ToolEnvWrapper, tools=[tool], max_tool_uses=3)
     tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen3-0.6B-Base")
-    chat_wrapper = partial(ChatTemplatedObservation, tokenizer=tokenizer)
+    wrapper_fns = get_wrapper_fns("python_tool,concat_chat", tokenizer=tokenizer)
 
     print("\n" * 5, "BATCH EPISODE: ASYNC VECTORIZED ENV")
     num_envs = 3
     ta_vec_env = gem.make_vec(
         env_name,
         num_envs=num_envs,
-        wrappers=[tool_env_wrapper, chat_wrapper],
+        wrappers=wrapper_fns,
         max_turns=3,
         async_mode=True,
     )
     await run_and_print_episode_async(
         ta_vec_env,
-        policy=lambda _: [SLEEP_ACTION for _ in range(num_envs)],
+        # policy=lambda _: [SLEEP_ACTION for _ in range(num_envs)],
+        policy=lambda _: [random.choice(TEST_ACTIONS) for _ in range(num_envs)],
         ignore_done=True,
         max_steps=5,
     )
@@ -86,15 +84,13 @@ async def test_llm_episode(
         print(f"LLM ACTION: {actions!r}")
         return actions
 
-    tool = PythonCodeTool(timeout=2)
-    tool_env_wrapper = partial(ToolEnvWrapper, tools=[tool], max_tool_uses=3)
-    chat_wrapper = partial(ChatTemplatedObservation, tokenizer=llm.get_tokenizer())
+    wrapper_fns = get_wrapper_fns("concat_chat,python_tool", tokenizer=llm.get_tokenizer())
     print("\n" * 5, "BATCH EPISODE: ASYNC VECTORIZED ENV")
     num_envs = 3
     ta_vec_env = gem.make_vec(
         env_name,
         num_envs=num_envs,
-        wrappers=[tool_env_wrapper, chat_wrapper],
+        wrappers=wrapper_fns,
         max_turns=3,
         async_mode=True,
     )
@@ -120,11 +116,11 @@ if __name__ == "__main__":
             "llm_episode": run_test_llm_episode,
         }
     )
-    print(f"\n\nAll tests run.")
+    print(f"\n\nAll tests run.\n\n")
 
     """Run with:
     python -m tests.test_tool.test_async episode --env_name ta:GuessTheNumber-v0
     python -m tests.test_tool.test_async llm_episode --env_name ta:GuessTheNumber-v0 --model_name Qwen/Qwen3-0.6B-Base
-    python -m tests.test_tool.test_async episode --env_name --env_name math:MATH500-v0
-    python -m tests.test_tool.test_async llm_episode --env_name math:MATH500-v0 --model_name Qwen/Qwen3-0.6B-Base
+    python -m tests.test_tool.test_async episode --env_name --env_name eval:MATH500
+    python -m tests.test_tool.test_async llm_episode --env_name eval:MATH500 --model_name Qwen/Qwen3-0.6B-Base
     """

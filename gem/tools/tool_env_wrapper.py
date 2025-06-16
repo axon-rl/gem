@@ -9,12 +9,12 @@ class ToolEnvWrapper(EnvWrapper):
         self,
         env: Env,
         tools: List[BaseTool],
-        tool_use_reward: float = 0.1,
+        tool_reward: float = 0.1,
         max_tool_uses: Optional[int] = 10,
     ):
         super().__init__(env)
         self.tools = tools
-        self.tool_use_reward = tool_use_reward
+        self.tool_reward = tool_reward
         self.max_tool_uses = (
             max_tool_uses if max_tool_uses is not None else float("inf")
         )
@@ -42,15 +42,15 @@ class ToolEnvWrapper(EnvWrapper):
         tool_executed = False
         if self.tool_use_counter < self.max_tool_uses:
             for tool in self.tools:
-                observation, terminated, tool_executed = tool.execute_action(action)
+                tool_executed, observation, parsed_action = tool.execute_action(action)
                 if tool_executed:
                     break
 
         if tool_executed:
             self.tool_use_counter += 1
-            reward = self.tool_use_reward
-            truncated = False
-            info = {}
+            reward = self.tool_reward
+            terminated, truncated = False, False
+            info = {"parsed_action": parsed_action, "tool_type": tool.tool_type}
             if verbose:
                 print(f"Tool executed: {tool.name}, tool use count: {self.tool_use_counter}")
         # if no tool was executed, step the environment

@@ -39,7 +39,7 @@ def test(env_name: str = "rg:leg_counting"):
 
 if __name__ == "__main__":
     fire.Fire(test)
-    print(f"\n\nAll tests run.")
+    print(f"\n\nAll tests run.\n\n")
 
     """Run with:
         python -m tests.test_env.test_reasoning_gym --env_name rg:leg_counting

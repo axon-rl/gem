@@ -13,7 +13,7 @@ import gem
 from gem.tools.python_code_tool import PythonCodeTool
 from gem.tools.tool_env_wrapper import ToolEnvWrapper
 from gem.utils.debug import run_and_print_episode
-from gem.wrappers.stateful_observation import ChatTemplatedObservation
+from gem.wrappers.wrapper_factory import WRAPPER_FACTORY
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
@@ -60,13 +60,13 @@ def test_episode(env_name: str = "ta:GuessTheNumber-v0"):
     print("\n" * 5, "EPISODE 2: CHAT TEMPLATE OBSERVATION")
     tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen3-0.6B-Base")
     wrapped_env = ToolEnvWrapper(env, tools=[tool], max_tool_uses=3)
-    wrapped_env = ChatTemplatedObservation(wrapped_env, tokenizer)
+    wrapped_env = WRAPPER_FACTORY["concat_chat"](wrapped_env, tokenizer=tokenizer)
     run_and_print_episode(wrapped_env, policy)
 
     print("\n" * 5, "BATCH EPISODE: SYNC VECTORIZED ENV")
     num_envs = 3
     tool_env_wrapper = partial(ToolEnvWrapper, tools=[tool], max_tool_uses=3)
-    chat_wrapper = partial(ChatTemplatedObservation, tokenizer=tokenizer)
+    chat_wrapper = partial(WRAPPER_FACTORY["concat_chat"], tokenizer=tokenizer)
     ta_vec_env = gem.make_vec(
         env_name,
         num_envs=num_envs,
@@ -136,13 +136,13 @@ def test_llm_episode(
 
     print("\n" * 5, "EPISODE 2: CHAT TEMPLATE OBSERVATION")
     wrapped_env = ToolEnvWrapper(env, tools=[tool], max_tool_uses=3)
-    wrapped_env = ChatTemplatedObservation(wrapped_env, tokenizer=llm.get_tokenizer())
+    wrapped_env = WRAPPER_FACTORY["concat_chat"](wrapped_env, tokenizer=llm.get_tokenizer())
     run_and_print_episode(wrapped_env, policy)
 
     print("\n" * 5, "BATCH EPISODE: SYNC VECTORIZED ENV")
     num_envs = 3
     tool_env_wrapper = partial(ToolEnvWrapper, tools=[tool], max_tool_uses=3)
-    chat_wrapper = partial(ChatTemplatedObservation, tokenizer=llm.get_tokenizer())
+    chat_wrapper = partial(WRAPPER_FACTORY["concat_chat"], tokenizer=llm.get_tokenizer())
     ta_vec_env = gem.make_vec(
         env_name,
         num_envs=num_envs,
@@ -165,12 +165,12 @@ if __name__ == "__main__":
             "llm_episode": test_llm_episode,
         }
     )
-    print(f"\n\nAll tests run.")
+    print(f"\n\nAll tests run.\n\n")
 
     """Run with:
     python -m tests.test_tool.test_python_code_tool single_action --env_name ta:GuessTheNumber-v0
     python -m tests.test_tool.test_python_code_tool episode --env_name ta:GuessTheNumber-v0
     python -m tests.test_tool.test_python_code_tool llm_episode --env_name ta:GuessTheNumber-v0 --model_name Qwen/Qwen3-0.6B-Base
-    python -m tests.test_tool.test_python_code_tool episode --env_name math:MATH500-v0
-    python -m tests.test_tool.test_python_code_tool llm_episode --env_name math:MATH500-v0 --model_name Qwen/Qwen3-0.6B-Base
+    python -m tests.test_tool.test_python_code_tool episode --env_name eval:MATH500
+    python -m tests.test_tool.test_python_code_tool llm_episode --env_name eval:MATH500 --model_name Qwen/Qwen3-0.6B-Base
     """

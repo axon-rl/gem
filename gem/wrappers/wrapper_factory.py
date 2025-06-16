@@ -1,0 +1,49 @@
+from functools import partial
+import gem
+from gem.wrappers.observation_wrapper import ObservationWrapper
+from gem.wrappers.episode_tracking_wrapper import EpisodeTrackingWrapper
+from gem.tools.tool_env_wrapper import ToolEnvWrapper
+from gem.tools.python_code_tool import PythonCodeTool
+
+# TODO refactor later
+
+### Note: Order is important!
+WRAPPER_FACTORY = {
+    ### 1. Frist, optionlly add the tool wrapper
+    "python_tool": partial(
+        ToolEnvWrapper,
+        tools=[PythonCodeTool(timeout=5)],
+        tool_reward=0.1,
+        max_tool_uses=10,
+    ),
+    ### 2. Then choose an observation wrapper
+    "concat": partial(
+        ObservationWrapper,
+        include_action=False,
+        include_chat_template=False,
+    ),
+    "concat_chat": partial(
+        ObservationWrapper,
+        include_action=True,
+        include_chat_template=True,
+        # Requires tokenizer to be passed later
+    ),
+    "concat_with_action": partial(
+        ObservationWrapper,
+        include_action=True,
+        include_chat_template=False,
+    ),
+    ### 3. Finally, optionally add the episode tracking wrapper
+    "episode_tracking": EpisodeTrackingWrapper,
+}
+
+def get_wrapper_fns(wrappers: str, tokenizer=None):
+    """Get a list of wrapper functions based on the provided wrapper names."""
+    wrapper_fns = []
+    if wrappers:
+        for w in wrappers.split(","):
+            wrapper_fn = WRAPPER_FACTORY[w]
+            if w == "concat_chat" and tokenizer is not None:
+                wrapper_fn = partial(wrapper_fn, tokenizer=tokenizer)
+            wrapper_fns.append(wrapper_fn)
+    return wrapper_fns
