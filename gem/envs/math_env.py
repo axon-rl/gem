@@ -1,6 +1,7 @@
 """Env for math datasets."""
 
 import logging
+from functools import partial
 from typing import Any, Optional, SupportsFloat, Tuple
 
 from datasets import Dataset, DatasetDict, load_dataset
@@ -14,6 +15,11 @@ logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
+
+# math_verify must be run without timeout to avoid using signal
+# since this is not compatible with multiprocessing
+parse = partial(parse, parsing_timeout=None)
+verify = partial(verify, timeout_seconds=None)
 
 
 class MathEnv(Env):
@@ -82,7 +88,7 @@ class MathEnv(Env):
     def _check_correct(self, model_answer: str) -> bool:
         """Check if the action is correct."""
         # parse with math_verify
-        model_answer = parse(model_answer, parsing_timeout=None)
+        model_answer = parse(model_answer)
 
         # get correct answers from the dataset entry
         if isinstance(self.answer, (str, float, int)):
@@ -96,7 +102,7 @@ class MathEnv(Env):
         # (math_verify.parse handles extraction e.g. from \\boxed{...})
         is_correct = False
         for correct_answer in correct_answers:
-            correct_answer = parse(str(correct_answer), parsing_timeout=None)
+            correct_answer = parse(str(correct_answer))
             if verify(correct_answer, model_answer):
                 is_correct = True
                 break
