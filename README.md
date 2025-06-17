@@ -10,5 +10,8 @@
 # reasoning gym
 pip install git+https://github.com/open-thought/reasoning-gym@0699e2f
 
+# sandbox
+conda install bubblewrap
+
 pip install -e .
 ```
