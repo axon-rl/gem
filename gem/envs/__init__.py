@@ -109,7 +109,6 @@ register(
 )
 
 # Register math dataset environments
-from datasets import load_dataset
 
 register(
     "eval:MATH500",

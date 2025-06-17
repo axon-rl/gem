@@ -1,9 +1,9 @@
 from functools import partial
-import gem
-from gem.wrappers.observation_wrapper import ObservationWrapper
-from gem.wrappers.episode_tracking_wrapper import EpisodeTrackingWrapper
-from gem.tools.tool_env_wrapper import ToolEnvWrapper
+
 from gem.tools.python_code_tool import PythonCodeTool
+from gem.tools.tool_env_wrapper import ToolEnvWrapper
+from gem.wrappers.episode_tracking_wrapper import EpisodeTrackingWrapper
+from gem.wrappers.observation_wrapper import ObservationWrapper
 
 # TODO refactor later
 
@@ -36,6 +36,7 @@ WRAPPER_FACTORY = {
     ### 3. Finally, optionally add the episode tracking wrapper
     "episode_tracking": EpisodeTrackingWrapper,
 }
+
 
 def get_wrapper_fns(wrappers: str, tokenizer=None):
     """Get a list of wrapper functions based on the provided wrapper names."""

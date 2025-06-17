@@ -35,7 +35,8 @@ class ToolEnvWrapper(EnvWrapper):
         return obs, info
 
     def step(
-        self, action: str,
+        self,
+        action: str,
         verbose: bool = False,
     ) -> Tuple[str, SupportsFloat, bool, bool, dict[str, Any]]:
         # try to execute the action with each tool
@@ -52,7 +53,9 @@ class ToolEnvWrapper(EnvWrapper):
             terminated, truncated = False, False
             info = {"parsed_action": parsed_action, "tool_type": tool.tool_type}
             if verbose:
-                print(f"Tool executed: {tool.name}, tool use count: {self.tool_use_counter}")
+                print(
+                    f"Tool executed: {tool.name}, tool use count: {self.tool_use_counter}"
+                )
         # if no tool was executed, step the environment
         else:
             observation, reward, terminated, truncated, info = self.env.step(action)

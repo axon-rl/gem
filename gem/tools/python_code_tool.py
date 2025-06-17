@@ -54,10 +54,8 @@ def check_forbidden_imports(code: str) -> bool:
 
 
 def get_python_output(
-        code: str,
-        timeout: int = TIMEOUT,
-        return_traceback: bool = False
-        ) -> Tuple[str, bool]:
+    code: str, timeout: int = TIMEOUT, return_traceback: bool = False
+) -> Tuple[str, bool]:
     """
     Execute Python code with a timeout.
     Args: code: Python code string to execute
@@ -178,10 +176,7 @@ class PythonCodeTool(BaseTool):
             is_valid: A boolean indicating if a valid code block was found.
         """
         # Regex patterns to search for.
-        patterns = [
-            r"<python>(.*?)</python>",
-            r"```\n?python(.*?)```"
-        ]
+        patterns = [r"<python>(.*?)</python>", r"```\n?python(.*?)```"]
 
         parsed_code = None
         parsed_action = action
@@ -194,7 +189,7 @@ class PythonCodeTool(BaseTool):
                 is_valid = True
                 if matches.end() <= prev_end:
                     parsed_code = matches.group(1).strip()
-                    parsed_action = action[:matches.end()]
+                    parsed_action = action[: matches.end()]
                     prev_end = matches.end()
         return parsed_code, parsed_action, is_valid
 
@@ -220,9 +215,11 @@ class PythonCodeTool(BaseTool):
             observation = ""
             done = False
         else:
-            execution_result, has_error = get_python_output(parsed_code,
-                                                            timeout=self.timeout,
-                                                            return_traceback=self.return_traceback)
+            execution_result, has_error = get_python_output(
+                parsed_code,
+                timeout=self.timeout,
+                return_traceback=self.return_traceback,
+            )
 
             execution_result = execution_result.lstrip(" \n")
 

@@ -5,7 +5,6 @@ import logging
 import random
 from functools import partial
 from typing import List
-import random
 
 import fire
 from transformers import AutoTokenizer
@@ -27,7 +26,7 @@ TEST_ACTIONS = [
     """<python>import sys\n\nprint('Hello from Python!')\nprint(f'Arguments: {sys.argv[1:]}')\nfor i in range(5):\n    print(f'Number {i}')</python> ...""",
     """```<python>import time\ntime.sleep(30)\nprint('Hello from Python!')</python> ... <python>print('Hello again!')</python>``` ...""",
     """```<python>prnit('Hello from Python!')</python> ...""",
-    "\\boxed{30}"
+    "\\boxed{30}",
 ]
 
 SLEEP_ACTION = """```<python>import time\ntime.sleep(30)\nprint('Hello from Python!')</python> ... <python>print('Hello again!')</python>``` ..."""

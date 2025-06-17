@@ -1,12 +1,14 @@
 """Synchronous (for loop) vectorized environment execution."""
 
 from copy import deepcopy
-from typing import Any, Optional, Sequence, Tuple, Union
 from multiprocessing import Pool, TimeoutError
+from typing import Any, Optional, Sequence, Tuple, Union
+
 import numpy as np
 
 from gem.core import ActType, ObsType
 from gem.vector.vector_env import ArrayType, AutoresetMode, VectorEnv
+
 
 def step_reset_env(action, env, autoreset_mode, autoreset_env):
     if autoreset_mode == AutoresetMode.NEXT_STEP:
@@ -38,14 +40,16 @@ class AsyncVectorEnv(VectorEnv):
         ArrayType,
         dict[str, Any],
     ]:
-        for i, (action, env, autoreset_env) in enumerate(zip(
-            actions,
-            self.envs,
-            self._autoreset_envs,
-        )):
+        for i, (action, env, autoreset_env) in enumerate(
+            zip(
+                actions,
+                self.envs,
+                self._autoreset_envs,
+            )
+        ):
             res = self.mp_pool.apply_async(
-                step_reset_env,
-                (action, env, self.autoreset_mode, autoreset_env))
+                step_reset_env, (action, env, self.autoreset_mode, autoreset_env)
+            )
             try:
                 obs, reward, terminated, truncated, info = res.get(timeout=10)
                 self._env_obs[i] = obs

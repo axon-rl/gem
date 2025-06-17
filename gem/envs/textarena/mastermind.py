@@ -8,7 +8,6 @@ from gem.core import Env
 from gem.utils.constants import TERMINAL_STATE
 
 
-
 class MastermindEnv(Env):
 
     def __init__(

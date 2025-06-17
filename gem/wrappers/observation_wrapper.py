@@ -3,8 +3,7 @@
 from collections import deque
 from typing import Any, Optional, SupportsFloat, Tuple, TypeVar
 
-from gem.core import Env, EnvWrapper, ActType, ObsType
-
+from gem.core import Env, EnvWrapper
 
 WrapperObsType = TypeVar("WrapperObsType")
 
@@ -17,13 +16,13 @@ def maybe_add_new_line(text: str):
 
 class ObservationWrapper(EnvWrapper):
     def __init__(
-            self,
-            env: Env,
-            include_action: bool = True,
-            include_chat_template: bool = True,
-            max_history_length: Optional[int] = None,
-            tokenizer = None,
-            ):
+        self,
+        env: Env,
+        include_action: bool = True,
+        include_chat_template: bool = True,
+        max_history_length: Optional[int] = None,
+        tokenizer=None,
+    ):
         super().__init__(env)
         self.include_action = include_action
         self.include_chat_template = include_chat_template
@@ -34,9 +33,11 @@ class ObservationWrapper(EnvWrapper):
         self.tokenizer = tokenizer
 
         if include_chat_template:
-            assert tokenizer is not None, "Tokenizer must be provided for chat template."
+            assert (
+                tokenizer is not None
+            ), "Tokenizer must be provided for chat template."
             assert include_action, f"Action must be included if using chat template."
-        
+
     def reset(self, seed: Optional[int] = None) -> Tuple[str, dict[str, Any]]:
         self.act_queue.clear()
         self.obs_queue.clear()
@@ -48,7 +49,9 @@ class ObservationWrapper(EnvWrapper):
         self, action: str
     ) -> Tuple[str, SupportsFloat, bool, bool, dict[str, Any]]:
         next_obs, reward, terminated, truncated, info = self.env.step(action)
-        self.act_queue.append(info["parsed_action"] if "parsed_action" in info else action)
+        self.act_queue.append(
+            info["parsed_action"] if "parsed_action" in info else action
+        )
         self.obs_queue.append(next_obs)
         return self.observation(), reward, terminated, truncated, info
 

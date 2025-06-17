@@ -2,11 +2,10 @@
 
 # Adapted from https://github.com/TIGER-AI-Lab/verl-tool
 import logging
+import random
 import time
-from functools import partial
 from pprint import pprint
 from typing import List, Optional
-import random
 
 import fire
 import numpy as np
@@ -52,7 +51,6 @@ def collect_episodes(
         next_obs, reward, terminated, truncated, info = env.step(action)
         done = terminated | truncated
 
-
         for i in range(num_envs):
             if done[i]:
                 episode_count += 1
@@ -64,7 +62,11 @@ def collect_episodes(
 
         if print_episodes:
             # print(f"------{info=}")
-            step_i = info[0]["prev_ep_step_counter"] if "prev_ep_step_counter" in info[0] else info[0]['step_counter']
+            step_i = (
+                info[0]["prev_ep_step_counter"]
+                if "prev_ep_step_counter" in info[0]
+                else info[0]["step_counter"]
+            )
             print("=" * 30)
             print(
                 "-" * 10,
@@ -86,7 +88,9 @@ def collect_episodes(
             pprint(next_obs[0])
             print("-" * 30)
             print(f"Step {step_i}")
-            print(f"Reward: {reward[0]}, Terminated: {terminated[0]}, Truncated: {truncated[0]}, Correct: {reward[0] == 1.0}")
+            print(
+                f"Reward: {reward[0]}, Terminated: {terminated[0]}, Truncated: {truncated[0]}, Correct: {reward[0] == 1.0}"
+            )
             print("-" * 30)
             print(f"So far:")
             print(f"Episodes collected: {episode_count}/{num_episodes}")
@@ -107,7 +111,9 @@ def collect_episodes(
 def eval(
     env_name: str = "ta:GuessTheNumber-v0",
     model_name: str = "Qwen/Qwen3-0.6B-Base",
-    wrappers: Optional[str] = "python_tool,concat_chat,episode_tracking", # Order is important!
+    wrappers: Optional[
+        str
+    ] = "python_tool,concat_chat,episode_tracking",  # Order is important!
     num_episodes: int = 100,
     batch_size: int = 10,
     max_turns: int = 3,
@@ -119,13 +125,18 @@ def eval(
     """Test episode with LLM observation and Python code tool."""
     # Set the policy
     if use_dummy_policy:
-        print(f"Warning: Running evaluation with dummy policy! This will not use the LLM model {model_name}.")
+        print(
+            f"Warning: Running evaluation with dummy policy! This will not use the LLM model {model_name}."
+        )
         from transformers import AutoTokenizer
+
         tokenizer = AutoTokenizer.from_pretrained(model_name)
+
         def batch_policy(obss):
             """A dummy policy that returns random actions from TEST_ACTIONS."""
             assert isinstance(obss, List), f"Incorrect obss type: {type(obss)=}"
             return [random.choice(TEST_ACTIONS) for _ in range(len(obss))]
+
     else:
         llm = LLM(
             model=model_name,
@@ -136,6 +147,7 @@ def eval(
             max_tokens=max_tokens,
         )
         tokenizer = llm.get_tokenizer()
+
         def batch_policy(obss):
             assert isinstance(obss, List), f"Incorrect obss type: {type(obss)=}"
             response = llm.generate(
@@ -148,7 +160,7 @@ def eval(
             actions = [r.outputs[0].text for r in response]
             # print(f"LLM ACTION: {actions!r}")
             return actions
-        
+
     # Collect the wrappers
     wrapper_fns = get_wrapper_fns(
         wrappers,
@@ -185,13 +197,21 @@ def eval(
     print(f"  {'Num Episodes:':<20} {len(episode_rewards)}")
     print("-" * width)
     # Metrics
-    print(f"  {'Cumulative reward:':<20} {np.mean(episode_rewards):.2f}\n({episode_rewards})")
-    print(f"  {'Accuracy:':<20} {np.mean(episode_accuracies):.2f}\n({episode_accuracies})")
-    print(f"  {'Episode length:':<20} {np.mean(episode_lengths):.2f}\n({episode_lengths})")
+    print(
+        f"  {'Cumulative reward:':<20} {np.mean(episode_rewards):.2f}\n({episode_rewards})"
+    )
+    print(
+        f"  {'Accuracy:':<20} {np.mean(episode_accuracies):.2f}\n({episode_accuracies})"
+    )
+    print(
+        f"  {'Episode length:':<20} {np.mean(episode_lengths):.2f}\n({episode_lengths})"
+    )
     if tool_uses:
         print(f"  {'Tool uses:':<20} {np.mean(tool_uses):.2f}\n({tool_uses})")
     print("-" * width)
-    print(f"  {'Time:':<20} {((time.time() - start_time) // 60)} minutes {((time.time() - start_time) % 60):.2f} seconds")
+    print(
+        f"  {'Time:':<20} {((time.time() - start_time) // 60)} minutes {((time.time() - start_time) % 60):.2f} seconds"
+    )
     print("=" * width + "\n")
 
 
