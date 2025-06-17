@@ -34,46 +34,85 @@ def mock_post(*args, **kwargs):
     return mock_resp
 
 
-def test_single_action(env_name: str = "ta:GuessTheNumber-v0"):
+def _should_use_real_requests(search_url: str) -> bool:
+    """Determine if we should use real requests based on the search_url."""
+    return search_url and search_url != "http://dummy-search-url" and not search_url.startswith("http://dummy")
+
+
+def test_single_action(env_name: str = "ta:GuessTheNumber-v0", search_url: str = "http://dummy-search-url"):
     env: MultiTurnEnv = gem.make(env_name, max_turns=3)
-    tool = SearchTool(search_url="http://dummy-search-url")
+    tool = SearchTool(search_url=search_url, topk=2)
     env = ToolEnvWrapper(env, tools=[tool])
     obs, info = env.reset()
-    with patch('requests.post', side_effect=mock_post):
+    
+    use_real_requests = _should_use_real_requests(search_url)
+    print(f"Using {'real' if use_real_requests else 'mocked'} requests with URL: {search_url}")
+    
+    if use_real_requests:
+        # Send real requests
         for i, test_action in enumerate(TEST_ACTIONS):
             print(f"------ Test {i} ------")
             print(f"Action: {test_action!r}")
-            obs, reward, terminated, truncated, info = env.step(test_action)
-            print(f"Observation: {obs}")
-            print(f"Reward: {reward}")
-            print(f"Terminated: {terminated}")
-            print(f"Truncated: {truncated}")
-            print(f"Info: {info}\n")
+            try:
+                obs, reward, terminated, truncated, info = env.step(test_action)
+                print(f"Observation: {obs}")
+                print(f"Reward: {reward}")
+                print(f"Terminated: {terminated}")
+                print(f"Truncated: {truncated}")
+                print(f"Info: {info}\n")
+            except Exception as e:
+                print(f"Error during real request: {e}")
+                print("Observation: [Error occurred]")
+                print("Continuing with next test...\n")
+    else:
+        # Use mocked requests
+        with patch('requests.post', side_effect=mock_post):
+            for i, test_action in enumerate(TEST_ACTIONS):
+                print(f"------ Test {i} ------")
+                print(f"Action: {test_action!r}")
+                obs, reward, terminated, truncated, info = env.step(test_action)
+                print(f"Observation: {obs}")
+                print(f"Reward: {reward}")
+                print(f"Terminated: {terminated}")
+                print(f"Truncated: {truncated}")
+                print(f"Info: {info}\n")
 
-def test_episode(env_name: str = "ta:GuessTheNumber-v0"):
+def test_episode(env_name: str = "ta:GuessTheNumber-v0", search_url: str = "http://dummy-search-url"):
     env: MultiTurnEnv = gem.make(env_name, max_turns=3)
     policy = lambda _: random.choice(TEST_ACTIONS)
-    tool = SearchTool(search_url="http://dummy-search-url")
+    tool = SearchTool(search_url=search_url, topk=2)
+    
+    use_real_requests = _should_use_real_requests(search_url)
+    print(f"Using {'real' if use_real_requests else 'mocked'} requests with URL: {search_url}")
 
-    print("\n" * 5, "EPISODE 1: DEFAULT OBSERVATION")
+    def run_episode_test(episode_name, wrapped_env, policy_func=None):
+        print(f"\n{episode_name}")
+        if use_real_requests:
+            try:
+                run_and_print_episode(wrapped_env, policy_func or policy)
+            except Exception as e:
+                print(f"Error during real request episode: {e}")
+        else:
+            with patch('requests.post', side_effect=mock_post):
+                run_and_print_episode(wrapped_env, policy_func or policy)
+
+    # Episode 1: Default observation
     wrapped_env = ToolEnvWrapper(env, tools=[tool], max_tool_uses=3)
-    with patch('requests.post', side_effect=mock_post):
-        run_and_print_episode(wrapped_env, policy)
+    run_episode_test("EPISODE 1: DEFAULT OBSERVATION", wrapped_env)
 
-    print("\n" * 5, "EPISODE 2: CONCATENATED OBSERVATION")
+    # Episode 2: Concatenated observation
     wrapped_env = ToolEnvWrapper(env, tools=[tool], max_tool_uses=3)
     wrapped_env = ConcatenatedObservation(wrapped_env)
-    with patch('requests.post', side_effect=mock_post):
-        run_and_print_episode(wrapped_env, policy)
+    run_episode_test("EPISODE 2: CONCATENATED OBSERVATION", wrapped_env)
 
-    print("\n" * 5, "EPISODE 3: CHAT TEMPLATE OBSERVATION")
+    # Episode 3: Chat template observation
     tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen3-0.6B-Base")
     wrapped_env = ToolEnvWrapper(env, tools=[tool], max_tool_uses=3)
     wrapped_env = ChatTemplatedObservation(wrapped_env, tokenizer)
-    with patch('requests.post', side_effect=mock_post):
-        run_and_print_episode(wrapped_env, policy)
+    run_episode_test("EPISODE 3: CHAT TEMPLATE OBSERVATION", wrapped_env)
 
-    print("\n" * 5, "BATCH EPISODE: SYNC VECTORIZED ENV")
+    # Batch episode: Sync vectorized env
+    print("\nBATCH EPISODE: SYNC VECTORIZED ENV")
     num_envs = 3
     tool_env_wrapper = partial(ToolEnvWrapper, tools=[tool], max_tool_uses=3)
     ta_vec_env = gem.make_vec(
@@ -82,18 +121,17 @@ def test_episode(env_name: str = "ta:GuessTheNumber-v0"):
         wrappers=[tool_env_wrapper, ConcatenatedObservation],
         max_turns=3,
     )
-    with patch('requests.post', side_effect=mock_post):
-        run_and_print_episode(
-            ta_vec_env,
-            policy=lambda _: [random.choice([TEST_ACTIONS[2]]) for _ in range(num_envs)],
-            ignore_done=True,
-            max_steps=5,
-        )
+    batch_policy = lambda _: [random.choice([TEST_ACTIONS[2]]) for _ in range(num_envs)]
+    run_episode_test("", ta_vec_env, batch_policy)
 
 def main():
     """Run with:
-    python -m tests.test_tool.test_search_tool single_action --env_name ta:GuessTheNumber-v0
-    python -m tests.test_tool.test_search_tool episode --env_name ta:GuessTheNumber-v0
+    python -m tests.test_tool.test_search_tool single_action
+    python -m tests.test_tool.test_search_tool episode
+    
+    # To test with real search server:
+    python -m tests.test_tool.test_search_tool single_action --search_url http://localhost:8000/retrieve
+    python -m tests.test_tool.test_search_tool episode --search_url http://localhost:8000/retrieve
     """
     fire.Fire(
         {
