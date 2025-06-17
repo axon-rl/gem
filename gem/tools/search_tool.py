@@ -10,6 +10,7 @@ from gem.tools.base_tool import BaseTool
 
 class SearchTool(BaseTool):
     tool_type = "search"
+    # TODO: add a timeout 
 
     def __init__(self, num_workers=1, search_url=None, topk=3):
         super().__init__(num_workers)
@@ -76,11 +77,9 @@ class SearchTool(BaseTool):
         if not is_valid:
             # observation = "No valid search query found. Please provide your query within <search>...</search> tags."
             observation = ""
-            done = False # TODO: @changyu maybe remove done?
             valid = False
         else:
             search_result = self._search(query)
             observation = f'\n\n<information>{search_result}</information>\n\n'
-            done = False
             valid = True
-        return observation, done, valid
+        return observation, valid

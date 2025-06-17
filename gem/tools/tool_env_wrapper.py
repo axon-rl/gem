@@ -28,12 +28,13 @@ class ToolEnvWrapper(EnvWrapper):
     ) -> Tuple[str, SupportsFloat, bool, bool, dict[str, Any]]:
         # try to execute the action with each tool
         for tool in self.tools:
-            observation, terminated, valid = tool.execute_action(action)
+            observation, valid = tool.execute_action(action)
             if valid:
                 if verbose:
                     print(f"Action {action!r} executed by tool {tool.tool_type}")
                 self.tool_use_counter += 1
                 reward = self.tool_use_reward
+                terminated = False
                 truncated = False
                 info = {}
                 break
