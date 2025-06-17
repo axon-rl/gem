@@ -82,7 +82,7 @@ class MathEnv(Env):
     def _check_correct(self, model_answer: str) -> bool:
         """Check if the action is correct."""
         # parse with math_verify
-        model_answer = parse(model_answer)
+        model_answer = parse(model_answer, parsing_timeout=None)
 
         # get correct answers from the dataset entry
         if isinstance(self.answer, (str, float, int)):
@@ -96,7 +96,7 @@ class MathEnv(Env):
         # (math_verify.parse handles extraction e.g. from \\boxed{...})
         is_correct = False
         for correct_answer in correct_answers:
-            correct_answer = parse(str(correct_answer))
+            correct_answer = parse(str(correct_answer), parsing_timeout=None)
             if verify(correct_answer, model_answer):
                 is_correct = True
                 break

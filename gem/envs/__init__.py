@@ -62,7 +62,7 @@ register(
     "gem.envs.textarena.mastermind:MastermindEnv",
     code_length=2,
     num_numbers=6,
-    max_turns=20,
+    max_turns=6,
     duplicate_numbers=False,
 )
 # Minesweeper
