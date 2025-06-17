@@ -3,12 +3,10 @@
 from copy import deepcopy
 from typing import Any, Optional, Sequence, Tuple, Union
 from multiprocessing import Pool, TimeoutError
-
 import numpy as np
 
 from gem.core import ActType, ObsType
 from gem.vector.vector_env import ArrayType, AutoresetMode, VectorEnv
-
 
 def step_reset_env(action, env, autoreset_mode, autoreset_env):
     if autoreset_mode == AutoresetMode.NEXT_STEP:

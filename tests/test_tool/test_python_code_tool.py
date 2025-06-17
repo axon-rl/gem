@@ -25,9 +25,9 @@ TEST_ACTIONS = [
     """<python>print('Hello from Python!')</python> ...""",
     """Dummy action""",
     """<python>import sys\n\nprint('Hello from Python!')\nprint(f'Arguments: {sys.argv[1:]}')\nfor i in range(5):\n    print(f'Number {i}')</python> ...""",
-    """```<python>\nprint('Hello from Python!')</python> ... <python>print('Hello again!')</python>``` ...""",
     """```<python>import time\ntime.sleep(30)\nprint('Hello from Python!')</python> ... <python>print('Hello again!')</python>``` ...""",
     """```<python>prnit('Hello from Python!')</python> ...""",
+    "\\boxed{30}"
 ]
 
 SLEEP_ACTION = """```<python>import time\ntime.sleep(30)\nprint('Hello from Python!')</python> ... <python>print('Hello again!')</python>``` ..."""
@@ -54,7 +54,7 @@ def test_episode(env_name: str = "ta:GuessTheNumber-v0"):
     policy = lambda _: random.choice(TEST_ACTIONS)
     tool = PythonCodeTool(timeout=2)
 
-    print("\n" * 5, "EPISODE: DEFAULT OBSERVATION")
+    print("\n" * 5, "EPISODE 1: DEFAULT OBSERVATION")
     wrapped_env = ToolEnvWrapper(env, tools=[tool], max_tool_uses=3)
     run_and_print_episode(wrapped_env, policy)
 
@@ -64,7 +64,7 @@ def test_episode(env_name: str = "ta:GuessTheNumber-v0"):
     wrapped_env = WRAPPER_FACTORY["concat_chat"](wrapped_env, tokenizer=tokenizer)
     run_and_print_episode(wrapped_env, policy)
 
-    print("\n" * 5, "BATCH EPISODE 1: SYNC ECTORIZED ENV")
+    print("\n" * 5, "BATCH EPISODE 1: SYNC VECTORIZED ENV")
     num_envs = 4
     tool_env_wrapper = partial(ToolEnvWrapper, tools=[tool], max_tool_uses=3)
     chat_wrapper = partial(WRAPPER_FACTORY["concat_chat"], tokenizer=tokenizer)
@@ -119,6 +119,7 @@ def test_llm_episode(
         max_tokens=100,
         top_p=0.95,
     )
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
 
     def policy(obs):
         assert isinstance(
@@ -152,19 +153,19 @@ def test_llm_episode(
 
     tool = PythonCodeTool(timeout=2)
 
-    print("\n" * 5, "EPISODE: DEFAULT OBSERVATION")
+    print("\n" * 5, "EPISODE 1: DEFAULT OBSERVATION")
     wrapped_env = ToolEnvWrapper(env, tools=[tool], max_tool_uses=3)
     run_and_print_episode(wrapped_env, policy)
 
     print("\n" * 5, "EPISODE 2: CHAT TEMPLATE OBSERVATION")
     wrapped_env = ToolEnvWrapper(env, tools=[tool], max_tool_uses=3)
-    wrapped_env = WRAPPER_FACTORY["concat_chat"](wrapped_env, tokenizer=llm.get_tokenizer())
+    wrapped_env = WRAPPER_FACTORY["concat_chat"](wrapped_env, tokenizer=tokenizer)
     run_and_print_episode(wrapped_env, policy)
 
     print("\n" * 5, "BATCH EPISODE 1: SYNC VECTORIZED ENV")
     num_envs = 4
     tool_env_wrapper = partial(ToolEnvWrapper, tools=[tool], max_tool_uses=3)
-    chat_wrapper = partial(WRAPPER_FACTORY["concat_chat"], tokenizer=llm.get_tokenizer())
+    chat_wrapper = partial(WRAPPER_FACTORY["concat_chat"], tokenizer=tokenizer)
     ta_vec_env = gem.make_vec(
         env_name,
         num_envs=num_envs,
@@ -179,23 +180,23 @@ def test_llm_episode(
         max_steps=2,
     )
 
-    # print("\n" * 5, "BATCH EPISODE 2: ASYNC VECTORIZED ENV")
-    # num_envs = 4
-    # tool_env_wrapper = partial(ToolEnvWrapper, tools=[tool], max_tool_uses=3)
-    # chat_wrapper = partial(WRAPPER_FACTORY["concat_chat"], tokenizer=llm.get_tokenizer())
-    # ta_vec_env = gem.make_vec(
-    #     env_name,
-    #     num_envs=num_envs,
-    #     wrappers=[tool_env_wrapper, chat_wrapper],
-    #     async_mode=True,
-    #     max_turns=3,
-    # )
-    # run_and_print_episode(
-    #     ta_vec_env,
-    #     policy=batch_policy,
-    #     ignore_done=True,
-    #     max_steps=2,
-    # )
+    print("\n" * 5, "BATCH EPISODE 2: ASYNC VECTORIZED ENV")
+    num_envs = 4
+    tool_env_wrapper = partial(ToolEnvWrapper, tools=[tool], max_tool_uses=3)
+    chat_wrapper = partial(WRAPPER_FACTORY["concat_chat"], tokenizer=tokenizer)
+    ta_vec_env = gem.make_vec(
+        env_name,
+        num_envs=num_envs,
+        wrappers=[tool_env_wrapper, chat_wrapper],
+        async_mode=True,
+        max_turns=3,
+    )
+    run_and_print_episode(
+        ta_vec_env,
+        policy=batch_policy,
+        ignore_done=True,
+        max_steps=2,
+    )
 
 
 if __name__ == "__main__":

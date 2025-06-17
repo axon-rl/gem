@@ -48,7 +48,8 @@ class MathEnv(Env):
                 )
         assert isinstance(dataset, Dataset), f"Expected a Dataset, got {type(dataset)}"
         self.dataset = dataset.shuffle(seed=self.seed)
-        self.dataset_iter = iter(self.dataset)
+        self.idx = 0
+        self.epoch = 0
 
     def step(
         self, action: str
@@ -65,17 +66,17 @@ class MathEnv(Env):
         """Sample a question from the dataset."""
         del seed
 
-        try:
-            data = next(self.dataset_iter)
-        except StopIteration:
-            self.dataset = self.dataset.shuffle(seed=self.seed)
-            self.dataset_iter = iter(self.dataset)
-            data = next(self.dataset_iter)
+        if self.idx == len(self.dataset):
+            self.epoch += 1
+            self.dataset = self.dataset.shuffle(seed=self.seed + self.epoch)
+            self.idx = 0
 
         # print(f"Sampled data: {data}")
 
+        data = self.dataset[self.idx]
         self.first_obs = data[self.question_key]
         self.answer = data[self.answer_key]
+        self.idx += 1
         return self.first_obs, {}
 
     def _check_correct(self, model_answer: str) -> bool:
