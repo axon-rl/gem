@@ -58,7 +58,12 @@ class AsyncVectorEnv(VectorEnv):
                 self._truncations[i] = truncated
                 self._env_infos[i] = info
             except TimeoutError:
-                assert False, f"Environment {i} step timed out with action {action}."
+                obs, reward, terminated, truncated, info = res.get(timeout=10)
+                self._env_obs[i] = "TimeoutError"
+                self._rewards[i] = 0.0
+                self._terminations[i] = True
+                self._truncations[i] = False
+                self._env_infos[i] = {}
 
         self._autoreset_envs = np.logical_or(self._terminations, self._truncations)
 
