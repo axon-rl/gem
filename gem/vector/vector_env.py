@@ -34,4 +34,5 @@ class VectorEnv(Env):
         self._rewards = np.zeros((self.num_envs,), dtype=np.float64)
         self._terminations = np.zeros((self.num_envs,), dtype=np.bool_)
         self._truncations = np.zeros((self.num_envs,), dtype=np.bool_)
+        self._env_infos = [{} for _ in range(self.num_envs)]
         self._autoreset_envs = np.zeros((self.num_envs,), dtype=np.bool_)

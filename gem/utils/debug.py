@@ -83,19 +83,19 @@ async def run_and_print_episode_async(
             "observation",
             "-" * 10,
         )
-        pprint(obs)
+        ppprint(obs)
         print(
             "-" * 10,
             "action",
             "-" * 10,
         )
-        pprint(action)
+        ppprint(action)
         print(
             "-" * 10,
             "reward",
             "-" * 10,
         )
-        pprint(reward)
+        ppprint(reward)
 
         done = terminated | truncated
 

@@ -2,8 +2,8 @@
 
 # Adapted from https://github.com/TIGER-AI-Lab/verl-tool
 import logging
+import random
 import time
-from functools import partial
 from pprint import pprint
 from typing import List, Optional
 
@@ -12,9 +12,7 @@ import numpy as np
 from vllm import LLM, SamplingParams
 
 import gem
-from gem.tools.python_code_tool import PythonCodeTool
-from gem.tools.tool_env_wrapper import ToolEnvWrapper
-from gem.wrappers.stateful_observation import ChatTemplatedObservation
+from gem.wrappers.wrapper_factory import get_wrapper_fns
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
@@ -37,47 +35,39 @@ def collect_episodes(
     policy,
     num_episodes: int = 10,
     print_episodes: bool = False,
-    tool_wrapper_depth: Optional[int] = None,
 ):
     num_envs = env.num_envs
     episode_count = 0
     episode_rewards = []
     episode_accuracies = []
     episode_lengths = []
-    env_rewards = [[] for _ in range(num_envs)]
-    env_steps = [0 for _ in range(num_envs)]
-    tool_uses = []
+    episode_tool_uses = []
     obs, _ = env.reset()
     done = False
     step_count = 0
     while True:
         step_count += 1
         action = policy(obs)
-        next_obs, reward, terminated, truncated, _ = env.step(action)
+        next_obs, reward, terminated, truncated, info = env.step(action)
         done = terminated | truncated
 
         for i in range(num_envs):
-            env_rewards[i].append(reward[i])
-            env_steps[i] += 1
             if done[i]:
                 episode_count += 1
-                episode_rewards.append(np.sum(env_rewards[i]))
-                env_rewards[i] = []
+                episode_rewards.append(info[i]["prev_ep_cumulative_rewards"])
                 episode_accuracies.append(reward[i] == 1.0)
-                episode_lengths.append(env_steps[i])
-                env_steps[i] = 0
-                if tool_wrapper_depth is not None:
-                    _env = env.envs[i]
-                    for j in range(tool_wrapper_depth):
-                        _env = _env.env
-                    tool_uses.append(_env.tool_use_counter)
-                    print(type(_env), _env.tool_use_counter)
+                episode_lengths.append(info[i]["prev_ep_step_counter"])
+                if "prev_ep_tool_use_counter" in info[i]:
+                    episode_tool_uses.append(info[i]["prev_ep_tool_use_counter"])
 
         if print_episodes:
-            print("=" * 30)
-            print(
-                f"Step {env_steps[0]} (Episodes collected so far: {episode_count}/{num_episodes})"
+            # print(f"------{info=}")
+            step_i = (
+                info[0]["prev_ep_step_counter"]
+                if "prev_ep_step_counter" in info[0]
+                else info[0]["step_counter"]
             )
+            print("=" * 30)
             print(
                 "-" * 10,
                 "observation",
@@ -92,17 +82,22 @@ def collect_episodes(
             pprint(action[0])
             print(
                 "-" * 10,
-                "reward",
-                "-" * 10,
-            )
-            pprint(reward[0])
-            print(f"terminated: {terminated[0]}, truncated: {truncated[0]}")
-            print(
-                "-" * 10,
                 "next observation",
                 "-" * 10,
             )
             pprint(next_obs[0])
+            print("-" * 30)
+            print(f"Step {step_i}")
+            print(
+                f"Reward: {reward[0]}, Terminated: {terminated[0]}, Truncated: {truncated[0]}, Correct: {reward[0] == 1.0}"
+            )
+            print("-" * 30)
+            print(f"So far:")
+            print(f"Episodes collected: {episode_count}/{num_episodes}")
+            print(f"Accuracy: {np.mean(episode_accuracies):.2f}")
+            print(f"Episode length: {np.mean(episode_lengths):.2f}")
+            if episode_tool_uses:
+                print(f"Tool uses: {np.mean(episode_tool_uses):.2f}")
             print("=" * 30)
 
         obs = next_obs
@@ -110,90 +105,125 @@ def collect_episodes(
         if episode_count >= num_episodes:
             break
 
-    return episode_rewards, episode_lengths, episode_accuracies, tool_uses
+    return episode_rewards, episode_lengths, episode_accuracies, episode_tool_uses
 
 
 def eval(
     env_name: str = "ta:GuessTheNumber-v0",
     model_name: str = "Qwen/Qwen3-0.6B-Base",
+    wrappers: Optional[
+        str
+    ] = "python_tool,concat_chat,episode_tracking",  # Order is important!
     num_episodes: int = 100,
     batch_size: int = 10,
     max_turns: int = 3,
-    max_tool_uses: int = 10,
-    temperature: float = 0.7,
-    print_episodes: bool = False,
-    enable_python_tool: bool = True,
+    temperature: float = 0.0,
+    print_episodes: bool = True,
     max_tokens: int = 3000,
+    use_dummy_policy: bool = False,
 ):
     """Test episode with LLM observation and Python code tool."""
-    llm = LLM(
-        model=model_name,
-    )
-    sampling_params = SamplingParams(
-        n=1,
-        temperature=temperature,
-        max_tokens=max_tokens,
+    # Set the policy
+    if use_dummy_policy:
+        print(
+            f"Warning: Running evaluation with dummy policy! This will not use the LLM model {model_name}."
+        )
+        from transformers import AutoTokenizer
+
+        tokenizer = AutoTokenizer.from_pretrained(model_name)
+
+        def batch_policy(obss):
+            """A dummy policy that returns random actions from TEST_ACTIONS."""
+            assert isinstance(obss, List), f"Incorrect obss type: {type(obss)=}"
+            return [random.choice(TEST_ACTIONS) for _ in range(len(obss))]
+
+    else:
+        llm = LLM(
+            model=model_name,
+        )
+        sampling_params = SamplingParams(
+            n=1,
+            temperature=temperature,
+            max_tokens=max_tokens,
+        )
+        tokenizer = llm.get_tokenizer()
+
+        def batch_policy(obss):
+            assert isinstance(obss, List), f"Incorrect obss type: {type(obss)=}"
+            response = llm.generate(
+                obss,
+                sampling_params=sampling_params,
+                use_tqdm=False,
+            )
+            # print(f"LLM OBSERVATION: {obss!r}")
+            # print(f"LLM RESPONSE: {response}")
+            actions = [r.outputs[0].text for r in response]
+            # print(f"LLM ACTION: {actions!r}")
+            return actions
+
+    # Collect the wrappers
+    wrapper_fns = get_wrapper_fns(
+        wrappers,
+        tokenizer=tokenizer if "concat_chat" in wrappers else None,
     )
 
-    def batch_policy(obss):
-        assert isinstance(
-            obss, List
-        ), f"Observation should be a string but is {type(obss)}."
-        # return [random.choice(TEST_ACTIONS) for _ in range(len(obss))]
-        response = llm.generate(
-            obss,
-            sampling_params=sampling_params,
-            use_tqdm=False,
-        )
-        # print(f"LLM OBSERVATION: {obss!r}")
-        # print(f"LLM RESPONSE: {response}")
-        actions = [r.outputs[0].text for r in response]
-        # print(f"LLM ACTION: {actions!r}")
-        return actions
-
-    tool = PythonCodeTool(timeout=5)
-    wrappers = []
-    if enable_python_tool:
-        tool_env_wrapper = partial(
-            ToolEnvWrapper, tools=[tool], max_tool_uses=max_tool_uses
-        )
-        wrappers.append(tool_env_wrapper)
-    chat_wrapper = partial(ChatTemplatedObservation, tokenizer=llm.get_tokenizer())
-    wrappers.append(chat_wrapper)
+    # Make vectorized environment
     ta_vec_env = gem.make_vec(
         env_name,
         num_envs=batch_size,
-        wrappers=wrappers,
+        wrappers=wrapper_fns,
         max_turns=max_turns,
         async_mode=False,
     )
+
+    # Collect episodes
     start_time = time.time()
     episode_rewards, episode_lengths, episode_accuracies, tool_uses = collect_episodes(
         ta_vec_env,
         policy=batch_policy,
         num_episodes=num_episodes,
         print_episodes=print_episodes,
-        tool_wrapper_depth=1 if enable_python_tool else None,
     )
-    print("\n" * 5, "EVALUATION RESULTS")
-    print(f"----ENV: {env_name}")
-    print(f"----MODEL: {model_name}")
-    print(f"----NUM EPISODES: {len(episode_rewards)}")
-    print(f"----EPISODE REWARD: {np.mean(episode_rewards)} ({episode_rewards})")
-    print(f"----EPISODE ACCURACY: {np.mean(episode_accuracies)} ({episode_accuracies})")
-    print(f"----EPISODE LENGTH: {np.mean(episode_lengths)} ({episode_lengths})")
+
+    # Print results
+    width = 50
+    header = " EVALUATION RESULTS "
+    print("\n" + "=" * width)
+    print(f"{header:=^{width}}")
+    print("=" * width)
+    # Configuration
+    print(f"  {'Environment:':<20} {env_name}")
+    print(f"  {'Model:':<20} {model_name}")
+    print(f"  {'Num Episodes:':<20} {len(episode_rewards)}")
+    print("-" * width)
+    # Metrics
+    print(
+        f"  {'Cumulative reward:':<20} {np.mean(episode_rewards):.2f}\n({episode_rewards})"
+    )
+    print(
+        f"  {'Accuracy:':<20} {np.mean(episode_accuracies):.2f}\n({episode_accuracies})"
+    )
+    print(
+        f"  {'Episode length:':<20} {np.mean(episode_lengths):.2f}\n({episode_lengths})"
+    )
     if tool_uses:
-        print(f"----TOOL USES: {np.mean(tool_uses)} ({tool_uses})")
-    print(f"----TIME: {time.time() - start_time:.2f} seconds\n\n")
+        print(f"  {'Tool uses:':<20} {np.mean(tool_uses):.2f}\n({tool_uses})")
+    print("-" * width)
+    print(
+        f"  {'Time:':<20} {((time.time() - start_time) // 60)} minutes {((time.time() - start_time) % 60):.2f} seconds"
+    )
+    print("=" * width + "\n")
 
 
 if __name__ == "__main__":
     fire.Fire(eval)
 
     """Run with:
-    python -m eval.eval --env_name ta:GuessTheNumber-v0 --model_name Qwen/Qwen3-0.6B --num_episodes 30 --batch_size 5 --print_episodes True
-    python -m eval.eval --env_name ta:GuessTheNumber-v0 --model_name Qwen/Qwen3-0.6B --print_episodes True
-    python -m eval.eval --env_name ta:GuessTheNumber-v0 --model_name GAIR/ToRL-1.5B --print_episodes True
-    python -m eval.eval --env_name math:MATH500-v0 --model_name GAIR/ToRL-1.5B --print_episodes True --num_episodes 100 --batch_size 3 --temperature 0.0 --enable_python_tool False --max_tokens 100
-    python -m eval.eval --env_name math:MATH500-v0 --model_name GAIR/ToRL-1.5B --print_episodes True --num_episodes 20 --batch_size 3 --temperature 0.0 --max_tokens 100
+    python -m eval.eval --env_name ta:GuessTheNumber-v0 --model_name Qwen/Qwen3-0.6B
+    python -m eval.eval --env_name ta:GuessTheNumber-v0 --model_name Qwen/Qwen3-0.6B --num_episodes 20 --batch_size 5
+    python -m eval.eval --env_name eval:MATH500 --model_name GAIR/ToRL-1.5Bx
+    python -m eval.eval --env_name eval:MATH500 --model_name GAIR/ToRL-1.5B --num_episodes 20 --batch_size 5 --wrappers "'python_tool,concat_with_action,episode_tracking'"
+    python -m eval.eval --env_name eval:MATH500 --model_name GAIR/ToRL-1.5B --num_episodes 20 --batch_size 5 --max_tokens 100
+    python -m eval.eval --env_name eval:MATH500 --model_name VerlTool/torl-deep_math-fsdp_agent-qwen2.5-math-1.5b-grpo-n16-b128-t1.0-lr1e-6-320-step --num_episodes 20 --batch_size 5 --max_tokens 100
+    python -m eval.eval --use_dummy_policy --num_episodes 20 --batch_size 5
     """

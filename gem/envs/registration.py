@@ -98,10 +98,12 @@ def make_vec(
         return single_env
 
     if async_mode:
+        print(f"AsyncVectorEnv with {num_envs} environments.")
         env = AsyncVectorEnv(
             env_fns=[partial(create_single_env, i) for i in range(num_envs)],
         )
     else:
+        print(f"SyncVectorEnv with {num_envs} environments.")
         env = SyncVectorEnv(
             env_fns=[partial(create_single_env, i) for i in range(num_envs)],
         )

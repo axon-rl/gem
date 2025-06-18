@@ -1,6 +1,7 @@
 """Env for math datasets."""
 
 import logging
+from functools import partial
 from typing import Any, Optional, SupportsFloat, Tuple
 
 from datasets import Dataset, DatasetDict, load_dataset
@@ -11,6 +12,11 @@ from gem.utils.constants import TERMINAL_STATE
 from gem.utils.parsing import extract_last_boxed_answer
 
 logger = logging.getLogger(__name__)
+
+# math_verify must be run without timeout to avoid using signal
+# since this is not compatible with multiprocessing
+parse = partial(parse, parsing_timeout=None)
+verify = partial(verify, timeout_seconds=None)
 
 
 class MathEnv(Env):
@@ -45,7 +51,8 @@ class MathEnv(Env):
                 )
         assert isinstance(dataset, Dataset), f"Expected a Dataset, got {type(dataset)}"
         self.dataset = dataset.shuffle(seed=self.seed)
-        self.dataset_iter = iter(self.dataset)
+        self.idx = 0
+        self.epoch = 0
 
     def step(
         self, action: str
@@ -62,15 +69,15 @@ class MathEnv(Env):
         """Sample a question from the dataset."""
         del seed
 
-        try:
-            data = next(self.dataset_iter)
-        except StopIteration:
-            self.dataset = self.dataset.shuffle(seed=self.seed)
-            self.dataset_iter = iter(self.dataset)
-            data = next(self.dataset_iter)
+        if self.idx == len(self.dataset):
+            self.epoch += 1
+            self.dataset = self.dataset.shuffle(seed=self.seed + self.epoch)
+            self.idx = 0
 
+        data = self.dataset[self.idx]
         self.first_obs = data[self.question_key]
         self.answer = data[self.answer_key]
+        self.idx += 1
         return self.first_obs, {}
 
     def _check_correct(self, model_answer: str) -> bool:
