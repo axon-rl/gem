@@ -11,9 +11,6 @@ from gem.core import Env
 from gem.utils.constants import TERMINAL_STATE
 from gem.utils.parsing import extract_last_boxed_answer
 
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-)
 logger = logging.getLogger(__name__)
 
 # math_verify must be run without timeout to avoid using signal
@@ -27,7 +24,7 @@ class MathEnv(Env):
 
     def __init__(
         self,
-        dataset_name: Optional[str] = "math_datasets/math_problems",
+        dataset_name: Optional[str] = "",
         split: Optional[str] = None,
         dataset: Optional[Dataset] = None,
         question_key: str = "problem",
@@ -41,7 +38,7 @@ class MathEnv(Env):
         self.answer_key = answer_key
         if dataset is None:
             dataset = load_dataset(dataset_name)
-            print(f"Loaded: {dataset=}")
+            logger.info(f"Loaded: {dataset=}")
         if isinstance(dataset, DatasetDict):
             if split is not None:
                 dataset = dataset[split]
@@ -60,11 +57,11 @@ class MathEnv(Env):
     def step(
         self, action: str
     ) -> Tuple[str, SupportsFloat, bool, bool, dict[str, Any]]:
-        clean_action = extract_last_boxed_answer(action)
-        if clean_action is None:
+        model_answer = extract_last_boxed_answer(action)
+        if model_answer is None:
             reward = -0.1
         else:
-            is_correct = self._check_correct(clean_action)
+            is_correct = self._check_correct(model_answer)
             reward = 1.0 if is_correct else 0.0
         return TERMINAL_STATE, reward, True, True, {}
 
@@ -76,8 +73,6 @@ class MathEnv(Env):
             self.epoch += 1
             self.dataset = self.dataset.shuffle(seed=self.seed + self.epoch)
             self.idx = 0
-
-        # print(f"Sampled data: {data}")
 
         data = self.dataset[self.idx]
         self.first_obs = data[self.question_key]
@@ -92,7 +87,7 @@ class MathEnv(Env):
 
         # get correct answers from the dataset entry
         if isinstance(self.answer, (str, float, int)):
-            correct_answers = [self.answer]
+            correct_answers = [str(self.answer)]
         elif isinstance(self.answer, list):
             correct_answers = self.answer
         else:

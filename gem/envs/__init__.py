@@ -140,6 +140,7 @@ register(
     max_turns=8,
 )
 
+
 # Register math dataset environments
 
 register(
@@ -147,9 +148,20 @@ register(
     "gem.envs.math_env:MathEnv",
     dataset_name="axon-rl/Eval-MATH500",
     split="test",
-    # dataset=load_dataset("axon-rl/Eval-MATH500"),
     question_key="problem",
     answer_key="answer",
+)
+
+# Register code dataset environments
+
+## The test split of deepmind/code_contests, with merged test cases.
+register(
+    "eval:CodeContest",
+    "gem.envs.code_env:CodeEnv",
+    dataset_name="axon-rl/CodeContest",
+    split="test",
+    question_key="problem",
+    test_key="tests",
 )
 
 # Register datasets from ReasoningGym

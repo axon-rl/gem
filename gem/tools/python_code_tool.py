@@ -6,52 +6,11 @@ from typing import Tuple
 
 import regex as re
 
-from .base_tool import BaseTool
+from gem.tools.base_tool import BaseTool
+from gem.utils.sandbox import check_forbidden_imports
 
 # Timeout for code execution in seconds
 TIMEOUT = 5
-
-
-def check_forbidden_imports(code: str) -> bool:
-    """
-    Checks if the code contains imports of potentially dangerous packages.
-    Args: code: Python code string to analyze
-    Returns: Boolean indicating if the code contains forbidden imports
-    """
-    # List of potentially dangerous modules that could affect the host system
-    forbidden_modules = [
-        "subprocess",
-        "multiprocessing",
-        "threading",
-        "socket",
-        "psutil",
-        "resource",
-        "ctypes",
-    ]
-
-    # Simple string-based check for import statements
-    for module in forbidden_modules:
-        if f"import {module}" in code or f"from {module}" in code:
-            return True
-
-    # Check for os.system, os.popen, and similar dangerous calls
-    dangerous_patterns = [
-        "os.system",
-        "os.popen",
-        "os.spawn",
-        "os.fork",
-        "os.exec",
-        "sys.exit",
-        "os._exit",
-        "os.kill",
-    ]
-
-    for pattern in dangerous_patterns:
-        if pattern in code:
-            return True
-
-    return False
-
 
 def get_python_output(
     code: str, timeout: int = TIMEOUT, return_traceback: bool = False
