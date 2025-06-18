@@ -3,6 +3,7 @@
 import re
 from typing import Tuple
 
+import msgspec
 import requests
 
 from gem.tools.base_tool import BaseTool
@@ -44,9 +45,9 @@ class SearchTool(BaseTool):
             "return_scores": True
         }
         try:
-            response = requests.post(self.search_url, json=payload)
+            response = requests.post(self.search_url, data=msgspec.msgpack.encode(payload))
             response.raise_for_status()
-            result = response.json()['result'][0]
+            result = msgspec.msgpack.decode(response.content)['result'][0]
             return self._passages2string(result)
         except Exception as e:
             return f"[SearchTool Error: {e}]"

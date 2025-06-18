@@ -9,10 +9,10 @@ from typing import Dict, List, Optional
 import aiohttp
 import bs4
 import chardet
-import uvicorn
-from fastapi import FastAPI
 from googleapiclient.discovery import build
-from pydantic import BaseModel
+from mosec import Runtime, Server, Worker
+from mosec.mixin import TypedMsgPackMixin
+from msgspec import Struct
 
 # --- CLI Args ---
 parser = argparse.ArgumentParser(description="Launch online search server.")
@@ -20,7 +20,16 @@ parser.add_argument('--api_key', type=str, required=True, help="API key for Goog
 parser.add_argument('--cse_id', type=str, required=True, help="CSE ID for Google search")
 parser.add_argument('--topk', type=int, default=3, help="Number of results to return per query")
 parser.add_argument('--snippet_only', action='store_true', help="If set, only return snippets; otherwise, return full context.")
+parser.add_argument('--max_wait_time', type=int, default=10, help="Maximum wait time for batching requests")
 args = parser.parse_args()
+
+
+class SearchRequest(Struct, kw_only=True):
+    queries: List[str]
+
+
+class SearchResponse(Struct, kw_only=True):
+    result: List[List[Dict]]
 
 
 # --- Config ---
@@ -147,9 +156,9 @@ class OnlineSearchEngine:
             return list(executor.map(self._retrieve_context, queries))
 
     def _retrieve_context(self, query: str) -> List[str]:
+        search_results = self.search(query)
         
         if self.config.snippet_only:
-            search_results = self.search(query)
             contexts = []
             for result in search_results:
                 for item in result.get("items", []):
@@ -159,7 +168,7 @@ class OnlineSearchEngine:
                         title = "No title." if not title else title
                         context = "No snippet available." if not context else context
                         contexts.append({
-                            'document': {"contents": f'\"{title}\"\n{context}'},
+                            'document': {"contents": f'"{title}"\n{context}'},
                         })
         else:
             content_dict = self.fetch_web_content(search_results)
@@ -175,26 +184,40 @@ class OnlineSearchEngine:
                             title = "No title." if not title else title
                             context = "No snippet available." if not context else context
                             contexts.append({
-                                'document': {"contents": f'\"{title}\"\n{context}'},
+                                'document': {"contents": f'"{title}"\n{context}'},
                             })
         
         return contexts[:self.config.topk]
 
 
-# --- FastAPI App ---
-app = FastAPI(title="Online Search Proxy Server")
-
-class SearchRequest(BaseModel):
-    queries: List[str]
-
-config = OnlineSearchConfig(api_key=args.api_key, cse_id=args.cse_id, topk=args.topk, snippet_only=args.snippet_only)
-engine = OnlineSearchEngine(config)
-
-@app.post("/retrieve")
-def search_endpoint(request: SearchRequest):
-    results = engine.batch_search(request.queries)
-    return {"result": results}
+class SearchWorker(TypedMsgPackMixin, Worker):
+    def __init__(self):
+        super().__init__()
+        self.config = OnlineSearchConfig(
+            api_key=args.api_key,
+            cse_id=args.cse_id,
+            topk=args.topk,
+            snippet_only=args.snippet_only
+        )
+        self.engine = OnlineSearchEngine(self.config)
+        
+    def forward(self, request: SearchRequest) -> SearchResponse:
+        results = self.engine.batch_search(request.queries)
+        return SearchResponse(result=results)
 
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    server = Server()
+    runtime = Runtime(
+        worker=SearchWorker,
+        num=1,
+        max_batch_size=1,
+        max_wait_time=args.max_wait_time,
+        timeout=30,  
+    )
+    
+    server.register_runtime({
+        "/retrieve": [runtime],
+    })
+    
+    server.run()

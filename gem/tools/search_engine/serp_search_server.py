@@ -1,12 +1,11 @@
-
 import argparse
 from concurrent.futures import ThreadPoolExecutor
 from typing import Dict, List, Optional
 
 import requests
-import uvicorn
-from fastapi import FastAPI
-from pydantic import BaseModel
+from mosec import Runtime, Server, Worker
+from mosec.mixin import TypedMsgPackMixin
+from msgspec import Struct
 
 parser = argparse.ArgumentParser(description="Launch online search server.")
 parser.add_argument('--search_url', type=str, required=True, 
@@ -17,7 +16,18 @@ parser.add_argument('--serp_api_key', type=str, default=None,
                     help="SerpAPI key for online search")
 parser.add_argument('--serp_engine', type=str, default="google", 
                     help="SerpAPI engine for online search")
+parser.add_argument('--max_wait_time', type=int, default=10,
+                    help="Maximum wait time for batching requests")
 args = parser.parse_args()
+
+
+class SearchRequest(Struct, kw_only=True):
+    queries: List[str]
+
+
+class SearchResponse(Struct, kw_only=True):
+    result: List[List[Dict]]
+
 
 # --- Config ---
 class OnlineSearchConfig:
@@ -49,6 +59,7 @@ class OnlineSearchEngine:
         return response.json()
 
     def batch_search(self, queries: List[str]):
+        # TODO: @changyu maybe add per request topk
         results = []
         with ThreadPoolExecutor() as executor:
             for result in executor.map(self._search_query, queries):
@@ -63,7 +74,7 @@ class OnlineSearchEngine:
             title = answer_box.get('title', 'No title.')
             snippet = answer_box.get('snippet', 'No snippet available.')
             results.append({
-                'document': {"contents": f'\"{title}\"\n{snippet}'},
+                'document': {"contents": f'"{title}"\n{snippet}'},
             })
 
         organic_results = search_result.get('organic_results', [])
@@ -71,7 +82,7 @@ class OnlineSearchEngine:
             title = result.get('title', 'No title.')
             snippet = result.get('snippet', 'No snippet available.')
             results.append({
-                'document': {"contents": f'\"{title}\"\n{snippet}'},
+                'document': {"contents": f'"{title}"\n{snippet}'},
             })
 
         related_results = search_result.get('related_questions', [])
@@ -79,35 +90,40 @@ class OnlineSearchEngine:
             title = result.get('question', 'No title.')  # question is the title here
             snippet = result.get('snippet', 'No snippet available.')
             results.append({
-                'document': {"contents": f'\"{title}\"\n{snippet}'},
+                'document': {"contents": f'"{title}"\n{snippet}'},
             })
 
         return results
 
 
-# --- FastAPI Setup ---
-app = FastAPI(title="Online Search Proxy Server")
+class SearchWorker(TypedMsgPackMixin, Worker):
+    def __init__(self):
+        super().__init__()
+        self.config = OnlineSearchConfig(
+            search_url=args.search_url,
+            topk=args.topk,
+            serp_api_key=args.serp_api_key,
+            serp_engine=args.serp_engine,
+        )
+        self.engine = OnlineSearchEngine(self.config)
+        
+    def forward(self, request: SearchRequest) -> SearchResponse:
+        results = self.engine.batch_search(request.queries)
+        return SearchResponse(result=results)
 
-class SearchRequest(BaseModel):
-    queries: List[str]
-
-# Instantiate global config + engine
-config = OnlineSearchConfig(
-    search_url=args.search_url,
-    topk=args.topk,
-    serp_api_key=args.serp_api_key,
-    serp_engine=args.serp_engine,
-)
-engine = OnlineSearchEngine(config)
-
-# --- Routes ---
-@app.post("/retrieve")
-def search_endpoint(request: SearchRequest):
-    results = engine.batch_search(request.queries)
-    return {"result": results}
-
-## return {"result": List[List[{'document': {"id": xx, "content": "title" + \n + "content"}, 'score': xx}]]}
 
 if __name__ == "__main__":
-    # 3) Launch the server. By default, it listens on http://127.0.0.1:8000
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    server = Server()
+    runtime = Runtime(
+        worker=SearchWorker,
+        num=1,
+        max_batch_size=1,
+        max_wait_time=args.max_wait_time,
+        timeout=30,  
+    )
+    
+    server.register_runtime({
+        "/retrieve": [runtime],
+    })
+    
+    server.run()
