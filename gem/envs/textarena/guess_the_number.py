@@ -5,8 +5,9 @@ import random
 from typing import Any, Optional, Tuple
 
 from gem.core import Env
-from gem.utils.constants import TERMINAL_STATE, FORMAT_ERROR_REWARD, INVALID_ACTION_REWARD, SUCCESS_REWARD
+from gem.utils.constants import TERMINAL_STATE, TextArenaGameReward
 from gem.utils.parsing import extract_last_boxed_answer
+
 
 class GuessTheNumberEnv(Env):
 
@@ -55,7 +56,7 @@ class GuessTheNumberEnv(Env):
         if not player_guess:
             return (
                 TERMINAL_STATE,
-                FORMAT_ERROR_REWARD,
+                TextArenaGameReward.format_error_reward,
                 True,
                 self.turn_count == self.max_turns,
                 {},
@@ -63,7 +64,7 @@ class GuessTheNumberEnv(Env):
         else:
             if self.turn_count >= self.max_turns:
                 if player_guess < self.min_number or player_guess > self.max_number:
-                    reward = -0.1
+                    reward = TextArenaGameReward.invalid_action_reward
                 else:
                     distance = abs(player_guess - self.game_number)
                     reward = 1 - (distance / (self.max_number - self.min_number))
@@ -71,19 +72,35 @@ class GuessTheNumberEnv(Env):
 
             if player_guess < self.min_number or player_guess > self.max_number:
                 next_obs = f"At turn {self.turn_count}, you guessed {player_guess}, which is outside the range specified."
-                reward, terminated, truncated = INVALID_ACTION_REWARD, False, False
+                reward, terminated, truncated = (
+                    TextArenaGameReward.invalid_action_reward,
+                    False,
+                    False,
+                )
             elif player_guess in self.previous_guesses:
                 next_obs = f"At turn {self.turn_count}, you guessed {player_guess}, which has been already guessed before."
-                reward, terminated, truncated = INVALID_ACTION_REWARD, False, False
+                reward, terminated, truncated = (
+                    TextArenaGameReward.invalid_action_reward,
+                    False,
+                    False,
+                )
             else:
                 self.previous_guesses.add(player_guess)
                 if player_guess == self.game_number:
                     next_obs = f"Congratulations! You guessed the correct number {self.game_number} in {self.turn_count} turns."
-                    reward, terminated, truncated = SUCCESS_REWARD, True, False
+                    reward, terminated, truncated = (
+                        TextArenaGameReward.success_reward,
+                        True,
+                        False,
+                    )
                 else:
                     hint = "lower" if player_guess > self.game_number else "higher"
                     next_obs = f"At turn {self.turn_count}, you guessed {player_guess}, and the target number is {hint} than {player_guess}."
-                    reward, terminated, truncated = 0, False, False
+                    reward, terminated, truncated = (
+                        TextArenaGameReward.internal_step_reward,
+                        False,
+                        False,
+                    )
 
         if not terminated:
             next_obs += "\nEnter your next guess."

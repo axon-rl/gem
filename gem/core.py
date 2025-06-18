@@ -50,12 +50,7 @@ class Env(abc.ABC):
         raise NotImplementedError
 
 
-class Wrapper(Env):
-    def __init__(self, env: Env):
-        self.env = env
-
-
-class EnvWrapper(Env, abc.ABC):
+class EnvWrapper(Env):
     def __init__(self, env: Env):
         super().__init__()
         self.env = env

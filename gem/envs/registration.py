@@ -6,7 +6,7 @@ from functools import partial
 from typing import Any, Callable, Dict, Optional, Sequence, Union
 
 from gem import Env
-from gem.core import Wrapper
+from gem.core import EnvWrapper
 from gem.vector.async_vector_env import AsyncVectorEnv
 from gem.vector.sync_vector_env import SyncVectorEnv
 from gem.vector.vector_env import VectorEnv
@@ -71,7 +71,7 @@ def make(env_id: str, **kwargs) -> Env:
 def make_vec(
     env_id,
     num_envs: int = 1,
-    wrappers: Optional[Sequence[Wrapper]] = None,
+    wrappers: Optional[Sequence[EnvWrapper]] = None,
     vec_kwargs: Optional[Sequence[dict]] = None,
     async_mode: bool = False,
     seed: int = 0,

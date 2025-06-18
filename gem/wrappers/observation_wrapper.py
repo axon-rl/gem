@@ -43,7 +43,7 @@ class ObservationWrapper(EnvWrapper):
         self.obs_queue.clear()
         obs, info = self.env.reset(seed=seed)
         self.obs_queue.append(obs)
-        return self.observation(), info
+        return self.observation(info), info
 
     def step(
         self, action: str
@@ -53,9 +53,9 @@ class ObservationWrapper(EnvWrapper):
             info["parsed_action"] if "parsed_action" in info else action
         )
         self.obs_queue.append(next_obs)
-        return self.observation(), reward, terminated, truncated, info
+        return self.observation(info), reward, terminated, truncated, info
 
-    def observation(self):
+    def observation(self, info: dict[str, Any]):
         if self.include_action:
             assert len(self.act_queue) == len(self.obs_queue) - 1, (
                 f"Action queue should be one shorter than observation queue, but got: "
@@ -89,4 +89,8 @@ class ObservationWrapper(EnvWrapper):
             wrapped_obs = ""
             for obs in self.obs_queue:
                 wrapped_obs += maybe_add_new_line(obs)
+        if "prefix" in info:
+            wrapped_obs = info["prefix"] + wrapped_obs
+        if "suffix" in info:
+            wrapped_obs = wrapped_obs + info["suffix"]
         return wrapped_obs
