@@ -28,6 +28,8 @@ class CodeEnv(Env):
         seed: int = 0,
         max_workers: int = 5,
         max_tests: int = 12,
+        verbose: bool = False,
+        sandbox_type: str = "none",
         **_,
     ):
         super().__init__()
@@ -56,6 +58,8 @@ class CodeEnv(Env):
 
         self.thread_pool_executer = ThreadPoolExecutor(max_workers=max_workers)
         self.max_tests = max_tests
+        self.verbose = verbose
+        self.sandbox_type = sandbox_type
 
     def step(
         self, action: str
@@ -88,7 +92,7 @@ class CodeEnv(Env):
 
     def _check_correct(self, model_code: str) -> bool:
         assert any(
-            [x in self.dataset_name.lower() for x in ["taco", "apps", "codecontests"]]
+            [x in self.dataset_name.lower() for x in ["taco", "apps", "codecontest"]]
         )
         tests = self.tests
 
@@ -123,12 +127,17 @@ class CodeEnv(Env):
                 tests = selected_tests
             num_tests = len(tests["inputs"])
 
-        code_and_tests = [(model_code, test) for test in tests["inputs"]]
+        code_and_tests = [
+            (model_code, self.sandbox_type, test) for test in tests["inputs"]
+        ]
         results = list(
             self.thread_pool_executer.map(
                 lambda args: run_python(*args), code_and_tests
             )
         )
+
+        if self.verbose:
+            logging.info(results)
 
         successes, stdouts, stderrs = zip(*results)
 

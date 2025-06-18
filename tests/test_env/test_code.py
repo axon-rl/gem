@@ -3,6 +3,7 @@ from time import time
 import fire
 from datasets import Dataset
 
+import gem
 from gem.envs.code_env import CodeEnv
 
 # Unit tests
@@ -69,7 +70,10 @@ if __name__ == "__main__":
         }
     )
     env = CodeEnv(
-        dataset=dataset, dataset_name="single_codecontests_example", max_tests=3
+        dataset=dataset,
+        dataset_name="single_codecontests_example",
+        max_tests=3,
+        verbose=True,
     )
     env.reset()
     print(env.tests)
@@ -82,15 +86,50 @@ if __name__ == "__main__":
 # Integrated tests
 
 
+def test_llm_episode(model_name: str = "agentica-org/DeepCoder-1.5B-Preview"):
+    from vllm import LLM, SamplingParams
+
+    llm = LLM(
+        model=model_name,
+    )
+    sampling_params = SamplingParams(
+        n=1,
+        temperature=0.6,
+        max_tokens=32768,
+        top_p=0.95,
+    )
+
+    tokenizer = llm.get_tokenizer()
+
+    env = gem.make("eval:CodeContest", verbose=True)
+    obs, _ = env.reset()
+
+    formatted_obs = tokenizer.apply_chat_template(
+        [{"content": obs, "role": "user"}], add_generation_prompt=True, tokenize=False
+    )
+    output = llm.generate(
+        [formatted_obs],
+        sampling_params=sampling_params,
+        use_tqdm=False,
+    )
+    action = output[0].outputs[0].text
+    env.step(action)
+    import pdb
+
+    pdb.set_trace()
+
+
 if __name__ == "__main__":
 
     fire.Fire(
         {
-            "action": test_reward_code_contests(),
+            "action": test_reward_code_contests,
+            "llm_episode": test_llm_episode,
         }
     )
     print(f"\n\nAll tests run.")
 
     """Run with:
     python -m tests.test_env.test_code action
+    python -m tests.test_env.test_code llm_episode
     """
