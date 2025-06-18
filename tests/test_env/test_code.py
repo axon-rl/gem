@@ -172,11 +172,10 @@ if __name__ == "__main__":
             "evaluate": evaluate,
         }
     )
-    print(f"\n\nAll tests run.")
+    print(f"\n\nAll tests run.\n\n")
 
     """Run with:
     python -m tests.test_env.test_code action
     python -m tests.test_env.test_code llm_episode
     python -m tests.test_env.test_code evaluate
-    8k -> 5.45%
     """
