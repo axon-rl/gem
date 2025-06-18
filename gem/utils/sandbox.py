@@ -58,6 +58,7 @@ def check_forbidden_imports(code: str) -> bool:
 def subprocess_run(
     code: str,
     cmd_list: List[str],
+    sandbox_type: str,
     stdin: Optional[str] = None,
     timeout: int = DEFAULT_TIMEOUT,
 ):
@@ -120,7 +121,9 @@ def subprocess_run(
         ) as tmp:
             tmp.write(code.encode())
             tmp.flush()
-            cmd_list.extend(["--ro-bind", tmp.name, tmp.name, "python", tmp.name])
+            if sandbox_type == "bwrap":
+                cmd_list.extend(["--ro-bind", tmp.name, tmp.name])
+            cmd_list.extend(["python", tmp.name])
             result = subprocess.run(
                 cmd_list,
                 input=stdin.encode() if stdin else None,
@@ -168,12 +171,14 @@ def run_python(
     try:
         # 1) Run the code without extra imports first
         run_success, stdout, stderr = subprocess_run(
-            code, copy.deepcopy(cmd_list), stdin
+            code, copy.deepcopy(cmd_list), sandbox_type, stdin
         )
         if not run_success and "is not defined" in stderr:
             # 2) Fix the missing imports and run again
             code = BASE_IMPORTS + "\n" + code
-            run_success, stdout, stderr = subprocess_run(code, cmd_list, stdin)
+            run_success, stdout, stderr = subprocess_run(
+                code, cmd_list, sandbox_type, stdin
+            )
     except subprocess.TimeoutExpired:
         run_success, stdout, stderr = (
             False,

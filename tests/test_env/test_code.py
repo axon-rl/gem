@@ -110,13 +110,57 @@ def test_llm_episode(model_name: str = "agentica-org/DeepCoder-1.5B-Preview"):
     output = llm.generate(
         [formatted_obs],
         sampling_params=sampling_params,
-        use_tqdm=False,
+        use_tqdm=True,
     )
     action = output[0].outputs[0].text
     env.step(action)
-    import pdb
 
-    pdb.set_trace()
+
+def evaluate(
+    model_name: str = "agentica-org/DeepCoder-1.5B-Preview", max_tokens: int = 32752
+):
+    from vllm import LLM, SamplingParams
+
+    NUM_TEST = 200
+
+    llm = LLM(
+        model=model_name,
+        dtype="bfloat16",
+    )
+    sampling_params = SamplingParams(
+        n=1,
+        temperature=0.6,
+        max_tokens=max_tokens,
+        top_p=0.95,
+    )
+
+    tokenizer = llm.get_tokenizer()
+
+    env = gem.make("eval:CodeContest", verbose=True)
+    dataset = env.dataset[:NUM_TEST]
+    obss = dataset["problem"]
+
+    formatted_obss = [
+        tokenizer.apply_chat_template(
+            [{"content": obs, "role": "user"}],
+            add_generation_prompt=True,
+            tokenize=False,
+        )
+        for obs in obss
+    ]
+    outputs = llm.generate(
+        formatted_obss,
+        sampling_params=sampling_params,
+        use_tqdm=True,
+    )
+    all_pass = 0
+    for i, output in enumerate(outputs):
+        action = output.outputs[0].text
+        env.tests = dataset["tests"][i]
+        _, r, _, _, _ = env.step(action)
+        all_pass += float(r == 1)
+
+    print(f"Tested {len(outputs)} questions; ", "Accuracy: ", all_pass / len(outputs))
 
 
 if __name__ == "__main__":
@@ -125,6 +169,7 @@ if __name__ == "__main__":
         {
             "action": test_reward_code_contests,
             "llm_episode": test_llm_episode,
+            "evaluate": evaluate,
         }
     )
     print(f"\n\nAll tests run.")
@@ -132,4 +177,6 @@ if __name__ == "__main__":
     """Run with:
     python -m tests.test_env.test_code action
     python -m tests.test_env.test_code llm_episode
+    python -m tests.test_env.test_code evaluate
+    8k -> 5.45%
     """

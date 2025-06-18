@@ -2,7 +2,6 @@
 
 import logging
 from concurrent.futures import ThreadPoolExecutor
-from time import time
 from typing import Any, Optional, SupportsFloat, Tuple
 
 from datasets import Dataset, DatasetDict, load_dataset
@@ -67,11 +66,9 @@ class CodeEnv(Env):
 
         model_code = extract_code_from_model(action)
         if model_code is None:
-            return -0.1
+            return TERMINAL_STATE, -0.1, True, True, {}
         else:
-            time_st = time()
             is_correct = self._check_correct(model_code)
-            logger.debug(time() - time_st)
             reward = 1.0 if is_correct else 0.0
         return TERMINAL_STATE, reward, True, True, {}
 
