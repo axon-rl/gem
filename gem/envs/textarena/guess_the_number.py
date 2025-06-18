@@ -1,12 +1,12 @@
 """Guess the number game environment."""
 
+import math
 import random
 from typing import Any, Optional, Tuple
 
 from gem.core import Env
-from gem.utils.constants import TERMINAL_STATE
+from gem.utils.constants import TERMINAL_STATE, FORMAT_ERROR_REWARD, INVALID_ACTION_REWARD, SUCCESS_REWARD
 from gem.utils.parsing import extract_last_boxed_answer
-
 
 class GuessTheNumberEnv(Env):
 
@@ -17,6 +17,7 @@ class GuessTheNumberEnv(Env):
         self.min_number = min_number
         self.max_number = max_number
         self.max_turns = max_turns
+        self.is_random = min_number is None or max_number is None
         self.reset()
 
     def _get_instructions(self) -> str:
@@ -32,6 +33,11 @@ class GuessTheNumberEnv(Env):
 
     def reset(self, seed: Optional[int] = None) -> Tuple[str, dict[str, Any]]:
         super().reset(seed)
+        if self.is_random:
+            self.min_number = 1
+            self.max_number = random.randint(self.min_number + 1, 100)
+            self.max_turns = math.ceil(math.sqrt(self.max_number - self.min_number)) + 1
+
         self.game_number = random.randint(self.min_number, self.max_number)
         self.previous_guesses = set()
         self.turn_count = 0
@@ -47,7 +53,13 @@ class GuessTheNumberEnv(Env):
             player_guess = None
 
         if not player_guess:
-            return TERMINAL_STATE, -0.1, True, self.turn_count == self.max_turns, {}
+            return (
+                TERMINAL_STATE,
+                FORMAT_ERROR_REWARD,
+                True,
+                self.turn_count == self.max_turns,
+                {},
+            )
         else:
             if self.turn_count >= self.max_turns:
                 if player_guess < self.min_number or player_guess > self.max_number:
@@ -59,15 +71,15 @@ class GuessTheNumberEnv(Env):
 
             if player_guess < self.min_number or player_guess > self.max_number:
                 next_obs = f"At turn {self.turn_count}, you guessed {player_guess}, which is outside the range specified."
-                reward, terminated, truncated = -0.05, False, False
+                reward, terminated, truncated = INVALID_ACTION_REWARD, False, False
             elif player_guess in self.previous_guesses:
                 next_obs = f"At turn {self.turn_count}, you guessed {player_guess}, which has been already guessed before."
-                reward, terminated, truncated = -0.05, False, False
+                reward, terminated, truncated = INVALID_ACTION_REWARD, False, False
             else:
                 self.previous_guesses.add(player_guess)
                 if player_guess == self.game_number:
                     next_obs = f"Congratulations! You guessed the correct number {self.game_number} in {self.turn_count} turns."
-                    reward, terminated, truncated = 1, True, False
+                    reward, terminated, truncated = SUCCESS_REWARD, True, False
                 else:
                     hint = "lower" if player_guess > self.game_number else "higher"
                     next_obs = f"At turn {self.turn_count}, you guessed {player_guess}, and the target number is {hint} than {player_guess}."

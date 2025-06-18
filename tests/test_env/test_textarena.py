@@ -20,7 +20,7 @@ def test(env_name: str = "ta:GuessTheNumber-v0"):
     wrapped_env = WRAPPER_FACTORY["concat"](env)
     run_and_print_episode(wrapped_env, policy)
 
-    print("\n" * 5, "EPISODE 3: CHAT TEMPLATE OBSERVATION")
+    print("\n" * 5, "EPISODE 4: CHAT TEMPLATE OBSERVATION")
     tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen3-0.6B-Base")
     wrapped_env = WRAPPER_FACTORY["concat_chat"](env, tokenizer=tokenizer)
     run_and_print_episode(wrapped_env, policy)

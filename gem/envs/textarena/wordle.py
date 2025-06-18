@@ -8,7 +8,7 @@ import nltk
 from nltk.corpus import words
 
 from gem.core import Env
-from gem.utils.constants import TERMINAL_STATE
+from gem.utils.constants import TERMINAL_STATE, FORMAT_ERROR_REWARD, INVALID_ACTION_REWARD, INTERNAL_STEP_REWARD, SUCCESS_REWARD
 
 
 class WordleEnv(Env):
@@ -74,12 +74,18 @@ class WordleEnv(Env):
             player_guess = None
 
         if not player_guess:
-            return TERMINAL_STATE, -0.1, True, self.turn_count == self.max_turns, {}
+            return (
+                TERMINAL_STATE,
+                FORMAT_ERROR_REWARD,
+                True,
+                self.turn_count == self.max_turns,
+                {},
+            )
         else:
             length_correct, feedback = self._evaluate_guess(player_guess)
             if self.turn_count >= self.max_turns:
                 reward = (
-                    -0.1
+                    INVALID_ACTION_REWARD
                     if not length_correct
                     else (feedback.count("G") + 0.5 * feedback.count("Y"))
                     / self.word_length
@@ -88,18 +94,18 @@ class WordleEnv(Env):
 
             if len(player_guess) != self.word_length:
                 next_obs = f"At turn {self.turn_count}, you guessed {player_guess} which has {len(player_guess)} letters but the secret word has {self.word_length} letters."
-                reward, terminated, truncated = -0.05, False, False
+                reward, terminated, truncated = INVALID_ACTION_REWARD, False, False
             elif player_guess.lower() not in self.all_words and self.only_real_words:
                 next_obs = f"At turn {self.turn_count}, you guessed {player_guess}. This word is not a valid English word. All guesses must be valid English words."
-                reward, terminated, truncated = -0.05, False, False
+                reward, terminated, truncated = INVALID_ACTION_REWARD, False, False
             elif player_guess in self.previous_guesses:
                 next_obs = f"At turn {self.turn_count}, you guessed {player_guess}, which has been already guessed before."
-                reward, terminated, truncated = -0.05, False, False
+                reward, terminated, truncated = INVALID_ACTION_REWARD, False, False
             else:
                 self.previous_guesses.add(player_guess)
                 if feedback.count("G") == self.word_length:
                     next_obs = f"Congratulations! You guessed the secret word {self.secret_word} in {self.turn_count} turns."
-                    reward, terminated, truncated = 1, True, False
+                    reward, terminated, truncated = SUCCESS_REWARD, True, False
                 else:
                     next_obs = f"At turn {self.turn_count}, you guessed {player_guess}.\nFeedback:\n"
                     next_obs += " ".join(player_guess) + "\n"

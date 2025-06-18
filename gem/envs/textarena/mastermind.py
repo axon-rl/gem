@@ -5,7 +5,7 @@ import re
 from typing import Any, List, Optional, Tuple
 
 from gem.core import Env
-from gem.utils.constants import TERMINAL_STATE
+from gem.utils.constants import TERMINAL_STATE, INTERNAL_STEP_REWARD, INVALID_ACTION_REWARD, SUCCESS_INTERNAL_REWARD, SUCCESS_REWARD
 
 
 class MastermindEnv(Env):
@@ -16,7 +16,7 @@ class MastermindEnv(Env):
         num_numbers: Optional[int] = 6,
         duplicate_numbers: Optional[bool] = False,
         max_turns: Optional[int] = 20,
-        **_,
+        **_,  # ignore addtional parameters, e.g. `seed`
     ):
         super().__init__()
         self.code_length = code_length
@@ -42,8 +42,8 @@ class MastermindEnv(Env):
     def reset(self, seed: Optional[int] = None) -> Tuple[str, dict[str, Any]]:
         super().reset(seed)
         if self.is_random:
-            self.code_length = random.randint(2, 4)
-            self.num_numbers = random.randint(self.code_length, 6)
+            self.code_length = random.randint(2, 6)
+            self.num_numbers = random.randint(self.code_length, 12)
         available_numbers = list(range(1, self.num_numbers + 1))
         sample_fn = random.choices if self.duplicate_numbers else random.sample
         self.game_code = sample_fn(available_numbers, k=self.code_length)
@@ -67,12 +67,18 @@ class MastermindEnv(Env):
             player_guess = None
 
         if not player_guess:
-            return TERMINAL_STATE, -0.1, True, self.turn_count == self.max_turns, {}
+            return (
+                TERMINAL_STATE,
+                FORMAT_ERROR_REWARD,
+                True,
+                self.turn_count == self.max_turns,
+                {},
+            )
         else:
             length_correct, black_pegs, white_pegs = self._evaluate_guess(player_guess)
             if self.turn_count >= self.max_turns:
                 reward = (
-                    -0.1
+                    INVALID_ACTION_REWARD
                     if not length_correct
                     else (black_pegs + 0.5 * white_pegs) / self.code_length
                 )
@@ -80,18 +86,18 @@ class MastermindEnv(Env):
 
             if not length_correct:
                 next_obs = f"At turn {self.turn_count}, you guessed {player_guess} which has {len(player_guess)} entires but the code has length {self.code_length}."
-                reward, terminated, truncated = -0.05, False, False
+                reward, terminated, truncated = INVALID_ACTION_REWARD, False, False
             elif any(num < 1 or num > self.num_numbers for num in player_guess):
                 next_obs = f"At turn {self.turn_count}, you guessed {player_guess}, which has numbers outside the range 1 to {self.num_numbers}."
-                reward, terminated, truncated = -0.05, False, False
+                reward, terminated, truncated = INVALID_ACTION_REWARD, False, False
             elif tuple(player_guess) in self.previous_guesses:
                 next_obs = f"At turn {self.turn_count}, you guessed {player_guess}, which has been already guessed before."
-                reward, terminated, truncated = -0.05, False, False
+                reward, terminated, truncated = INVALID_ACTION_REWARD, False, False
             else:
                 self.previous_guesses.add(tuple(player_guess))
                 if black_pegs == self.code_length:
                     next_obs = f"Congratulations! You guessed the correct code {self.game_code} in {self.turn_count} turns."
-                    reward, terminated, truncated = 1, True, False
+                    reward, terminated, truncated = SUCCESS_REWARD, True, False
                 else:
                     next_obs = f"At turn {self.turn_count}, you guessed {player_guess}. This guess recieves {black_pegs} black peg(s) and {white_pegs} white peg(s)."
                     reward, terminated, truncated = 0, False, False

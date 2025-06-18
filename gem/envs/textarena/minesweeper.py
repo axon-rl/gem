@@ -8,7 +8,7 @@ from typing import Any, Optional, Tuple
 import numpy as np
 
 from gem.core import Env
-from gem.utils.constants import TERMINAL_STATE
+from gem.utils.constants import TERMINAL_STATE, FORMAT_ERROR_REWARD, INVALID_ACTION_REWARD, SUCCESS_INTERNAL_REWARD, SUCCESS_REWARD, FAIL_REWARD, INTERNAL_STEP_REWARD
 
 
 class MinesweeperEnv(Env):
@@ -26,6 +26,9 @@ class MinesweeperEnv(Env):
         self.cols = cols
         self.num_mines = num_mines
         self.max_turns = max_turns
+        self.is_random = (
+            rows is None or cols is None or num_mines is None or max_turns is None
+        )
         self.reset()
 
     def _get_instructions(self) -> str:
@@ -48,13 +51,24 @@ class MinesweeperEnv(Env):
             "The current board layout is shown below. Cells that are unrevealed are represented by a dot ('.'), revealed numbers show the count of adjacent mines, and flagged cells are marked with an 'F'.\n"
             "Use logic and deduction to avoid revealing cells with mines!\n"
             "Be mindful not to choose revealed or flagged cells.\n"
-            "Here is the current board layout:\n"
-            f"{self._render_board(is_start=True)}\n"
-            "Enter your first guess to start the game.\n"
+            # "Here is the current board layout:\n"
+            # f"{self._render_board(is_start=True)}\n"
+        )
+
+    def get_task_suffix(self) -> str:
+        return (
+            f"Here is the current board layout:\n{self._render_board()}\n"
+            "Enter your guess."
         )
 
     def reset(self, seed: Optional[int] = None) -> Tuple[str, dict[str, Any]]:
         super().reset(seed)
+        if self.is_random:
+            num_grid = random.randint(5, 12)
+            self.rows = self.cols = num_grid
+            self.num_mines = num_grid**2 // 5
+            self.max_turns = 100
+
         self.grid = [[0 for _ in range(self.cols)] for _ in range(self.rows)]
         self.revealed = [[False for _ in range(self.cols)] for _ in range(self.rows)]
         self.flags = [[False for _ in range(self.cols)] for _ in range(self.rows)]
@@ -78,7 +92,13 @@ class MinesweeperEnv(Env):
             action_type, row, col = None, None, None
 
         if action_type is None or row is None or col is None:
-            return TERMINAL_STATE, -1, True, self.turn_count == self.max_turns, {}
+            return (
+                TERMINAL_STATE,
+                FORMAT_ERROR_REWARD,
+                True,
+                self.turn_count == self.max_turns,
+                {},
+            )
         else:
             if self.turn_count >= self.max_turns:
                 num_revealed = np.sum(self.revealed)
@@ -87,7 +107,7 @@ class MinesweeperEnv(Env):
 
             if not (0 <= row < self.rows and 0 <= col < self.cols):
                 next_obs = f"At turn {self.turn_count}, you chose cell ({row}, {col}), which is outside the bounds of the grid."
-                reward, terminated, truncated = -0.1, False, False
+                reward, terminated, truncated = INVALID_ACTION_REWARD, False, False
             elif action_type == "reveal":
                 if self.first_reveal:
                     self._setup_mines(row, col)
@@ -96,23 +116,28 @@ class MinesweeperEnv(Env):
                 if self.grid[row][col] == -1:
                     ## If the cell is a mine, end the game
                     next_obs = f"Game over! You hit a mine at ({row}, {col})."
-                    reward, terminated, truncated = -1, True, False
+                    reward, terminated, truncated = FAIL_REWARD, True, False
                 elif self.revealed[row][col] or self.flags[row][col]:
                     ## If already revealed or flagged
                     next_obs = f"At turn {self.turn_count}, you chose to reveal cell ({row}, {col}), which has already been revealed or flagged."
-                    reward, terminated, truncated = -0.1, False, False
+                    reward, terminated, truncated = INVALID_ACTION_REWARD, False, False
                 else:
                     self._update_grid(row, col)  # Update the grid and reveal cells
                     if self._is_solved():
                         ## If the game is solved
-                        next_obs = f"Congratulations! You have successfully cleared the Minesweeper board."
-                        reward, terminated, truncated = 1, True, False
+                        next_obs = "Congratulations! You have successfully cleared the Minesweeper board."
+                        reward, terminated, truncated = SUCCESS_REWARD, True, False
                     else:
                         next_obs = (
-                            f"At turn {self.turn_count}, successfully revealed cell ({row}, {col}).\n"
-                            f"Here is the updated board:\n{self._render_board()}\n"
+                            f"At turn {self.turn_count}, you successfully revealed cell ({row}, {col}).\n"
+                            # f"Here is the updated board:\n{self._render_board()}\n"
                         )
-                        reward, terminated, truncated = 0.1, False, False
+                        # NOTE: test reward == 0.0
+                        reward, terminated, truncated = (
+                            SUCCESS_INTERNAL_REWARD,
+                            False,
+                            False,
+                        )
 
             elif action_type == "flag":
                 if self.revealed[row][col]:
@@ -124,14 +149,14 @@ class MinesweeperEnv(Env):
                         f"At turn {self.turn_count}, you "
                         f"{'added' if self.flags[row][col] else 'removed'} "
                         f"a flag on cell ({row}, {col}).\n"
-                        f"Here is the updated board:\n{self._render_board()}\n"
+                        # f"Here is the updated board:\n{self._render_board()}\n"
                     )
-                    reward, terminated, truncated = 0.1, False, False
+                    reward, terminated, truncated = INTERNAL_STEP_REWARD, False, False
 
             else:
                 ## If the action is not recognized
                 next_obs = f"At turn {self.turn_count}, you chose an invalid action '{action_type}'. Valid actions are 'reveal' or 'flag'."
-                reward, terminated, truncated = -0.1, False, False
+                reward, terminated, truncated = INVALID_ACTION_REWARD, False, False
 
             if not terminated:
                 next_obs += "\nEnter your next guess."
@@ -219,9 +244,9 @@ class MinesweeperEnv(Env):
                             not self.revealed[neighbor_row][neighbor_col]
                             and not self.flags[neighbor_row][neighbor_col]
                         ):
-                            self.revealed[neighbor_row][
-                                neighbor_col
-                            ] = True  # Mark as revealed when adding to queue
+                            self.revealed[neighbor_row][neighbor_col] = (
+                                True  # Mark as revealed when adding to queue
+                            )
                             queue.append((neighbor_row, neighbor_col))
 
     def _is_solved(self) -> bool:
