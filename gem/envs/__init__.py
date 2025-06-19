@@ -144,14 +144,6 @@ register(
 # Register math dataset environments
 
 register(
-    "eval:MATH500",
-    "gem.envs.math_env:MathEnv",
-    dataset_name="axon-rl/Eval-MATH500",
-    question_key="problem",
-    answer_key="answer",
-)
-
-register(
     "math:Math12K",
     "gem.envs.math_env:MathEnv",
     dataset_name="axon-rl/MATH-12k",
@@ -160,6 +152,37 @@ register(
 )
 
 # Register code dataset environments
+
+register(
+    "code:CodeContest",
+    "gem.envs.code_env:CodeEnv",
+    dataset_name="axon-rl/CodeContest",
+    split="train",
+    question_key="problem",
+    test_key="tests",
+)
+
+# Register datasets from ReasoningGym
+
+for name in rg.factory.DATASETS.keys():
+    register(
+        f"rg:{name}",
+        "gem.envs.reasoning_gym:ReasoningGymEnv",
+        name=name,
+        size=500,
+        seed=42,
+    )
+
+# Register evaluation datasets
+
+## MATH500
+register(
+    "eval:MATH500",
+    "gem.envs.math_env:MathEnv",
+    dataset_name="axon-rl/Eval-MATH500",
+    question_key="problem",
+    answer_key="answer",
+)
 
 ## The test split of deepmind/code_contests, with merged test cases.
 register(
@@ -170,13 +193,3 @@ register(
     question_key="problem",
     test_key="tests",
 )
-
-# Register datasets from ReasoningGym
-for name in rg.factory.DATASETS.keys():
-    register(
-        f"rg:{name}",
-        "gem.envs.reasoning_gym:ReasoningGymEnv",
-        name=name,
-        size=500,
-        seed=42,
-    )

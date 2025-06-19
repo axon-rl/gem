@@ -1,7 +1,7 @@
 """Synchronous (for loop) vectorized environment execution."""
 
+from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
-from multiprocessing import Pool, TimeoutError
 from typing import Any, Optional, Sequence, Tuple, Union
 
 import numpy as np
@@ -28,10 +28,9 @@ def step_reset_env(action, env, autoreset_mode, autoreset_env):
 
 class AsyncVectorEnv(VectorEnv):
 
-    def __init__(self, pool_size: int = None, *args, **kwargs):
+    def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.mp_pool = Pool(len(self.envs)) if pool_size is None else Pool(pool_size)
-        print(f"Using multiprocessing pool with size {self.mp_pool._processes}.")
+        self.thread_pool_executer = ThreadPoolExecutor(max_workers=self.num_envs)
 
     def step(self, actions: Sequence[ActType]) -> Tuple[
         Sequence[ObsType],
@@ -40,31 +39,25 @@ class AsyncVectorEnv(VectorEnv):
         ArrayType,
         dict[str, Any],
     ]:
-        for i, (action, env, autoreset_env) in enumerate(
-            zip(
-                actions,
-                self.envs,
-                self._autoreset_envs,
+        results = list(
+            self.thread_pool_executer.map(
+                lambda args: step_reset_env(*args),
+                list(
+                    zip(
+                        actions,
+                        self.envs,
+                        [self.autoreset_mode] * self.num_envs,
+                        self._autoreset_envs,
+                    )
+                ),
             )
-        ):
-            res = self.mp_pool.apply_async(
-                step_reset_env, (action, env, self.autoreset_mode, autoreset_env)
-            )
-            try:
-                obs, reward, terminated, truncated, info = res.get(timeout=10)
-                self._env_obs[i] = obs
-                self._rewards[i] = reward
-                self._terminations[i] = terminated
-                self._truncations[i] = truncated
-                self._env_infos[i] = info
-            except TimeoutError:
-                obs, reward, terminated, truncated, info = res.get(timeout=10)
-                self._env_obs[i] = "TimeoutError"
-                self._rewards[i] = 0.0
-                self._terminations[i] = True
-                self._truncations[i] = False
-                self._env_infos[i] = {}
-
+        )
+        for i, (obs, reward, terminated, truncated, info) in enumerate(results):
+            self._env_obs[i] = obs
+            self._rewards[i] = reward
+            self._terminations[i] = terminated
+            self._truncations[i] = truncated
+            self._env_infos[i] = info
         self._autoreset_envs = np.logical_or(self._terminations, self._truncations)
 
         return (
