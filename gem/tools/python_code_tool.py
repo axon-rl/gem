@@ -12,6 +12,7 @@ from gem.utils.sandbox import check_forbidden_imports
 # Timeout for code execution in seconds
 TIMEOUT = 5
 
+
 def get_python_output(
     code: str, timeout: int = TIMEOUT, return_traceback: bool = False
 ) -> Tuple[str, bool]:

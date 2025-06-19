@@ -115,7 +115,14 @@ register(
     "eval:MATH500",
     "gem.envs.math_env:MathEnv",
     dataset_name="axon-rl/Eval-MATH500",
-    split="test",
+    question_key="problem",
+    answer_key="answer",
+)
+
+register(
+    "math:Math12K",
+    "gem.envs.math_env:MathEnv",
+    dataset_name="axon-rl/MATH-12k",
     question_key="problem",
     answer_key="answer",
 )

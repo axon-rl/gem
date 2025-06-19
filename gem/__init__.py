@@ -4,8 +4,8 @@
 
 
 import logging
-from gem.core import Env
 
+from gem.core import Env
 from gem.envs.registration import make, make_vec, register
 
 logging.basicConfig(
