@@ -1,7 +1,7 @@
 """Env for math datasets."""
 
 import logging
-from functools import partial
+from multiprocessing import Pool
 from typing import Any, Optional, SupportsFloat, Tuple
 
 from datasets import Dataset, DatasetDict, load_dataset
@@ -12,11 +12,6 @@ from gem.utils.constants import TERMINAL_STATE
 from gem.utils.parsing import extract_last_boxed_answer
 
 logger = logging.getLogger(__name__)
-
-# math_verify must be run without timeout to avoid using signal
-# since this is not compatible with multiprocessing
-parse = partial(parse, parsing_timeout=None)
-verify = partial(verify, timeout_seconds=None)
 
 
 class MathEnv(Env):
@@ -53,6 +48,8 @@ class MathEnv(Env):
         self.dataset = dataset.shuffle(seed=self.seed)
         self.idx = 0
         self.epoch = 0
+        # Process pool is used to enable the timeout mechanism for answer grading in a potential distributed training setup
+        self.mp_pool = Pool(2)
 
     def step(
         self, action: str
@@ -61,7 +58,13 @@ class MathEnv(Env):
         if model_answer is None:
             reward = -0.1
         else:
-            is_correct = self._check_correct(model_answer)
+            res = self.mp_pool.apply_async(
+                self.check_correct, (model_answer, self.answer)
+            )
+            try:
+                is_correct = res.get(timeout=1)
+            except TimeoutError:
+                is_correct = False
             reward = 1.0 if is_correct else 0.0
         return TERMINAL_STATE, reward, True, True, {}
 
@@ -80,18 +83,19 @@ class MathEnv(Env):
         self.idx += 1
         return self.first_obs, {}
 
-    def _check_correct(self, model_answer: str) -> bool:
+    @staticmethod
+    def check_correct(model_answer: str, gt_answer: str) -> bool:
         """Check if the action is correct."""
         # parse with math_verify
         model_answer = parse(model_answer)
 
         # get correct answers from the dataset entry
-        if isinstance(self.answer, (str, float, int)):
-            correct_answers = [str(self.answer)]
-        elif isinstance(self.answer, list):
-            correct_answers = self.answer
+        if isinstance(gt_answer, (str, float, int)):
+            correct_answers = [str(gt_answer)]
+        elif isinstance(gt_answer, list):
+            correct_answers = gt_answer
         else:
-            raise ValueError(f"Unexpected answer type: {type(self.answer)}")
+            raise ValueError(f"Unexpected answer type: {type(gt_answer)}")
 
         # check against all possible correct answers
         # (math_verify.parse handles extraction e.g. from \\boxed{...})
