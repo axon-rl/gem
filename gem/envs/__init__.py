@@ -162,6 +162,15 @@ register(
     test_key="tests",
 )
 
+register(
+    "code:Taco8k",
+    "gem.envs.code_env:CodeEnv",
+    dataset_name="axon-rl/TACO-8k",
+    split="train",
+    question_key="problem",
+    test_key="tests",
+)
+
 # Register datasets from ReasoningGym
 
 for name in rg.factory.DATASETS.keys():

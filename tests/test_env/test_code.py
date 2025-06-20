@@ -117,7 +117,9 @@ def test_llm_episode(model_name: str = "agentica-org/DeepCoder-1.5B-Preview"):
 
 
 def evaluate(
-    model_name: str = "agentica-org/DeepCoder-1.5B-Preview", max_tokens: int = 32752
+    model_name: str = "agentica-org/DeepCoder-1.5B-Preview",
+    end_id: str = "code:Taco8k",
+    max_tokens: int = 32752,
 ):
     from vllm import LLM, SamplingParams
 
@@ -136,7 +138,7 @@ def evaluate(
 
     tokenizer = llm.get_tokenizer()
 
-    env = gem.make("eval:CodeContest", verbose=True)
+    env = gem.make(end_id, verbose=True)
     dataset = env.dataset[:NUM_TEST]
     obss = dataset["problem"]
 
@@ -177,5 +179,5 @@ if __name__ == "__main__":
     """Run with:
     python -m tests.test_env.test_code action
     python -m tests.test_env.test_code llm_episode
-    python -m tests.test_env.test_code evaluate
+    python -m tests.test_env.test_code evaluate --model_name Qwen/Qwen2.5-Coder-1.5B-Instruct
     """
