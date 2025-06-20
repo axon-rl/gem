@@ -7,27 +7,40 @@ from typing import Any, Optional, Tuple
 
 import numpy as np
 
-from gem.envs.multi_turn import MultiTurnEnv
-from gem.utils.constants import TERMINAL_STATE
+from gem.core import Env
+from gem.utils.constants import TERMINAL_STATE, TextArenaGameReward
 
 
-class MinesweeperEnv(MultiTurnEnv):
+class MinesweeperEnv(Env):
+    """The board state describes all necessary information (Markovian),
+    so we return the rendered board as a suffix instead of intermediate
+    observations to make the concat observation concise."""
 
     def __init__(
-        self, rows: int = 8, cols: int = 8, num_mines: int = 10, max_turns: int = 20
+        self,
+        rows: int = 8,
+        cols: int = 8,
+        num_mines: int = 10,
+        max_turns: int = 20,
+        **_,
     ):
         super().__init__()
         self.rows = rows
         self.cols = cols
         self.num_mines = num_mines
         self.max_turns = max_turns
+        self.is_random = (
+            rows is None or cols is None or num_mines is None or max_turns is None
+        )
         self.reset()
 
-    def get_task_prefix(self) -> str:
-        reveal_r = int(self.example_reveal.split(" ")[1])
-        reveal_c = int(self.example_reveal.split(" ")[2].split("}")[0])
-        flag_r = int(self.example_flag.split(" ")[1])
-        flag_c = int(self.example_flag.split(" ")[2].split("}")[0])
+    def _get_instructions(self) -> str:
+        example_reveal = self.sample_random_action(reveal_or_flag="reveal")
+        example_flag = self.sample_random_action(reveal_or_flag="flag")
+        reveal_r = int(example_reveal.split(" ")[1])
+        reveal_c = int(example_reveal.split(" ")[2].split("}")[0])
+        flag_r = int(example_flag.split(" ")[1])
+        flag_c = int(example_flag.split(" ")[2].split("}")[0])
         return (
             f"You are playing the Minesweeper game.\n"
             "The objective of the game is to reveal all cells that do not contain mines.\n"
@@ -36,28 +49,35 @@ class MinesweeperEnv(MultiTurnEnv):
             "- 'flag': Place or remove a flag on a specific cell to mark it as a potential mine.\n"
             "To submit your move, type the command followed by the row and column in \\boxed{}.\n"
             "For example:\n"
-            f"- {self.example_reveal} to reveal the cell in Row {reveal_r}, Column {reveal_c}.\n"
-            f"- {self.example_flag} to place or remove a flag on the cell in Row {flag_r}, Column {flag_c}.\n"
+            f"- {example_reveal} to reveal the cell in Row {reveal_r}, Column {reveal_c}.\n"
+            f"- {example_flag} to place or remove a flag on the cell in Row {flag_r}, Column {flag_c}.\n"
             "The current board layout is shown below. Cells that are unrevealed are represented by a dot ('.'), revealed numbers show the count of adjacent mines, and flagged cells are marked with an 'F'.\n"
             "Use logic and deduction to avoid revealing cells with mines!\n"
             "Be mindful not to choose revealed or flagged cells.\n"
-            "Here is the current board layout:\n"
-            f"{self._render_board(is_start=True)}\n"
+            # "Here is the current board layout:\n"
+            # f"{self._render_board(is_start=True)}\n"
         )
 
     def get_task_suffix(self) -> str:
-        return "Enter your guess."
+        return (
+            f"Here is the current board layout:\n{self._render_board()}\n"
+            "Enter your guess."
+        )
 
     def reset(self, seed: Optional[int] = None) -> Tuple[str, dict[str, Any]]:
         super().reset(seed)
+        if self.is_random:
+            num_grid = random.randint(5, 12)
+            self.rows = self.cols = num_grid
+            self.num_mines = num_grid**2 // 5
+            self.max_turns = 100
+
         self.grid = [[0 for _ in range(self.cols)] for _ in range(self.rows)]
         self.revealed = [[False for _ in range(self.cols)] for _ in range(self.rows)]
         self.flags = [[False for _ in range(self.cols)] for _ in range(self.rows)]
         self.first_reveal = True  # Track if it's the first move to ensure playability
         self.turn_count = 0
-        self.example_reveal = self.sample_random_action(reveal_or_flag="reveal")
-        self.example_flag = self.sample_random_action(reveal_or_flag="flag")
-        return self.get_task_prefix() + self.get_task_suffix(), {}
+        return self._get_instructions(), {"suffix": self.get_task_suffix()}
 
     def step(self, action: str) -> Tuple[str, float, bool, bool, dict[str, Any]]:
         self.turn_count += 1
@@ -75,16 +95,32 @@ class MinesweeperEnv(MultiTurnEnv):
             action_type, row, col = None, None, None
 
         if action_type is None or row is None or col is None:
-            return TERMINAL_STATE, -1, True, self.turn_count == self.max_turns, {}
+            return (
+                TERMINAL_STATE,
+                TextArenaGameReward.format_error_reward,
+                True,
+                self.turn_count == self.max_turns,
+                {"suffix": self.get_task_suffix()},
+            )
         else:
             if self.turn_count >= self.max_turns:
                 num_revealed = np.sum(self.revealed)
                 reward = num_revealed / (self.rows * self.cols - self.num_mines)
-                return TERMINAL_STATE, reward, True, True, {}
+                return (
+                    TERMINAL_STATE,
+                    reward,
+                    True,
+                    True,
+                    {"suffix": self.get_task_suffix()},
+                )
 
             if not (0 <= row < self.rows and 0 <= col < self.cols):
                 next_obs = f"At turn {self.turn_count}, you chose cell ({row}, {col}), which is outside the bounds of the grid."
-                reward, terminated, truncated = -0.1, False, False
+                reward, terminated, truncated = (
+                    TextArenaGameReward.invalid_action_reward,
+                    False,
+                    False,
+                )
             elif action_type == "reveal":
                 if self.first_reveal:
                     self._setup_mines(row, col)
@@ -93,44 +129,81 @@ class MinesweeperEnv(MultiTurnEnv):
                 if self.grid[row][col] == -1:
                     ## If the cell is a mine, end the game
                     next_obs = f"Game over! You hit a mine at ({row}, {col})."
-                    reward, terminated, truncated = -1, True, False
+                    reward, terminated, truncated = (
+                        TextArenaGameReward.fail_reward,
+                        True,
+                        False,
+                    )
                 elif self.revealed[row][col] or self.flags[row][col]:
                     ## If already revealed or flagged
                     next_obs = f"At turn {self.turn_count}, you chose to reveal cell ({row}, {col}), which has already been revealed or flagged."
-                    reward, terminated, truncated = -0.1, False, False
+                    reward, terminated, truncated = (
+                        TextArenaGameReward.invalid_action_reward,
+                        False,
+                        False,
+                    )
                 else:
                     self._update_grid(row, col)  # Update the grid and reveal cells
                     if self._is_solved():
                         ## If the game is solved
-                        next_obs = f"Congratulations! You have successfully cleared the Minesweeper board."
-                        reward, terminated, truncated = 1, True, False
+                        next_obs = "Congratulations! You have successfully cleared the Minesweeper board."
+                        reward, terminated, truncated = (
+                            TextArenaGameReward.success_reward,
+                            True,
+                            False,
+                        )
                     else:
                         next_obs = (
-                            f"At turn {self.turn_count}, successfully revealed cell ({row}, {col}).\n"
-                            f"Here is the updated board:\n{self._render_board()}\n"
+                            f"At turn {self.turn_count}, you successfully revealed cell ({row}, {col}).\n"
+                            # f"Here is the updated board:\n{self._render_board()}\n"
                         )
-                        reward, terminated, truncated = 0.1, False, False
+                        # NOTE: test reward == 0.0
+                        reward, terminated, truncated = (
+                            TextArenaGameReward.success_internal_reward,
+                            False,
+                            False,
+                        )
 
             elif action_type == "flag":
                 if self.revealed[row][col]:
                     next_obs = f"At turn {self.turn_count}, you chose to flag cell ({row}, {col}), which has already been revealed."
-                    reward, terminated, truncated = -0.1, False, False
+                    reward, terminated, truncated = (
+                        TextArenaGameReward.invalid_action_reward,
+                        False,
+                        False,
+                    )
                 else:
                     self.flags[row][col] = not self.flags[row][col]  # Toggle flag
                     next_obs = (
                         f"At turn {self.turn_count}, you "
                         f"{'added' if self.flags[row][col] else 'removed'} "
                         f"a flag on cell ({row}, {col}).\n"
-                        f"Here is the updated board:\n{self._render_board()}\n"
+                        # f"Here is the updated board:\n{self._render_board()}\n"
                     )
-                    reward, terminated, truncated = 0.1, False, False
+                    reward, terminated, truncated = (
+                        TextArenaGameReward.internal_step_reward,
+                        False,
+                        False,
+                    )
 
             else:
                 ## If the action is not recognized
                 next_obs = f"At turn {self.turn_count}, you chose an invalid action '{action_type}'. Valid actions are 'reveal' or 'flag'."
-                reward, terminated, truncated = -0.1, False, False
+                reward, terminated, truncated = (
+                    TextArenaGameReward.invalid_action_reward,
+                    False,
+                    False,
+                )
 
-            return next_obs, reward, terminated, truncated, {}
+            if not terminated:
+                next_obs += "\nEnter your next guess."
+            return (
+                next_obs,
+                reward,
+                terminated,
+                truncated,
+                {"suffix": self.get_task_suffix()},
+            )
 
     def sample_random_action(self, reveal_or_flag=None) -> str:
         if reveal_or_flag is None:

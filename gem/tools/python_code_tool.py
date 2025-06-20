@@ -6,54 +6,16 @@ from typing import Tuple
 
 import regex as re
 
-from .base_tool import BaseTool
+from gem.tools.base_tool import BaseTool
+from gem.utils.sandbox import check_forbidden_imports
 
 # Timeout for code execution in seconds
 TIMEOUT = 5
 
 
-def check_forbidden_imports(code: str) -> bool:
-    """
-    Checks if the code contains imports of potentially dangerous packages.
-    Args: code: Python code string to analyze
-    Returns: Boolean indicating if the code contains forbidden imports
-    """
-    # List of potentially dangerous modules that could affect the host system
-    forbidden_modules = [
-        "subprocess",
-        "multiprocessing",
-        "threading",
-        "socket",
-        "psutil",
-        "resource",
-        "ctypes",
-    ]
-
-    # Simple string-based check for import statements
-    for module in forbidden_modules:
-        if f"import {module}" in code or f"from {module}" in code:
-            return True
-
-    # Check for os.system, os.popen, and similar dangerous calls
-    dangerous_patterns = [
-        "os.system",
-        "os.popen",
-        "os.spawn",
-        "os.fork",
-        "os.exec",
-        "sys.exit",
-        "os._exit",
-        "os.kill",
-    ]
-
-    for pattern in dangerous_patterns:
-        if pattern in code:
-            return True
-
-    return False
-
-
-def execute_python(code: str, timeout: int = TIMEOUT) -> Tuple[str, bool]:
+def get_python_output(
+    code: str, timeout: int = TIMEOUT, return_traceback: bool = False
+) -> Tuple[str, bool]:
     """
     Execute Python code with a timeout.
     Args: code: Python code string to execute
@@ -139,8 +101,11 @@ def execute_python(code: str, timeout: int = TIMEOUT) -> Tuple[str, bool]:
         stderr = result.stderr.strip()
         if stderr:
             has_error = True
+            if not return_traceback:
+                # If we don't want the full traceback, just return the error message
+                stderr = stderr.splitlines()[-1]
 
-        result = f"{stdout}\nError:\n{stderr}" if stderr else stdout
+        result = f"{stdout}\n{stderr}" if stderr else stdout
         if result:
             result = result.strip()
     except subprocess.TimeoutExpired:
@@ -156,30 +121,43 @@ def execute_python(code: str, timeout: int = TIMEOUT) -> Tuple[str, bool]:
 
 class PythonCodeTool(BaseTool):
     tool_type = "python_code"
-    timeout = TIMEOUT
+
+    def __init__(self, timeout: int = TIMEOUT, return_traceback: bool = False):
+        self.timeout = timeout
+        self.return_traceback = return_traceback
 
     def _parse_action(self, action: str) -> Tuple[str, bool]:
         """
-        Parse the raw action string (which is the llm response) into an actual action and its contents.
-        Ensures that the parsed code is valid and safe for execution.
+        Extract the first complete codeblock from the raw action string (llm response) (if possible).
         Args: action: Raw action string containing Python code
-        Returns: Tuple containing the extracted code and a validity flag
+        Returns:
+            parsed_code: First extracted Python code block as a string (or "" if no code block found).
+            parsed_action: Text up to the end of the first code block (or whole action if no code block found).
+            is_valid: A boolean indicating if a valid code block was found.
         """
-        # Try to find Python code in various formats
-        all_valid_python_code = re.findall(r"<python>(.*?)</python>", action, re.DOTALL)
+        # Regex patterns to search for.
+        patterns = [r"<python>(.*?)</python>", r"```\n?python(.*?)```"]
 
-        if not all_valid_python_code:
-            all_valid_python_code = re.findall(
-                r"```\n?python(.*?)```", action, re.DOTALL
-            )
+        parsed_code = None
+        parsed_action = action
+        is_valid = False
+        prev_end = len(action)
+        for pattern in patterns:
+            # Search for the first occurrence of the pattern
+            matches = re.search(pattern, action, re.DOTALL)
+            if matches:
+                is_valid = True
+                if matches.end() <= prev_end:
+                    parsed_code = matches.group(1).strip()
+                    parsed_action = action[: matches.end()]
+                    prev_end = matches.end()
+        return parsed_code, parsed_action, is_valid
 
-        if len(all_valid_python_code) == 0:
-            return "", False
-
-        # use all the code blocks
-        parsed_code = "\n".join([code.strip() for code in all_valid_python_code])
-
-        return parsed_code, True
+    def instruction_string(self) -> str:
+        return (
+            "You can execute Python code by wrapping it in <python>...</python> tags or "
+            "using ```python...``` code blocks. "
+        )
 
     def execute_action(self, action):
         """
@@ -190,16 +168,18 @@ class PythonCodeTool(BaseTool):
         Returns:
             Tuple containing observation, done flag, and validity flag
         """
-        parsed_action, is_valid = self._parse_action(action)
+        parsed_code, parsed_action, is_valid = self._parse_action(action)
 
         if not is_valid:
             # observation = "No valid Python code found. Please provide code in either <python>...</python> tags or ```python...``` code blocks."
             observation = ""
             done = False
-            valid = False
         else:
-            code_to_execute = parsed_action
-            execution_result, has_error = execute_python(code_to_execute, self.timeout)
+            execution_result, has_error = get_python_output(
+                parsed_code,
+                timeout=self.timeout,
+                return_traceback=self.return_traceback,
+            )
 
             execution_result = execution_result.lstrip(" \n")
 
@@ -232,7 +212,4 @@ class PythonCodeTool(BaseTool):
             else:
                 observation = "\n" + observation + "\n"
 
-            done = False
-            valid = True
-
-        return observation, done, valid
+        return is_valid, observation, parsed_action

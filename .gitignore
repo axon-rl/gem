@@ -186,3 +186,6 @@ evals/benchmarks/*/data*
 evals/benchmarks/wandb*
 evals/benchmarks/*/eval_res*
 evals/game/results*
+
+# neovim
+.nvim/

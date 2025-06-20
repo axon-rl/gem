@@ -6,7 +6,7 @@ from functools import partial
 from typing import Any, Callable, Dict, Optional, Sequence, Union
 
 from gem import Env
-from gem.core import Wrapper
+from gem.core import EnvWrapper
 from gem.vector.async_vector_env import AsyncVectorEnv
 from gem.vector.sync_vector_env import SyncVectorEnv
 from gem.vector.vector_env import VectorEnv
@@ -71,18 +71,26 @@ def make(env_id: str, **kwargs) -> Env:
 def make_vec(
     env_id,
     num_envs: int = 1,
-    wrappers: Optional[Sequence[Wrapper]] = None,
+    wrappers: Optional[Sequence[EnvWrapper]] = None,
     vec_kwargs: Optional[Sequence[dict]] = None,
     async_mode: bool = False,
+    seed: int = 0,
     **kwargs,
 ) -> VectorEnv:
     def create_single_env(idx: int) -> Env:
+        # set vec specific kwargs
         if vec_kwargs is not None:
             _kwargs = vec_kwargs[idx]
         else:
             _kwargs = {}
+        # set different seed for each environment in vec
+        if "seed" not in _kwargs:
+            _kwargs["seed"] = seed + idx
+        # update with additional kwargs
         _kwargs.update(**kwargs)
+        # create the environment
         single_env = make(env_id, **_kwargs)
+        # apply wrappers if provided
         if wrappers is None:
             return single_env
         for wrapper in wrappers:
@@ -90,10 +98,12 @@ def make_vec(
         return single_env
 
     if async_mode:
+        print(f"AsyncVectorEnv with {num_envs} environments.")
         env = AsyncVectorEnv(
             env_fns=[partial(create_single_env, i) for i in range(num_envs)],
         )
     else:
+        print(f"SyncVectorEnv with {num_envs} environments.")
         env = SyncVectorEnv(
             env_fns=[partial(create_single_env, i) for i in range(num_envs)],
         )
