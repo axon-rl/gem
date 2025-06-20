@@ -6,12 +6,10 @@ import fire
 from transformers import AutoTokenizer
 
 import gem
-from gem.envs.multi_turn import MultiTurnEnv
 from gem.tools.search_tool import SearchTool
 from gem.tools.tool_env_wrapper import ToolEnvWrapper
 from gem.utils.debug import run_and_print_episode
-from gem.wrappers.stateful_observation import (ChatTemplatedObservation,
-                                               ConcatenatedObservation)
+from gem.wrappers.wrapper_factory import WRAPPER_FACTORY
 
 TEST_ACTIONS = [
     """<search>What is the capital of France?</search> ...""",
@@ -40,7 +38,7 @@ def _should_use_real_requests(search_url: str) -> bool:
 
 
 def test_single_action(env_name: str = "ta:GuessTheNumber-v0", search_url: str = "http://dummy-search-url"):
-    env: MultiTurnEnv = gem.make(env_name, max_turns=3)
+    env = gem.make(env_name, max_turns=3)
     tool = SearchTool(search_url=search_url, topk=2)
     env = ToolEnvWrapper(env, tools=[tool])
     obs, info = env.reset()
@@ -78,7 +76,7 @@ def test_single_action(env_name: str = "ta:GuessTheNumber-v0", search_url: str =
                 print(f"Info: {info}\n")
 
 def test_episode(env_name: str = "ta:GuessTheNumber-v0", search_url: str = "http://dummy-search-url"):
-    env: MultiTurnEnv = gem.make(env_name, max_turns=3)
+    env = gem.make(env_name, max_turns=3)
     policy = lambda _: random.choice(TEST_ACTIONS)
     tool = SearchTool(search_url=search_url, topk=2)
     
@@ -100,25 +98,21 @@ def test_episode(env_name: str = "ta:GuessTheNumber-v0", search_url: str = "http
     wrapped_env = ToolEnvWrapper(env, tools=[tool], max_tool_uses=3)
     run_episode_test("EPISODE 1: DEFAULT OBSERVATION", wrapped_env)
 
-    # Episode 2: Concatenated observation
-    wrapped_env = ToolEnvWrapper(env, tools=[tool], max_tool_uses=3)
-    wrapped_env = ConcatenatedObservation(wrapped_env)
-    run_episode_test("EPISODE 2: CONCATENATED OBSERVATION", wrapped_env)
-
     # Episode 3: Chat template observation
     tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen3-0.6B-Base")
     wrapped_env = ToolEnvWrapper(env, tools=[tool], max_tool_uses=3)
-    wrapped_env = ChatTemplatedObservation(wrapped_env, tokenizer)
+    wrapped_env = WRAPPER_FACTORY["concat_chat"](wrapped_env, tokenizer=tokenizer)
     run_episode_test("EPISODE 3: CHAT TEMPLATE OBSERVATION", wrapped_env)
 
     # Batch episode: Sync vectorized env
     print("\nBATCH EPISODE: SYNC VECTORIZED ENV")
     num_envs = 3
     tool_env_wrapper = partial(ToolEnvWrapper, tools=[tool], max_tool_uses=3)
+    chat_wrapper = partial(WRAPPER_FACTORY["concat_chat"], tokenizer=tokenizer)
     ta_vec_env = gem.make_vec(
         env_name,
         num_envs=num_envs,
-        wrappers=[tool_env_wrapper, ConcatenatedObservation],
+        wrappers=[tool_env_wrapper, chat_wrapper],
         max_turns=3,
     )
     batch_policy = lambda _: [random.choice([TEST_ACTIONS[2]]) for _ in range(num_envs)]

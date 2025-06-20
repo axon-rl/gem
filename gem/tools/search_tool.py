@@ -20,19 +20,20 @@ class SearchTool(BaseTool):
         self.search_url = search_url
         self.topk = topk
 
-    def _parse_action(self, action: str) -> Tuple[str, bool]:
+    def _parse_action(self, action: str) -> Tuple[str, str, bool]:
         """
-        Parse the action string to extract the <search> content only.
-        Returns (content, is_valid)
+        Parse the action string to extract the <search> content and the full matched tag.
+        Returns (content, parsed_action, is_valid)
         """
         # TODO: @changyu handle multiple search matches
         pattern = r'<search>(.*?)</search>'
         match = re.search(pattern, action, re.DOTALL)
         if match:
-            content = match.group(1).strip()
-            return content, True
+            parsed_query = match.group(1).strip()
+            parsed_action = match.group(0)
+            return parsed_query, parsed_action, True
         else:
-            return '', False
+            return '', '', False
 
     def _search(self, query: str):
         """
@@ -61,6 +62,11 @@ class SearchTool(BaseTool):
             format_reference += f"Doc {idx+1}(Title: {title}) {text}\n"
         return format_reference
 
+    def instruction_string(self) -> str:
+        return (
+            "You can execute search by wrapping it in <search>...</search> tags. "
+        )
+
     def execute_action(self, action: str):
         """
         Execute the parsed action for the SearchTool.
@@ -74,13 +80,13 @@ class SearchTool(BaseTool):
             done: Always False for search tool (search does not terminate the episode).
             valid: True if a valid search query was found and executed, False otherwise.
         """
-        query, is_valid = self._parse_action(action)
+        parsed_query, parsed_action, is_valid = self._parse_action(action)
         if not is_valid:
             # observation = "No valid search query found. Please provide your query within <search>...</search> tags."
             observation = ""
             valid = False
         else:
-            search_result = self._search(query)
+            search_result = self._search(parsed_query)
             observation = f'\n\n<information>{search_result}</information>\n\n'
             valid = True
-        return observation, valid
+        return valid, observation, parsed_action
