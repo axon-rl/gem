@@ -1,19 +1,19 @@
+import argparse
 import json
 import os
 import warnings
-from typing import List, Dict, Optional
-import argparse
+from typing import Dict, List, Optional
 
-import faiss
-import torch
-import numpy as np
-from transformers import AutoConfig, AutoTokenizer, AutoModel
-from tqdm import tqdm
 import datasets
+import faiss
+import numpy as np
+import torch
+from mosec import Runtime, Server, Worker
+from mosec.mixin import TypedMsgPackMixin
+from msgspec import Struct
+from tqdm import tqdm
+from transformers import AutoConfig, AutoModel, AutoTokenizer
 
-import uvicorn
-from fastapi import FastAPI
-from pydantic import BaseModel
 
 def load_corpus(corpus_path: str):
     corpus = datasets.load_dataset(
@@ -315,47 +315,48 @@ class Config:
         self.retrieval_batch_size = retrieval_batch_size
 
 
-class QueryRequest(BaseModel):
+class QueryRequest(Struct, kw_only=True):
     queries: List[str]
     topk: Optional[int] = None
     return_scores: bool = False
 
 
-app = FastAPI()
+class RetrievalResponse(Struct, kw_only=True):
+    result: List[List[Dict]]
 
-@app.post("/retrieve")
-def retrieve_endpoint(request: QueryRequest):
-    """
-    Endpoint that accepts queries and performs retrieval.
-    Input format:
-    {
-      "queries": ["What is Python?", "Tell me about neural networks."],
-      "topk": 3,
-      "return_scores": true
-    }
-    """
-    if not request.topk:
-        request.topk = config.retrieval_topk  # fallback to default
 
-    # Perform batch retrieval
-    results, scores = retriever.batch_search(
-        query_list=request.queries,
-        num=request.topk,
-        return_score=request.return_scores
-    )
-    
-    # Format response
-    resp = []
-    for i, single_result in enumerate(results):
-        if request.return_scores:
-            # If scores are returned, combine them with results
-            combined = []
-            for doc, score in zip(single_result, scores[i]):
-                combined.append({"document": doc, "score": score})
-            resp.append(combined)
-        else:
-            resp.append(single_result)
-    return {"result": resp}
+class RetrievalWorker(TypedMsgPackMixin, Worker):
+    def __init__(self):
+        super().__init__()
+        self.config = Config(**json.loads(os.environ.get("CONFIG")))
+        self.retriever = get_retriever(self.config)
+        
+    def forward(self, request: QueryRequest) -> RetrievalResponse:
+        """
+        Perform retrieval based on the request.
+        """
+        if not request.topk:
+            request.topk = self.config.retrieval_topk  # fallback to default
+
+        # Perform batch retrieval
+        results, scores = self.retriever.batch_search(
+            query_list=request.queries,
+            num=request.topk,
+            return_score=request.return_scores
+        )
+        
+        # Format response
+        resp = []
+        for i, single_result in enumerate(results):
+            if request.return_scores:
+                # If scores are returned, combine them with results
+                combined = []
+                for doc, score in zip(single_result, scores[i]):
+                    combined.append({"document": doc, "score": score})
+                resp.append(combined)
+            else:
+                resp.append(single_result)
+        return RetrievalResponse(result=resp)
 
 
 if __name__ == "__main__":
@@ -367,26 +368,39 @@ if __name__ == "__main__":
     parser.add_argument("--retriever_name", type=str, default="e5", help="Name of the retriever model.")
     parser.add_argument("--retriever_model", type=str, default="intfloat/e5-base-v2", help="Path of the retriever model.")
     parser.add_argument('--faiss_gpu', action='store_true', help='Use GPU for computation')
+    parser.add_argument('--max_wait_time', type=int, default=10, help="Maximum wait time for batching requests")
 
     args = parser.parse_args()
     
     # 1) Build a config (could also parse from arguments).
-    #    In real usage, you'd parse your CLI arguments or environment variables.
-    config = Config(
-        retrieval_method = args.retriever_name,  # or "dense"
-        index_path=args.index_path,
-        corpus_path=args.corpus_path,
-        retrieval_topk=args.topk,
-        faiss_gpu=args.faiss_gpu,
-        retrieval_model_path=args.retriever_model,
-        retrieval_pooling_method="mean",
-        retrieval_query_max_length=256,
-        retrieval_use_fp16=True,
-        retrieval_batch_size=512,
-    )
-
-    # 2) Instantiate a global retriever so it is loaded once and reused.
-    retriever = get_retriever(config)
+    config = {
+        "retrieval_method": args.retriever_name,
+        "index_path": args.index_path,
+        "corpus_path": args.corpus_path,
+        "retrieval_topk": args.topk,
+        "faiss_gpu": args.faiss_gpu,
+        "retrieval_model_path": args.retriever_model,
+        "retrieval_pooling_method": "mean",
+        "retrieval_query_max_length": 256,
+        "retrieval_use_fp16": True,
+        "retrieval_batch_size": 512,
+    }
     
-    # 3) Launch the server. By default, it listens on http://127.0.0.1:8000
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    # 2) Launch the mosec server
+    server = Server()
+    runtime = Runtime(
+        worker=RetrievalWorker,
+        num=1,
+        max_batch_size=1,
+        max_wait_time=args.max_wait_time,
+        timeout=30,  
+        env=[{
+            "CONFIG": json.dumps(config)
+        }]
+    )
+    
+    server.register_runtime({
+        "/retrieve": [runtime],
+    })
+    
+    server.run()
