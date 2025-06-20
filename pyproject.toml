@@ -26,6 +26,7 @@ classifiers = [
 ]
 dependencies = [
   "nltk==3.9.1",
+  "math-verify[antlr4_13_2]",
 ]
 
 [project.urls]

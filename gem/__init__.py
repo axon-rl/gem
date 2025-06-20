@@ -2,13 +2,19 @@
 #
 # SPDX-License-Identifier: MIT
 
-from gem.core import Env, ObservationWrapper
+
+import logging
+
+from gem.core import Env
 from gem.envs.registration import make, make_vec, register
+
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
 
 __all__ = [
     # core classes
     "Env",
-    "ObservationWrapper",
     # registration
     "make",
     "make_vec",

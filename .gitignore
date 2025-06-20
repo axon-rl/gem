@@ -188,3 +188,6 @@ evals/benchmarks/*/eval_res*
 evals/game/results*
 resources
 scripts
+
+# neovim
+.nvim/

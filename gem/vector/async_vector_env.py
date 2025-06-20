@@ -1,89 +1,70 @@
-"""Asynchronous vectorized environment execution."""
+"""Synchronous (for loop) vectorized environment execution."""
 
-import asyncio
 from copy import deepcopy
+from multiprocessing import Pool, TimeoutError
 from typing import Any, Optional, Sequence, Tuple, Union
 
 import numpy as np
 
 from gem.core import ActType, ObsType
-from gem.vector.sync_vector_env import ArrayType, AutoresetMode, SyncVectorEnv
+from gem.vector.vector_env import ArrayType, AutoresetMode, VectorEnv
 
 
-class AsyncVectorEnv(SyncVectorEnv):
-
-    async def _execute_step_in_thread(
-        self, env_idx: int, action: ActType
-    ) -> Tuple[ObsType, float, bool, bool]:
-        """Helper to run a single environment's step (and potential reset) in a thread."""
-        current_env = self.envs[env_idx]
-
-        obs: Optional[ObsType] = None
-        reward: float = 0.0
-        terminated: bool = False
-        truncated: bool = False
-
-        if self.autoreset_mode == AutoresetMode.NEXT_STEP:
-            # If the environment is set to autoreset, check if it needs resetting
-            if self._autoreset_envs[env_idx]:
-                obs_reset, _ = await asyncio.to_thread(current_env.reset)
-                obs = obs_reset
-            else:
-                # Standard step
-                obs_step, r_step, term_step, trunc_step, _ = await asyncio.to_thread(
-                    current_env.step, action
-                )
-                obs, reward, terminated, truncated = (
-                    obs_step,
-                    r_step,
-                    term_step,
-                    trunc_step,
-                )
-
-        elif self.autoreset_mode == AutoresetMode.SAME_STEP:
-            # Standard step
-            obs_step, r_step, term_step, trunc_step, _ = await asyncio.to_thread(
-                current_env.step, action
-            )
-            obs, reward, terminated, truncated = obs_step, r_step, term_step, trunc_step
-
-            # If terminated or truncated, reset immediately in the same step
-            if terminated or truncated:
-                obs_reset, _ = await asyncio.to_thread(current_env.reset)
-                obs = obs_reset
+def step_reset_env(action, env, autoreset_mode, autoreset_env):
+    if autoreset_mode == AutoresetMode.NEXT_STEP:
+        if autoreset_env:
+            obs, info = env.reset()
+            reward, terminated, truncated = 0.0, False, False
         else:
-            raise ValueError
+            obs, reward, terminated, truncated, info = env.step(action)
+    elif autoreset_mode == AutoresetMode.SAME_STEP:
+        obs, reward, terminated, truncated, info = env.step(action)
+        if terminated or truncated:
+            obs, info = env.reset()
+    else:
+        raise ValueError
+    return obs, reward, terminated, truncated, info
 
-        return obs, reward, terminated, truncated
 
-    async def step(self, actions: Sequence[ActType]) -> Tuple[
+class AsyncVectorEnv(VectorEnv):
+
+    def __init__(self, pool_size: int = None, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.mp_pool = Pool(len(self.envs)) if pool_size is None else Pool(pool_size)
+        print(f"Using multiprocessing pool with size {self.mp_pool._processes}.")
+
+    def step(self, actions: Sequence[ActType]) -> Tuple[
         Sequence[ObsType],
         ArrayType,
         ArrayType,
         ArrayType,
         dict[str, Any],
     ]:
-        """Steps all sub-environments asynchronously with the provided actions."""
-        if len(actions) != self.num_envs:
-            raise ValueError(
-                f"Number of actions ({len(actions)}) does not match number of "
-                f"environments ({self.num_envs})."
+        for i, (action, env, autoreset_env) in enumerate(
+            zip(
+                actions,
+                self.envs,
+                self._autoreset_envs,
             )
+        ):
+            res = self.mp_pool.apply_async(
+                step_reset_env, (action, env, self.autoreset_mode, autoreset_env)
+            )
+            try:
+                obs, reward, terminated, truncated, info = res.get(timeout=10)
+                self._env_obs[i] = obs
+                self._rewards[i] = reward
+                self._terminations[i] = terminated
+                self._truncations[i] = truncated
+                self._env_infos[i] = info
+            except TimeoutError:
+                obs, reward, terminated, truncated, info = res.get(timeout=10)
+                self._env_obs[i] = "TimeoutError"
+                self._rewards[i] = 0.0
+                self._terminations[i] = True
+                self._truncations[i] = False
+                self._env_infos[i] = {}
 
-        # Step environments in parallel using asyncio and gather
-        step_tasks = [
-            self._execute_step_in_thread(i, act) for i, act in enumerate(actions)
-        ]
-        results: Sequence[Tuple[ObsType, float, bool, bool]] = await asyncio.gather(
-            *step_tasks
-        )
-
-        # Unpack results
-        for i, (obs_val, r_val, term_val, trunc_val) in enumerate(results):
-            self._env_obs[i] = obs_val
-            self._rewards[i] = r_val
-            self._terminations[i] = term_val
-            self._truncations[i] = trunc_val
         self._autoreset_envs = np.logical_or(self._terminations, self._truncations)
 
         return (
@@ -91,21 +72,12 @@ class AsyncVectorEnv(SyncVectorEnv):
             np.copy(self._rewards),
             np.copy(self._terminations),
             np.copy(self._truncations),
-            {},
+            deepcopy(self._env_infos),
         )
 
-    async def _execute_reset_in_thread(
-        self, env_idx: int, seed_val: Optional[int]
-    ) -> ObsType:
-        """Helper to run a single environment's reset method in a separate thread."""
-        obs, info = await asyncio.to_thread(self.envs[env_idx].reset, seed=seed_val)
-        del info
-        return obs
-
-    async def reset(
+    def reset(
         self, seed: Optional[Union[int, Sequence[int]]] = None
     ) -> Tuple[Sequence[ObsType], dict[str, Any]]:
-        """Resets all sub-environments asynchronously."""
         if seed is None:
             seed = [None for _ in range(self.num_envs)]
         elif isinstance(seed, int):
@@ -114,14 +86,11 @@ class AsyncVectorEnv(SyncVectorEnv):
             len(seed) == self.num_envs
         ), f"If seeds are passed as a list the length must match num_envs={self.num_envs} but got length={len(seed)}."
 
-        reset_tasks = [self._execute_reset_in_thread(i, s) for i, s in enumerate(seed)]
-        all_new_obs: Sequence[ObsType] = await asyncio.gather(*reset_tasks)
+        for i, (env, single_seed) in enumerate(zip(self.envs, seed)):
+            self._env_obs[i], self._env_infos[i] = env.reset(seed=single_seed)
 
-        for i, obs_val in enumerate(all_new_obs):
-            self._env_obs[i] = obs_val
-        self._rewards.fill(0.0)
-        self._terminations.fill(False)
-        self._truncations.fill(False)
-        self._autoreset_envs.fill(False)
+        self._terminations = np.zeros((self.num_envs,), dtype=np.bool_)
+        self._truncations = np.zeros((self.num_envs,), dtype=np.bool_)
+        self._autoreset_envs = np.zeros((self.num_envs,), dtype=np.bool_)
 
-        return deepcopy(self._env_obs), {}
+        return deepcopy(self._env_obs), deepcopy(self._env_infos)
