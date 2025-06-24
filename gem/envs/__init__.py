@@ -171,6 +171,17 @@ register(
     test_key="tests",
 )
 
+# Register qa dataset environments
+
+register(
+    "eval:QaOpen",
+    "gem.envs.qa_env:QaEnv",
+    dataset_name="google-research-datasets/nq_open",
+    split="validation",
+    question_key="question",
+    answer_key="answer",
+)
+
 # Register datasets from ReasoningGym
 for name in rg.factory.DATASETS.keys():
     register(
