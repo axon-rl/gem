@@ -139,6 +139,24 @@ register(
     only_real_words=False,
     max_turns=8,
 )
+register(
+    "ta:FifteenPuzzle-v0",
+    "gem.envs.textarena.fifteen_puzzle:FifteenPuzzleEnv",
+    num_rows=3,
+    max_turns=20,
+)
+register(
+    "ta:FifteenPuzzle-v0-easy",
+    "gem.envs.textarena.fifteen_puzzle:FifteenPuzzleEnv",
+    num_rows=2,
+    max_turns=10,
+)
+register(
+    "ta:FifteenPuzzle-v0-hard",
+    "gem.envs.textarena.fifteen_puzzle:FifteenPuzzleEnv",
+    num_rows=4,
+    max_turns=50,
+)
 
 
 # Register math dataset environments
