@@ -29,6 +29,22 @@ dependencies = [
   "math-verify[antlr4_13_2]",
 ]
 
+[project.optional-dependencies]
+search = [
+  "msgspec",
+  "mosec",
+  "aiohttp",
+  "bs4",
+  "chardet",
+  "google-api-python-client",
+  "torch",
+  "torchvision",
+  "torchaudio",
+  "transformers",
+  "datasets",
+  "pyserini",
+]
+
 [project.urls]
 Documentation = "https://github.com/Zichen/gem#readme"
 Issues = "https://github.com/Zichen/gem/issues"
