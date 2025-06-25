@@ -11,7 +11,7 @@ from gem.tools.base_tool import BaseTool
 
 class SearchTool(BaseTool):
     tool_type = "search"
-    # TODO: add a timeout 
+    # TODO: add a timeout
 
     def __init__(self, num_workers=1, search_url=None, topk=3):
         super().__init__(num_workers)
@@ -26,46 +26,42 @@ class SearchTool(BaseTool):
         Returns (content, parsed_action, is_valid)
         """
         # TODO: @changyu handle multiple search matches
-        pattern = r'<search>(.*?)</search>'
+        pattern = r"<search>(.*?)</search>"
         match = re.search(pattern, action, re.DOTALL)
         if match:
             parsed_query = match.group(1).strip()
             parsed_action = match.group(0)
             return parsed_query, parsed_action, True
         else:
-            return '', '', False
+            return "", "", False
 
     def _search(self, query: str):
         """
         Perform a search using the configured search_url.
         Returns a formatted string of search results.
         """
-        payload = {
-            "queries": [query],
-            "topk": self.topk,
-            "return_scores": True
-        }
+        payload = {"queries": [query], "topk": self.topk, "return_scores": True}
         try:
-            response = requests.post(self.search_url, data=msgspec.msgpack.encode(payload))
+            response = requests.post(
+                self.search_url, data=msgspec.msgpack.encode(payload)
+            )
             response.raise_for_status()
-            result = msgspec.msgpack.decode(response.content)['result'][0]
+            result = msgspec.msgpack.decode(response.content)["result"][0]
             return self._passages2string(result)
         except Exception as e:
             return f"[SearchTool Error: {e}]"
 
     def _passages2string(self, result):
-        format_reference = ''
+        format_reference = ""
         for idx, doc_item in enumerate(result):
-            content = doc_item['document']['contents']
+            content = doc_item["document"]["contents"]
             title = content.split("\n")[0]
             text = "\n".join(content.split("\n")[1:])
             format_reference += f"Doc {idx+1}(Title: {title}) {text}\n"
         return format_reference
 
     def instruction_string(self) -> str:
-        return (
-            "You can execute search by wrapping it in <search>...</search> tags. "
-        )
+        return "You can execute search by wrapping it in <search>...</search> tags. "
 
     def execute_action(self, action: str):
         """
@@ -87,6 +83,6 @@ class SearchTool(BaseTool):
             valid = False
         else:
             search_result = self._search(parsed_query)
-            observation = f'\n\n<information>{search_result}</information>\n\n'
+            observation = f"\n\n<information>{search_result}</information>\n\n"
             valid = True
         return valid, observation, parsed_action

@@ -117,5 +117,4 @@ if __name__ == "__main__":
     assert QaEnv.check_correct("43", [42, "some other answer"]) is False
     print("Test 7 Passed: Incorrect integer answer.")
 
-    print("--- All tests passed! ---") 
-
+    print("--- All tests passed! ---")

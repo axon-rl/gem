@@ -55,7 +55,7 @@ def test_action_sequence():
         obs, _ = env.reset()
 
         print(f"------ Test {i} ------")
-        if i == 3: 
+        if i == 3:
             action = f"<answer>     {env.answer[0]}</answer>"
         print(f"Action: {action!r}")
         obs, reward, terminated, truncated, info = env.step(action)

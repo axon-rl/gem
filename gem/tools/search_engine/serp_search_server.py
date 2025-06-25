@@ -8,16 +8,27 @@ from mosec.mixin import TypedMsgPackMixin
 from msgspec import Struct
 
 parser = argparse.ArgumentParser(description="Launch online search server.")
-parser.add_argument('--search_url', type=str, required=True, 
-                    help="URL for search engine (e.g. https://serpapi.com/search)")
-parser.add_argument('--topk', type=int, default=3, 
-                    help="Number of results to return per query")
-parser.add_argument('--serp_api_key', type=str, default=None, 
-                    help="SerpAPI key for online search")
-parser.add_argument('--serp_engine', type=str, default="google", 
-                    help="SerpAPI engine for online search")
-parser.add_argument('--max_wait_time', type=int, default=10,
-                    help="Maximum wait time for batching requests")
+parser.add_argument(
+    "--search_url",
+    type=str,
+    required=True,
+    help="URL for search engine (e.g. https://serpapi.com/search)",
+)
+parser.add_argument(
+    "--topk", type=int, default=3, help="Number of results to return per query"
+)
+parser.add_argument(
+    "--serp_api_key", type=str, default=None, help="SerpAPI key for online search"
+)
+parser.add_argument(
+    "--serp_engine", type=str, default="google", help="SerpAPI engine for online search"
+)
+parser.add_argument(
+    "--max_wait_time",
+    type=int,
+    default=10,
+    help="Maximum wait time for batching requests",
+)
 args = parser.parse_args()
 
 
@@ -68,30 +79,36 @@ class OnlineSearchEngine:
 
     def _process_result(self, search_result: Dict):
         results = []
-        
-        answer_box = search_result.get('answer_box', {})
+
+        answer_box = search_result.get("answer_box", {})
         if answer_box:
-            title = answer_box.get('title', 'No title.')
-            snippet = answer_box.get('snippet', 'No snippet available.')
-            results.append({
-                'document': {"contents": f'"{title}"\n{snippet}'},
-            })
+            title = answer_box.get("title", "No title.")
+            snippet = answer_box.get("snippet", "No snippet available.")
+            results.append(
+                {
+                    "document": {"contents": f'"{title}"\n{snippet}'},
+                }
+            )
 
-        organic_results = search_result.get('organic_results', [])
-        for _, result in enumerate(organic_results[:self.config.topk]):
-            title = result.get('title', 'No title.')
-            snippet = result.get('snippet', 'No snippet available.')
-            results.append({
-                'document': {"contents": f'"{title}"\n{snippet}'},
-            })
+        organic_results = search_result.get("organic_results", [])
+        for _, result in enumerate(organic_results[: self.config.topk]):
+            title = result.get("title", "No title.")
+            snippet = result.get("snippet", "No snippet available.")
+            results.append(
+                {
+                    "document": {"contents": f'"{title}"\n{snippet}'},
+                }
+            )
 
-        related_results = search_result.get('related_questions', [])
-        for _, result in enumerate(related_results[:self.config.topk]):
-            title = result.get('question', 'No title.')  # question is the title here
-            snippet = result.get('snippet', 'No snippet available.')
-            results.append({
-                'document': {"contents": f'"{title}"\n{snippet}'},
-            })
+        related_results = search_result.get("related_questions", [])
+        for _, result in enumerate(related_results[: self.config.topk]):
+            title = result.get("question", "No title.")  # question is the title here
+            snippet = result.get("snippet", "No snippet available.")
+            results.append(
+                {
+                    "document": {"contents": f'"{title}"\n{snippet}'},
+                }
+            )
 
         return results
 
@@ -106,7 +123,7 @@ class SearchWorker(TypedMsgPackMixin, Worker):
             serp_engine=args.serp_engine,
         )
         self.engine = OnlineSearchEngine(self.config)
-        
+
     def forward(self, request: SearchRequest) -> SearchResponse:
         results = self.engine.batch_search(request.queries)
         return SearchResponse(result=results)
@@ -119,11 +136,13 @@ if __name__ == "__main__":
         num=1,
         max_batch_size=1,
         max_wait_time=args.max_wait_time,
-        timeout=30,  
+        timeout=30,
     )
-    
-    server.register_runtime({
-        "/retrieve": [runtime],
-    })
-    
+
+    server.register_runtime(
+        {
+            "/retrieve": [runtime],
+        }
+    )
+
     server.run()

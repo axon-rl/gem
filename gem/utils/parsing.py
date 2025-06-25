@@ -74,10 +74,10 @@ def extract_last_tagged_answer(model_response: str):
         str or None: The extracted answer, or None if not found.
     """
 
-    answer_pattern = r'<answer>(.*?)</answer>'
+    answer_pattern = r"<answer>(.*?)</answer>"
     match = re.finditer(answer_pattern, model_response, re.DOTALL)
     matches = list(match)
-    
+
     if len(matches) == 0:
         return None
 
