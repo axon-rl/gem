@@ -45,7 +45,7 @@ def test_action_sequence():
     env = gem.make("eval:QaOpen", verbose=True)
 
     actions = [
-        "<answer>The first president of the United States was George Washington.</answer>",
+        "<answer>The first president of the United States was George Washington.",
         "<answer>The Earth revolves around the Sun.</answer>",
         "<answer>Water is composed of two hydrogen atoms and one oxygen atom.</answer>",
         "<answer>The powerhouse of the cell is the mitochondria.</answer>",
@@ -56,7 +56,7 @@ def test_action_sequence():
 
         print(f"------ Test {i} ------")
         if i == 3: 
-            action = f"<answer>{env.answer[0]}</answer>"
+            action = f"<answer>     {env.answer[0]}</answer>"
         print(f"Action: {action!r}")
         obs, reward, terminated, truncated, info = env.step(action)
 
