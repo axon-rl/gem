@@ -139,17 +139,27 @@ register(
     only_real_words=False,
     max_turns=8,
 )
+register(
+    "ta:FifteenPuzzle-v0",
+    "gem.envs.textarena.fifteen_puzzle:FifteenPuzzleEnv",
+    num_rows=3,
+    max_turns=20,
+)
+register(
+    "ta:FifteenPuzzle-v0-easy",
+    "gem.envs.textarena.fifteen_puzzle:FifteenPuzzleEnv",
+    num_rows=2,
+    max_turns=10,
+)
+register(
+    "ta:FifteenPuzzle-v0-hard",
+    "gem.envs.textarena.fifteen_puzzle:FifteenPuzzleEnv",
+    num_rows=4,
+    max_turns=50,
+)
 
 
 # Register math dataset environments
-
-register(
-    "eval:MATH500",
-    "gem.envs.math_env:MathEnv",
-    dataset_name="axon-rl/Eval-MATH500",
-    question_key="problem",
-    answer_key="answer",
-)
 
 register(
     "math:Math12K",
@@ -161,12 +171,20 @@ register(
 
 # Register code dataset environments
 
-## The test split of deepmind/code_contests, with merged test cases.
 register(
-    "eval:CodeContest",
+    "code:CodeContest",
     "gem.envs.code_env:CodeEnv",
     dataset_name="axon-rl/CodeContest",
-    split="test",
+    split="train",
+    question_key="problem",
+    test_key="tests",
+)
+
+register(
+    "code:Taco8k",
+    "gem.envs.code_env:CodeEnv",
+    dataset_name="axon-rl/TACO-8k",
+    split="train",
     question_key="problem",
     test_key="tests",
 )
@@ -183,6 +201,7 @@ register(
 )
 
 # Register datasets from ReasoningGym
+
 for name in rg.factory.DATASETS.keys():
     register(
         f"rg:{name}",
@@ -191,3 +210,24 @@ for name in rg.factory.DATASETS.keys():
         size=500,
         seed=42,
     )
+
+# Register evaluation datasets
+
+## MATH500
+register(
+    "eval:MATH500",
+    "gem.envs.math_env:MathEnv",
+    dataset_name="axon-rl/Eval-MATH500",
+    question_key="problem",
+    answer_key="answer",
+)
+
+## The test split of deepmind/code_contests, with merged test cases.
+register(
+    "eval:CodeContest",
+    "gem.envs.code_env:CodeEnv",
+    dataset_name="axon-rl/CodeContest",
+    split="test",
+    question_key="problem",
+    test_key="tests",
+)
