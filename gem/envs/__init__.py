@@ -191,14 +191,16 @@ register(
 
 # Register qa dataset environments
 
-register(
-    "eval:QaOpen",
-    "gem.envs.qa_env:QaEnv",
-    dataset_name="google-research-datasets/nq_open",
-    split="validation",
-    question_key="question",
-    answer_key="answer",
-)
+for i in range(4):
+    register(
+        f"logic:RuleTaker-d{i}",
+        "gem.envs.qa_env:QaEnv",
+        dataset_name=f"axon-rl/RuleTaker-d{i}-70k",
+        split="train",
+        extract_boxed=True,
+        question_key="question",
+        answer_key="answer",
+    )
 
 # Register datasets from ReasoningGym
 
@@ -230,4 +232,13 @@ register(
     split="test",
     question_key="problem",
     test_key="tests",
+)
+
+register(
+    "eval:QaOpen",
+    "gem.envs.qa_env:QaEnv",
+    dataset_name="google-research-datasets/nq_open",
+    split="validation",
+    question_key="question",
+    answer_key="answer",
 )

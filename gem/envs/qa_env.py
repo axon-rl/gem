@@ -7,7 +7,8 @@ from datasets import Dataset, DatasetDict, load_dataset
 
 from gem.core import Env
 from gem.utils.constants import TERMINAL_STATE
-from gem.utils.parsing import extract_last_tagged_answer
+from gem.utils.parsing import (extract_last_boxed_answer,
+                               extract_last_tagged_answer)
 from gem.utils.qa_em import em_check
 
 logger = logging.getLogger(__name__)
@@ -24,6 +25,7 @@ class QaEnv(Env):
         question_key: str = "question",
         answer_key: str = "answer",
         seed: int = 0,
+        extract_boxed: bool = False,
         **_,
     ):
         super().__init__()
@@ -48,10 +50,15 @@ class QaEnv(Env):
         self.idx = 0
         self.epoch = 0
 
+        if extract_boxed:
+            self.extractor = extract_last_boxed_answer
+        else:
+            self.extractor = extract_last_tagged_answer
+
     def step(
         self, action: str
     ) -> Tuple[str, SupportsFloat, bool, bool, dict[str, Any]]:
-        model_answer = extract_last_tagged_answer(action)
+        model_answer = self.extractor(action)
         if model_answer is None:
             reward = -0.1
         else:

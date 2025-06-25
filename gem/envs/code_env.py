@@ -1,5 +1,6 @@
 """Env for code datasets."""
 
+import json
 import logging
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Optional, SupportsFloat, Tuple
@@ -51,6 +52,25 @@ class CodeEnv(Env):
                 )
         assert isinstance(dataset, Dataset), f"Expected a Dataset, got {type(dataset)}"
 
+        # Data preprocessing
+        # logging.info(f"Dataset size before preprocessing: {len(dataset)}")
+        # dataset = dataset.filter(
+        #     lambda example: isinstance(example[self.test_key], dict)
+        # )
+        # dataset = dataset.filter(
+        #     lambda example: "inputs" in example[self.test_key]
+        #     and "outputs" in example[self.test_key]
+        # )
+        # dataset = dataset.filter(
+        #     lambda example: len(example[self.test_key]["inputs"])
+        #     == len(example[self.test_key]["outputs"])
+        #     > 0
+        # )
+        # logging.info(
+        #     f"Dataset size after removing unsupported and invalid test cases: {len(dataset)}"
+        # )
+        # logging.info(f"Random seed: {self.seed}")
+
         self.dataset_name = dataset_name
         self.dataset = dataset.shuffle(seed=self.seed)
         self.dataset_iter = iter(self.dataset)
@@ -85,6 +105,8 @@ class CodeEnv(Env):
 
         self.first_obs = data[self.question_key]
         self.tests = data[self.test_key]
+        if isinstance(self.tests, str):
+            self.tests = json.loads(self.tests)
         return self.first_obs, {}
 
     def _check_correct(self, model_code: str) -> bool:
@@ -124,8 +146,15 @@ class CodeEnv(Env):
                 tests = selected_tests
             num_tests = len(tests["inputs"])
 
+        def _parse_test(test):
+            if isinstance(test, str):
+                return test
+            if isinstance(test, list):
+                return "\n".join(map(str, test))
+
         code_and_tests = [
-            (model_code, self.sandbox_type, test) for test in tests["inputs"]
+            (model_code, self.sandbox_type, _parse_test(test))
+            for test in tests["inputs"]
         ]
         results = list(
             self.thread_pool_executer.map(
@@ -133,14 +162,18 @@ class CodeEnv(Env):
             )
         )
 
-        if self.verbose:
-            logging.info(results)
-
-        successes, stdouts, stderrs = zip(*results)
+        try:
+            successes, stdouts, stderrs = zip(*results)
+        except ValueError as e:
+            logging.info(code_and_tests)
+            logging.info("-" * 20)
+            logging.info(list(zip(*results)))
+            raise e
 
         if not all(successes):
             return False
         for gt, pred in zip(tests["outputs"], stdouts):
-            if gt != pred:
+            gt = _parse_test(gt)
+            if gt.strip() != pred.strip():
                 return False
         return True
