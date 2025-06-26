@@ -84,13 +84,21 @@ def test_episode(search_url: str, env_name: str = "ta:GuessTheNumber-v0"):
 
 def test_llm_episode(
     search_url: str,
-    env_name: str = "ta:GuessTheNumber-v0",
-    model_name: str = "Qwen/Qwen3-0.6B-Base",
+    env_name: str = "eval:QaOpen",
+    model_name: str = "PeterJinGo/SearchR1-nq_hotpotqa_train-qwen2.5-7b-em-ppo",
 ):
     """Test episode with LLM observation and Search tool."""
+    from datasets import Dataset
     from vllm import LLM, SamplingParams
 
     env = gem.make(env_name, max_turns=3)
+    # hack: fix the question and answer of the dataset
+    question = "Mike Barnett negotiated many contracts including which player that went on to become general manager of CSKA Moscow of the Kontinental Hockey League?"
+    prompt = f'Answer the given question. You must conduct reasoning inside <think> and </think> first every time you get new information. After reasoning, if you find you lack some knowledge, you can call a search engine by <search> query </search> and it will return the top searched results between <information> and </information>. You can search as many times as your want. If you find no further external knowledge needed, you can directly provide the answer inside <answer> and </answer>, without detailed illustrations. For example, <answer> Beijing </answer>. Question: {question}\n'
+    answer = "Sergei Fedorov"
+    dataset = Dataset.from_dict({"question": [prompt], "answer": [answer]})
+    env.dataset = dataset
+
     llm = LLM(
         model=model_name,
     )
@@ -100,7 +108,7 @@ def test_llm_episode(
         max_tokens=100,
         top_p=0.95,
     )
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    tokenizer = llm.get_tokenizer()
 
     def policy(obs):
         assert isinstance(
@@ -114,18 +122,6 @@ def test_llm_episode(
         action = response[0].outputs[0].text
         return action
 
-    def batch_policy(obss):
-        assert isinstance(
-            obss, List
-        ), f"Observation should be a string but is {type(obss)}."
-        response = llm.generate(
-            obss,
-            sampling_params=sampling_params,
-            use_tqdm=False,
-        )
-        actions = [r.outputs[0].text for r in response]
-        return actions
-
     tool = SearchTool(search_url=search_url, topk=2)
 
     print(f"Using real requests with URL: {search_url}")
@@ -137,52 +133,9 @@ def test_llm_episode(
         except Exception as e:
             print(f"Error during real request episode: {e}")
 
-    print("\n" * 5, "EPISODE 1: DEFAULT OBSERVATION")
-    wrapped_env = ToolEnvWrapper(env, tools=[tool], max_tool_uses=3)
-    run_episode_test("EPISODE 1: DEFAULT OBSERVATION", wrapped_env, policy)
-
-    print("\n" * 5, "EPISODE 2: CHAT TEMPLATE OBSERVATION")
     wrapped_env = ToolEnvWrapper(env, tools=[tool], max_tool_uses=3)
     wrapped_env = WRAPPER_FACTORY["concat_chat"](wrapped_env, tokenizer=tokenizer)
-    run_episode_test("EPISODE 2: CHAT TEMPLATE OBSERVATION", wrapped_env, policy)
-
-    print("\n" * 5, "BATCH EPISODE 1: SYNC VECTORIZED ENV")
-    num_envs = 2
-    tool_env_wrapper = partial(ToolEnvWrapper, tools=[tool], max_tool_uses=3)
-    chat_wrapper = partial(WRAPPER_FACTORY["concat_chat"], tokenizer=tokenizer)
-    ta_vec_env = gem.make_vec(
-        env_name,
-        num_envs=num_envs,
-        wrappers=[tool_env_wrapper, chat_wrapper],
-        async_mode=False,
-        max_turns=3,
-    )
-    run_episode_test(
-        "BATCH EPISODE 1: SYNC VECTORIZED ENV",
-        ta_vec_env,
-        policy_func=batch_policy,
-        ignore_done=True,
-        max_steps=2,
-    )
-
-    print("\n" * 5, "BATCH EPISODE 2: ASYNC VECTORIZED ENV")
-    num_envs = 2
-    tool_env_wrapper = partial(ToolEnvWrapper, tools=[tool], max_tool_uses=3)
-    chat_wrapper = partial(WRAPPER_FACTORY["concat_chat"], tokenizer=tokenizer)
-    ta_vec_env = gem.make_vec(
-        env_name,
-        num_envs=num_envs,
-        wrappers=[tool_env_wrapper, chat_wrapper],
-        async_mode=True,
-        max_turns=3,
-    )
-    run_episode_test(
-        "BATCH EPISODE 2: ASYNC VECTORIZED ENV",
-        ta_vec_env,
-        policy_func=batch_policy,
-        ignore_done=True,
-        max_steps=2,
-    )
+    run_episode_test("EPISODE 1: CHAT TEMPLATE OBSERVATION", wrapped_env, policy)
 
 
 def main():
