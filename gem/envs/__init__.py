@@ -191,7 +191,7 @@ register(
 
 # Register qa dataset environments
 
-for i in range(4):
+for i in [0, 1, 2, 3, 5]:
     register(
         f"logic:RuleTaker-d{i}",
         "gem.envs.qa_env:QaEnv",
