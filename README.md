@@ -14,4 +14,8 @@ pip install git+https://github.com/open-thought/reasoning-gym@0699e2f
 conda install bubblewrap
 
 pip install -e .
+
+# search
+pip install -e .[search]
+conda install -c pytorch -c nvidia faiss-gpu=1.8.0
 ```

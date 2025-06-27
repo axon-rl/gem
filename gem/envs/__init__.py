@@ -142,6 +142,24 @@ register(
     only_real_words=False,
     max_turns=8,
 )
+register(
+    "ta:FifteenPuzzle-v0",
+    "gem.envs.textarena.fifteen_puzzle:FifteenPuzzleEnv",
+    num_rows=3,
+    max_turns=20,
+)
+register(
+    "ta:FifteenPuzzle-v0-easy",
+    "gem.envs.textarena.fifteen_puzzle:FifteenPuzzleEnv",
+    num_rows=2,
+    max_turns=10,
+)
+register(
+    "ta:FifteenPuzzle-v0-hard",
+    "gem.envs.textarena.fifteen_puzzle:FifteenPuzzleEnv",
+    num_rows=4,
+    max_turns=50,
+)
 
 
 # Register math dataset environments
@@ -198,6 +216,19 @@ register(
     test_key="tests",
 )
 
+# Register qa dataset environments
+
+for i in [0, 1, 2, 3, 5]:
+    register(
+        f"logic:RuleTaker-d{i}",
+        "gem.envs.qa_env:QaEnv",
+        dataset_name=f"axon-rl/RuleTaker-d{i}-70k",
+        split="train",
+        extract_boxed=True,
+        question_key="question",
+        answer_key="answer",
+    )
+
 # Register datasets from ReasoningGym
 
 for name in rg.factory.DATASETS.keys():
@@ -228,4 +259,13 @@ register(
     split="test",
     question_key="problem",
     test_key="tests",
+)
+
+register(
+    "eval:QaOpen",
+    "gem.envs.qa_env:QaEnv",
+    dataset_name="google-research-datasets/nq_open",
+    split="validation",
+    question_key="question",
+    answer_key="answer",
 )
