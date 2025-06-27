@@ -147,6 +147,7 @@ register(
 # Register math dataset environments
 from datasets import load_dataset
 _wait_time = 5
+
 for _ in range(10):
     # Retry in case network error when accessing HF.
     try:
@@ -159,13 +160,78 @@ for _ in range(10):
         logging.warning(f"{e}")
         logging.warning("Re-trying...")
 else:
-    raise RuntimeError("Cannot load MATH-12k dataset")
-
+    raise RuntimeError("Cannot load axon-rl/MATH-12k dataset")
 register(
     "math:Math12K",
     "gem.envs.math_env:MathEnv",
     # dataset_name="axon-rl/MATH-12k",
     dataset=math_12k_dataset,
+    question_key="problem",
+    answer_key="answer",
+)
+
+for _ in range(10):
+    # Retry in case network error when accessing HF.
+    try:
+        asdiv_2k_dataset = load_dataset("axon-rl/ASDIV-2k", split="train")
+        break
+    except Exception as e:
+        # In case of timeout.
+        time.sleep(_wait_time)
+        _wait_time *= 1.2
+        logging.warning(f"{e}")
+        logging.warning("Re-trying...")
+else:
+    raise RuntimeError("Cannot load axon-rl/ASDIV-2k dataset")
+register(
+    "math:ASDIV2k",
+    "gem.envs.math_env:MathEnv",
+    # dataset_name="axon-rl/ASDIV-2k",
+    dataset=asdiv_2k_dataset,
+    question_key="problem",
+    answer_key="answer",
+)
+
+for _ in range(10):
+    # Retry in case network error when accessing HF.
+    try:
+        gsm_8k_dataset = load_dataset("axon-rl/GSM-8k", split="train")
+        break
+    except Exception as e:
+        # In case of timeout.
+        time.sleep(_wait_time)
+        _wait_time *= 1.2
+        logging.warning(f"{e}")
+        logging.warning("Re-trying...")
+else:
+    raise RuntimeError("Cannot load axon-rl/GSM-8k dataset")
+register(
+    "math:GSM8k",
+    "gem.envs.math_env:MathEnv",
+    # dataset_name="axon-rl/GSM-8k",
+    dataset=gsm_8k_dataset,
+    question_key="problem",
+    answer_key="answer",
+)
+
+for _ in range(10):
+    # Retry in case network error when accessing HF.
+    try:
+        orz_57k_dataset = load_dataset("axon-rl/ORZ-57k", split="train")
+        break
+    except Exception as e:
+        # In case of timeout.
+        time.sleep(_wait_time)
+        _wait_time *= 1.2
+        logging.warning(f"{e}")
+        logging.warning("Re-trying...")
+else:
+    raise RuntimeError("Cannot load axon-rl/ORZ-57k dataset")
+register(
+    "math:ORZ57k",
+    "gem.envs.math_env:MathEnv",
+    # dataset_name="axon-rl/ORZ-57k",
+    dataset=orz_57k_dataset,
     question_key="problem",
     answer_key="answer",
 )
