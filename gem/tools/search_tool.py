@@ -8,24 +8,27 @@ import requests
 
 from gem.tools.base_tool import BaseTool
 
+# Timeout for search request in seconds
+TIMEOUT = 5
+
 
 class SearchTool(BaseTool):
     tool_type = "search"
-    # TODO: add a timeout
 
-    def __init__(self, num_workers=1, search_url=None, topk=3):
+    def __init__(self, num_workers=1, search_url=None, topk=3, timeout=TIMEOUT):
         super().__init__(num_workers)
         if not search_url:
             raise ValueError("search_url must be provided for SearchTool.")
         self.search_url = search_url
         self.topk = topk
+        self.timeout = timeout
 
     def _parse_action(self, action: str) -> Tuple[str, str, bool]:
         """
         Parse the action string to extract the <search> content and the full matched tag.
         Returns (content, parsed_action, is_valid)
         """
-        # TODO: @changyu handle multiple search matches
+        # only take the first match
         pattern = r"<search>(.*?)</search>"
         match = re.search(pattern, action, re.DOTALL)
         if match:
@@ -43,7 +46,9 @@ class SearchTool(BaseTool):
         payload = {"queries": [query], "topk": self.topk, "return_scores": True}
         try:
             response = requests.post(
-                self.search_url, data=msgspec.msgpack.encode(payload)
+                self.search_url,
+                data=msgspec.msgpack.encode(payload),
+                timeout=self.timeout,
             )
             response.raise_for_status()
             result = msgspec.msgpack.decode(response.content)["result"][0]
