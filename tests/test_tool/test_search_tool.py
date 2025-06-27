@@ -138,18 +138,88 @@ def test_llm_episode(
     run_episode_test("EPISODE 1: CHAT TEMPLATE OBSERVATION", wrapped_env, policy)
 
 
+def evaluate(
+    search_url: str,
+    model_name: str = "PeterJinGo/SearchR1-nq_hotpotqa_train-qwen2.5-7b-em-ppo",
+    max_tokens: int = 1024,
+    n_examples: int = 500,
+    max_tool_uses: int = 4,
+    verbose: bool = False,
+):
+    """Evaluate the model on the QaOpen dataset with the Search tool."""
+    from datasets import Dataset
+    from tqdm import tqdm
+    from vllm import LLM, SamplingParams
+
+    llm = LLM(
+        model=model_name,
+    )
+    sampling_params = SamplingParams(
+        n=1,
+        temperature=0.6,
+        max_tokens=max_tokens,
+        top_p=0.95,
+    )
+    tokenizer = llm.get_tokenizer()
+    prompt_template = 'Answer the given question. You must conduct reasoning inside <think> and </think> first every time you get new information. After reasoning, if you find you lack some knowledge, you can call a search engine by <search> query </search> and it will return the top searched results between <information> and </information>. You can search as many times as your want. If you find no further external knowledge needed, you can directly provide the answer inside <answer> and </answer>, without detailed illustrations. For example, <answer> Beijing </answer>. Question: {question}\n'
+
+    def apply_prompt(example):
+        example["question"] = prompt_template.format(question=example["question"])
+        return example
+
+    tool = SearchTool(search_url=search_url, topk=3)
+    base_env = gem.make("eval:QaOpen", seed=42)
+    dataset = base_env.dataset
+    dataset = dataset.select(range(n_examples))
+    dataset = dataset.map(apply_prompt)
+    base_env.dataset = dataset
+
+    print("First question:\n", '-'*20, '\n', dataset[0]["question"], '\n', '-'*20, '\n')
+
+    wrapped_env = ToolEnvWrapper(base_env, tools=[tool], max_tool_uses=max_tool_uses)
+    wrapped_env = WRAPPER_FACTORY["concat_chat"](wrapped_env, tokenizer=tokenizer)
+
+    all_pass = 0
+    for _ in tqdm(range(n_examples)):
+        obs, info = wrapped_env.reset()
+        terminated = False
+        truncated = False
+        while not (terminated or truncated):
+            response = llm.generate(
+                [obs], sampling_params=sampling_params, use_tqdm=False
+            )
+            action = response[0].outputs[0].text
+            next_obs, reward, terminated, truncated, info = wrapped_env.step(action)
+            obs = next_obs
+        if reward == 1:
+            all_pass += 1
+    
+        if verbose: 
+            print(f"Action: {action!r}")
+            print(f"Answer: {base_env.answer!r}")
+            print(f"Observation: {obs!r}")
+            print(f"Reward: {reward}")
+            print(f"Terminated: {terminated}")
+            print(f"Truncated: {truncated}")
+            print(f"Info: {info!r}")
+
+    print(f"Tested {len(dataset)} questions; Accuracy: {all_pass / len(dataset)}")
+
+
 def main():
     """Run with:
     # To test with real search server:
     python -m tests.test_tool.test_search_tool single_action --search_url http://localhost:8000/retrieve
     python -m tests.test_tool.test_search_tool episode --search_url http://localhost:8000/retrieve
     python -m tests.test_tool.test_search_tool llm_episode --search_url http://localhost:8000/retrieve
+    python -m tests.test_tool.test_search_tool evaluate --search_url http://localhost:8000/retrieve --n_examples 20 --verbose
     """
     fire.Fire(
         {
             "single_action": test_single_action,
             "episode": test_episode,
             "llm_episode": test_llm_episode,
+            "evaluate": evaluate,
         }
     )
 
