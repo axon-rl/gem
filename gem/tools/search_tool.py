@@ -66,7 +66,25 @@ class SearchTool(BaseTool):
         return format_reference
 
     def instruction_string(self) -> str:
-        return "You can execute search by wrapping it in <search>...</search> tags. "
+        return (
+            'You are provided with a search engine to help answer questions.\n\n'
+            'Instructions:\n'
+            '- Always conduct reasoning inside:\n'
+            '  <think> your reasoning here </think>\n'
+            '- After reasoning, if knowledge is missing, issue a search query:\n'
+            '  <search> your query </search>\n'
+            '- The search engine returns results inside:\n'
+            '  <information> ... </information>\n'
+            '- You can search as many times as needed.\n'
+            '- When ready, give the final concise answer using:\n'
+            '  <answer> your answer </answer>\n\n'
+            'Example:\n'
+            '<think> I need to find the capital of China. </think>\n'
+            '<search> capital of China </search>\n'
+            '<information> Beijing is the capital of China. </information>\n'
+            '<think> The capital is Beijing. </think>\n'
+            '<answer> Beijing </answer>'
+        )
 
     def execute_action(self, action: str):
         """

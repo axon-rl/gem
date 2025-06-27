@@ -13,6 +13,11 @@ from gem.utils.qa_em import em_check
 logger = logging.getLogger(__name__)
 
 
+def apply_prompt(example):
+    prompt_template = "Answer the given question. Question: {question}\n"
+    example["question"] = prompt_template.format(question=example["question"])
+    return example
+
 class QaEnv(Env):
     """Built upon a dataset, serving as a single-turn env (contextual bandits)."""
 
@@ -44,6 +49,7 @@ class QaEnv(Env):
                     f"Please specify a split: {list(dataset.keys())}"
                 )
         assert isinstance(dataset, Dataset), f"Expected a Dataset, got {type(dataset)}"
+        dataset = dataset.map(apply_prompt)
         self.dataset = dataset.shuffle(seed=self.seed)
         self.idx = 0
         self.epoch = 0
