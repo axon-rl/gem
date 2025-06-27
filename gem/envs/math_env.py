@@ -59,7 +59,7 @@ class MathEnv(Env):
             reward = -0.1
         else:
             res = self.mp_pool.apply_async(
-                self.check_correct, (model_answer, self.answer)
+                self.check_correct, (model_answer, self.answers)
             )
             try:
                 is_correct = res.get(timeout=1)
@@ -79,30 +79,29 @@ class MathEnv(Env):
 
         data = self.dataset[self.idx]
         self.first_obs = data[self.question_key]
-        self.answer = data[self.answer_key]
+        answer = data[self.answer_key]
+        if isinstance(answer, (str, float, int)):
+            self.answers = tuple([str(answer)])
+        elif isinstance(answer, list):
+            self.answers = tuple(answer)
+        else:
+            raise ValueError(f"Unexpected answer type: {type(answer)}")
+
         self.idx += 1
         return self.first_obs, {}
 
     @staticmethod
-    def check_correct(model_answer: str, gt_answer: str) -> bool:
+    def check_correct(model_answer: str, gt_answers: Tuple[str]) -> bool:
         """Check if the action is correct."""
         # parse with math_verify
         model_answer = parse(model_answer)
 
-        # get correct answers from the dataset entry
-        if isinstance(gt_answer, (str, float, int)):
-            correct_answers = [str(gt_answer)]
-        elif isinstance(gt_answer, list):
-            correct_answers = gt_answer
-        else:
-            raise ValueError(f"Unexpected answer type: {type(gt_answer)}")
-
         # check against all possible correct answers
         # (math_verify.parse handles extraction e.g. from \\boxed{...})
         is_correct = False
-        for correct_answer in correct_answers:
-            correct_answer = parse(str(correct_answer))
-            if verify(correct_answer, model_answer):
+        for gt_answer in gt_answers:
+            gt_answer = parse(str(gt_answer))
+            if verify(gt_answer, model_answer):
                 is_correct = True
                 break
         return is_correct
@@ -110,6 +109,19 @@ class MathEnv(Env):
     def sample_random_action(self) -> str:
         """Sample a random action."""
         return "\\boxed{42}"
+
+    def get_initial_state(self) -> Tuple[str, str]:
+        return (self.first_obs, self.answers)
+
+    def reset_to_initial_state(self, initial_state: Tuple[str, str]) -> Tuple[str, dict[str, Any]]:
+        assert (
+            isinstance(initial_state, tuple)
+            and len(initial_state) == 2
+            and isinstance(initial_state[0], str)
+            and isinstance(initial_state[1], tuple)
+        ), f"Incorrect initial state format: {type(initial_state)=}, {initial_state=}"
+        self.first_obs, self.answers = initial_state
+        return self.first_obs, {}
 
 
 if __name__ == "__main__":

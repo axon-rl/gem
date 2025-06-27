@@ -108,3 +108,17 @@ class GuessTheNumberEnv(Env):
 
     def sample_random_action(self):
         return "\\boxed{" + str(random.randint(self.min_number, self.max_number)) + "}"
+
+    def get_initial_state(self) -> Tuple[int, int, int, int]:
+        return (self.game_number, self.min_number, self.max_number, self.max_turns)
+
+    def reset_to_initial_state(self, initial_state: Tuple[int, int, int, int]) -> Tuple[str, dict[str, Any]]:
+        assert (
+            isinstance(initial_state, tuple)
+            and len(initial_state) == 4
+            and all(isinstance(x, int) for x in initial_state)
+        ), f"Incorrect initial state format: {type(initial_state)=}, {initial_state=}"
+        self.game_number, self.min_number, self.max_number, self.max_turns = initial_state
+        self.previous_guesses = set()
+        self.turn_count = 0
+        return self._get_instructions(), {}

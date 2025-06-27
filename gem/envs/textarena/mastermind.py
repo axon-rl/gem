@@ -46,7 +46,7 @@ class MastermindEnv(Env):
             self.num_numbers = random.randint(self.code_length, 12)
         available_numbers = list(range(1, self.num_numbers + 1))
         sample_fn = random.choices if self.duplicate_numbers else random.sample
-        self.game_code = sample_fn(available_numbers, k=self.code_length)
+        self.game_code = tuple(sample_fn(available_numbers, k=self.code_length))
         self.previous_guesses = set()
         self.turn_count = 0
         return self._get_instructions(), {}
@@ -137,7 +137,7 @@ class MastermindEnv(Env):
             + "}"
         )
 
-    def _evaluate_guess(self, player_guess: List[int]) -> Tuple[int, int]:
+    def _evaluate_guess(self, player_guess: List[int]) -> Tuple[bool, int, int]:
         """
         Evaluates the player's guess and returns the number of black and white pegs.
         Black peg: correct digit in the correct position.
@@ -154,8 +154,8 @@ class MastermindEnv(Env):
         white_pegs = 0
 
         # Create copies to mark matched positions
-        code_copy = self.game_code.copy()
-        guess_copy = player_guess.copy()
+        code_copy = list(self.game_code)
+        guess_copy = list(player_guess)
 
         # First pass: count black pegs and mark them as None
         for i in range(self.code_length):
@@ -172,3 +172,21 @@ class MastermindEnv(Env):
                 code_copy[code_copy.index(guess_copy[i])] = None
 
         return length_correct, black_pegs, white_pegs
+
+
+    def get_initial_state(self) -> Tuple[Tuple[int, ...], int, int]:
+        return (self.game_code, self.code_length, self.num_numbers)
+
+    def reset_to_initial_state(self, initial_state: Tuple[Tuple[int, ...], int, int]) -> Tuple[str, dict[str, Any]]:
+        assert (
+            isinstance(initial_state, tuple)
+            and len(initial_state) == 3
+            and isinstance(initial_state[0], tuple)
+            and all(isinstance(x, int) for x in initial_state[0])
+            and isinstance(initial_state[1], int)
+            and isinstance(initial_state[2], int)
+        ), f"Incorrect initial state format: {type(initial_state)=}, {initial_state=}"
+        self.game_code, self.code_length, self.num_numbers = initial_state
+        self.previous_guesses = set()
+        self.turn_count = 0
+        return self._get_instructions(), {}

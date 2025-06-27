@@ -9,14 +9,20 @@ from gem.wrappers.observation_wrapper import ObservationWrapper
 
 ### Note: Order is important!
 WRAPPER_FACTORY = {
-    ### 1. Frist, optionlly add the tool wrapper
+    ### 1. First, optionally add the tool wrapper
     "python_tool": partial(
         ToolEnvWrapper,
         tools=[PythonCodeTool(timeout=5)],
         tool_reward=0.1,
-        max_tool_uses=10,
+        max_tool_uses=4,
     ),
-    ### 2. Then choose an observation wrapper
+    "python_tool_no_reward": partial(
+        ToolEnvWrapper,
+        tools=[PythonCodeTool(timeout=5)],
+        tool_reward=0.0,
+        max_tool_uses=4,
+    ),
+    ### 2. Then, optionally choose an observation wrapper
     "concat": partial(
         ObservationWrapper,
         include_action=False,

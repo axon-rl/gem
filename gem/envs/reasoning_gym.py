@@ -43,7 +43,14 @@ class ReasoningGymEnv(Env):
             self.dataset_iter = iter(self.dataset)
             data = next(self.dataset_iter)
 
-        question = data["question"]
         self.idx += 1
         self.data = data
-        return question, {}
+        return self.data["question"], {}
+
+    def get_initial_state(self) -> dict[str, Any]:
+        return self.data
+
+    def reset_to_initial_state(self, initial_state: dict[str, Any]) -> Tuple[str, dict[str, Any]]:
+        assert isinstance(initial_state, dict), f"Incorrect initial state format: {type(initial_state)=}, {initial_state=}"
+        self.data = initial_state
+        return self.data["question"], {}

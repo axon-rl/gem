@@ -144,3 +144,9 @@ class CodeEnv(Env):
             if gt != pred:
                 return False
         return True
+
+    def get_initial_state(self):
+        raise NotImplementedError
+
+    def reset_to_initial_state(self, initial_state):
+        raise NotImplementedError

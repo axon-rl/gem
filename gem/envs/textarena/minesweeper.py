@@ -331,3 +331,9 @@ class MinesweeperEnv(Env):
                         row_str += " . "
             board_str += row_str + "\n"
         return board_str
+
+    def get_initial_state(self):
+        raise NotImplementedError
+
+    def reset_to_initial_state(self, initial_state):
+        raise NotImplementedError

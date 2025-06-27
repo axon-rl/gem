@@ -167,3 +167,18 @@ class WordleEnv(Env):
                     feedback[i] = "X"
 
         return length_correct, feedback
+
+    def get_initial_state(self) -> Tuple[int, str]:
+        return (self.word_length, self.secret_word)
+
+    def reset_to_initial_state(self, initial_state: Tuple[int, str]) -> Tuple[str, dict[str, Any]]:
+        assert (
+            isinstance(initial_state, tuple)
+            and len(initial_state) == 2
+            and isinstance(initial_state[0], int)
+            and isinstance(initial_state[1], str)
+        ), f"Incorrect initial state format: {type(initial_state)=}, {initial_state=}"
+        self.word_length, self.secret_word = initial_state
+        self.previous_guesses = set()
+        self.turn_count = 0
+        return self._get_instructions(), {}
