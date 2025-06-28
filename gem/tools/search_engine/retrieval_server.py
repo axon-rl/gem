@@ -464,7 +464,7 @@ if __name__ == "__main__":
         max_batch_size=1,
         max_wait_time=args.max_wait_time,
         timeout=30,
-        env=[{"CONFIG": json.dumps(config)}],
+        env=[{"CONFIG": json.dumps(config)} for _ in range(args.num_workers)],
     )
 
     server.register_runtime(
