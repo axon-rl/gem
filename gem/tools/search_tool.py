@@ -33,7 +33,7 @@ class SearchTool(BaseTool):
         match = re.search(pattern, action, re.DOTALL)
         if match:
             parsed_query = match.group(1).strip()
-            parsed_action = match.group(0)
+            parsed_action = action[: match.end()] # including thinking process
             return parsed_query, parsed_action, True
         else:
             return "", "", False

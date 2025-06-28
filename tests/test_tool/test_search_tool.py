@@ -14,13 +14,13 @@ from gem.wrappers.wrapper_factory import WRAPPER_FACTORY
 TEST_ACTIONS = [
     """<search>What is the capital of France?</search> ...""",
     """Dummy action""",
-    """<search>Python list comprehension examples</search> ...""",
+    """<think>I need to search for Python list comprehension examples</think><search>Python list comprehension examples</search> ...""",
     """```<search>First query</search> ... <search>Second query</search>``` ...""",
 ]
 
 
 def test_single_action(search_url: str, env_name: str = "ta:GuessTheNumber-v0"):
-    env = gem.make(env_name, max_turns=3)
+    env = gem.make(env_name, max_turns=4)
     tool = SearchTool(search_url=search_url, topk=2)
     env = ToolEnvWrapper(env, tools=[tool])
     obs, info = env.reset()
