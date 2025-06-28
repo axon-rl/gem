@@ -18,6 +18,7 @@ def apply_prompt(example):
     example["question"] = prompt_template.format(question=example["question"])
     return example
 
+
 class QaEnv(Env):
     """Built upon a dataset, serving as a single-turn env (contextual bandits)."""
 

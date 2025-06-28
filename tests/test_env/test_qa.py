@@ -66,6 +66,7 @@ def test_action_sequence():
         print(f"Truncated: {truncated}")
         print(f"Info: {info}")
 
+
 def evaluate(model_name: str = "Qwen/Qwen3-4B", max_tokens: int = 32768):
     from vllm import LLM, SamplingParams
 

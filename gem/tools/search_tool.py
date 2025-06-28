@@ -33,7 +33,7 @@ class SearchTool(BaseTool):
         match = re.search(pattern, action, re.DOTALL)
         if match:
             parsed_query = match.group(1).strip()
-            parsed_action = action[: match.end()] # including thinking process
+            parsed_action = action[: match.end()]  # including thinking process
             return parsed_query, parsed_action, True
         else:
             return "", "", False
@@ -67,23 +67,23 @@ class SearchTool(BaseTool):
 
     def instruction_string(self) -> str:
         return (
-            'You are provided with a search engine to help answer questions.\n\n'
-            'Instructions:\n'
-            '- Always conduct reasoning inside:\n'
-            '  <think> your reasoning here </think>\n'
-            '- After reasoning, if knowledge is missing, issue a search query:\n'
-            '  <search> your query </search>\n'
-            '- The search engine returns results inside:\n'
-            '  <information> ... </information>\n'
-            '- You can search as many times as needed.\n'
-            '- When ready, give the final concise answer using:\n'
-            '  <answer> your answer </answer>\n\n'
-            'Example:\n'
-            '<think> I need to find the capital of China. </think>\n'
-            '<search> capital of China </search>\n'
-            '<information> Beijing is the capital of China. </information>\n'
-            '<think> The capital is Beijing. </think>\n'
-            '<answer> Beijing </answer>'
+            "You are provided with a search engine to help answer questions.\n\n"
+            "Instructions:\n"
+            "- Always conduct reasoning inside:\n"
+            "  <think> your reasoning here </think>\n"
+            "- After reasoning, if knowledge is missing, issue a search query:\n"
+            "  <search> your query </search>\n"
+            "- The search engine returns results inside:\n"
+            "  <information> ... </information>\n"
+            "- You can search as many times as needed.\n"
+            "- When ready, give the final concise answer using:\n"
+            "  <answer> your answer </answer>\n\n"
+            "Example:\n"
+            "<think> I need to find the capital of China. </think>\n"
+            "<search> capital of China </search>\n"
+            "<information> Beijing is the capital of China. </information>\n"
+            "<think> The capital is Beijing. </think>\n"
+            "<answer> Beijing </answer>"
         )
 
     def execute_action(self, action: str):

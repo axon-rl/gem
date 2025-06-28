@@ -1,6 +1,5 @@
 import random
 from functools import partial
-from typing import List
 
 import fire
 from transformers import AutoTokenizer
@@ -70,7 +69,9 @@ def test_episode(search_url: str, env_name: str = "ta:GuessTheNumber-v0"):
 
     # Episode 3: Chat template observation on reset
     wrapped_env = ToolEnvWrapper(env, tools=[tool], max_tool_uses=3)
-    wrapped_env = WRAPPER_FACTORY["concat_chat_on_reset"](wrapped_env, tokenizer=tokenizer)
+    wrapped_env = WRAPPER_FACTORY["concat_chat_on_reset"](
+        wrapped_env, tokenizer=tokenizer
+    )
     run_episode_test("EPISODE 3: CHAT TEMPLATE OBSERVATION ON RESET", wrapped_env)
 
     # Batch episode: Sync vectorized env
@@ -100,7 +101,7 @@ def test_llm_episode(
     env = gem.make(env_name, max_turns=3)
     # hack: fix the question and answer of the dataset
     question = "Mike Barnett negotiated many contracts including which player that went on to become general manager of CSKA Moscow of the Kontinental Hockey League?"
-    prompt = f'Answer the given question. You must conduct reasoning inside <think> and </think> first every time you get new information. After reasoning, if you find you lack some knowledge, you can call a search engine by <search> query </search> and it will return the top searched results between <information> and </information>. You can search as many times as your want. If you find no further external knowledge needed, you can directly provide the answer inside <answer> and </answer>, without detailed illustrations. For example, <answer> Beijing </answer>. Question: {question}\n'
+    prompt = f"Answer the given question. You must conduct reasoning inside <think> and </think> first every time you get new information. After reasoning, if you find you lack some knowledge, you can call a search engine by <search> query </search> and it will return the top searched results between <information> and </information>. You can search as many times as your want. If you find no further external knowledge needed, you can directly provide the answer inside <answer> and </answer>, without detailed illustrations. For example, <answer> Beijing </answer>. Question: {question}\n"
     answer = "Sergei Fedorov"
     dataset = Dataset.from_dict({"question": [prompt], "answer": [answer]})
     env.dataset = dataset
@@ -154,7 +155,6 @@ def evaluate(
     verbose: bool = False,
 ):
     """Evaluate the model on the QaOpen dataset with the Search tool."""
-    from datasets import Dataset
     from tqdm import tqdm
     from vllm import LLM, SamplingParams
 
@@ -175,7 +175,15 @@ def evaluate(
     dataset = dataset.select(range(n_examples))
     base_env.dataset = dataset
 
-    print("First question:\n", '-'*20, '\n', dataset[0]["question"], '\n', '-'*20, '\n')
+    print(
+        "First question:\n",
+        "-" * 20,
+        "\n",
+        dataset[0]["question"],
+        "\n",
+        "-" * 20,
+        "\n",
+    )
 
     wrapped_env = ToolEnvWrapper(base_env, tools=[tool], max_tool_uses=max_tool_uses)
     wrapped_env = WRAPPER_FACTORY[obs_wrapper](wrapped_env, tokenizer=tokenizer)
@@ -194,8 +202,8 @@ def evaluate(
             obs = next_obs
         if reward == 1:
             all_pass += 1
-    
-        if verbose: 
+
+        if verbose:
             print(f"Action: {action!r}")
             print(f"Answer: {base_env.answer!r}")
             print(f"Observation: {obs!r}")
