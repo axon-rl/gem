@@ -62,11 +62,16 @@ def test_episode(search_url: str, env_name: str = "ta:GuessTheNumber-v0"):
     wrapped_env = ToolEnvWrapper(env, tools=[tool], max_tool_uses=3)
     run_episode_test("EPISODE 1: DEFAULT OBSERVATION", wrapped_env)
 
-    # Episode 3: Chat template observation
+    # Episode 2: Chat template observation
     tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen3-0.6B-Base")
     wrapped_env = ToolEnvWrapper(env, tools=[tool], max_tool_uses=3)
     wrapped_env = WRAPPER_FACTORY["concat_chat"](wrapped_env, tokenizer=tokenizer)
-    run_episode_test("EPISODE 3: CHAT TEMPLATE OBSERVATION", wrapped_env)
+    run_episode_test("EPISODE 2: CHAT TEMPLATE OBSERVATION", wrapped_env)
+
+    # Episode 3: Chat template observation on reset
+    wrapped_env = ToolEnvWrapper(env, tools=[tool], max_tool_uses=3)
+    wrapped_env = WRAPPER_FACTORY["concat_chat_on_reset"](wrapped_env, tokenizer=tokenizer)
+    run_episode_test("EPISODE 3: CHAT TEMPLATE OBSERVATION ON RESET", wrapped_env)
 
     # Batch episode: Sync vectorized env
     print("\nBATCH EPISODE: SYNC VECTORIZED ENV")
@@ -162,17 +167,11 @@ def evaluate(
         top_p=0.95,
     )
     tokenizer = llm.get_tokenizer()
-    prompt_template = 'Answer the given question. You must conduct reasoning inside <think> and </think> first every time you get new information. After reasoning, if you find you lack some knowledge, you can call a search engine by <search> query </search> and it will return the top searched results between <information> and </information>. You can search as many times as your want. If you find no further external knowledge needed, you can directly provide the answer inside <answer> and </answer>, without detailed illustrations. For example, <answer> Beijing </answer>. Question: {question}\n'
-
-    def apply_prompt(example):
-        example["question"] = prompt_template.format(question=example["question"])
-        return example
 
     tool = SearchTool(search_url=search_url, topk=3)
     base_env = gem.make("eval:QaOpen", seed=42)
     dataset = base_env.dataset
     dataset = dataset.select(range(n_examples))
-    dataset = dataset.map(apply_prompt)
     base_env.dataset = dataset
 
     print("First question:\n", '-'*20, '\n', dataset[0]["question"], '\n', '-'*20, '\n')
