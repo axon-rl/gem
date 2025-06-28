@@ -16,13 +16,14 @@ TEST_ACTIONS = [
     """Dummy action""",
     """<think>I need to search for Python list comprehension examples</think><search>Python list comprehension examples</search> ...""",
     """```<search>First query</search> ... <search>Second query</search>``` ...""",
+    """```<search>Test the max number of tools</search> ...``` ...""",
 ]
 
 
 def test_single_action(search_url: str, env_name: str = "ta:GuessTheNumber-v0"):
     env = gem.make(env_name, max_turns=4)
     tool = SearchTool(search_url=search_url, topk=2)
-    env = ToolEnvWrapper(env, tools=[tool])
+    env = ToolEnvWrapper(env, tools=[tool], max_tool_uses=3)
     obs, info = env.reset()
 
     print(f"Using real requests with URL: {search_url}")
