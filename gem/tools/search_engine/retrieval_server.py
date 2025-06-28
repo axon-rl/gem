@@ -433,6 +433,12 @@ if __name__ == "__main__":
         default=10,
         help="Maximum wait time for batching requests",
     )
+    parser.add_argument(
+        "--num_workers",
+        type=int,
+        default=1,
+        help="Number of worker processes for the retrieval server.",
+    )
 
     args = parser.parse_args()
 
@@ -454,7 +460,7 @@ if __name__ == "__main__":
     server = Server()
     runtime = Runtime(
         worker=RetrievalWorker,
-        num=1,
+        num=args.num_workers,
         max_batch_size=1,
         max_wait_time=args.max_wait_time,
         timeout=30,

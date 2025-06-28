@@ -150,6 +150,7 @@ def evaluate(
     max_tokens: int = 1024,
     n_examples: int = 500,
     max_tool_uses: int = 4,
+    obs_wrapper: str = "concat_chat",
     verbose: bool = False,
 ):
     """Evaluate the model on the QaOpen dataset with the Search tool."""
@@ -177,7 +178,7 @@ def evaluate(
     print("First question:\n", '-'*20, '\n', dataset[0]["question"], '\n', '-'*20, '\n')
 
     wrapped_env = ToolEnvWrapper(base_env, tools=[tool], max_tool_uses=max_tool_uses)
-    wrapped_env = WRAPPER_FACTORY["concat_chat"](wrapped_env, tokenizer=tokenizer)
+    wrapped_env = WRAPPER_FACTORY[obs_wrapper](wrapped_env, tokenizer=tokenizer)
 
     all_pass = 0
     for _ in tqdm(range(n_examples)):
@@ -212,7 +213,7 @@ def main():
     python -m tests.test_tool.test_search_tool single_action --search_url http://localhost:8000/retrieve
     python -m tests.test_tool.test_search_tool episode --search_url http://localhost:8000/retrieve
     python -m tests.test_tool.test_search_tool llm_episode --search_url http://localhost:8000/retrieve
-    python -m tests.test_tool.test_search_tool evaluate --search_url http://localhost:8000/retrieve --n_examples 20 --verbose
+    python -m tests.test_tool.test_search_tool evaluate --search_url http://localhost:8000/retrieve --n_examples 1 --verbose
     """
     fire.Fire(
         {
