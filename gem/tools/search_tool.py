@@ -1,5 +1,6 @@
 # Adapted from https://github.com/PeterGriffinJin/Search-R1
 
+import os
 import re
 from typing import Tuple
 
@@ -17,9 +18,12 @@ class SearchTool(BaseTool):
 
     def __init__(self, num_workers=1, search_url=None, topk=3, timeout=TIMEOUT):
         super().__init__(num_workers)
-        if not search_url:
+        if search_url:
+            self.search_url = search_url
+        elif os.environ.get("SEARCH_URL"):
+            self.search_url = os.environ.get("SEARCH_URL")
+        else:
             raise ValueError("search_url must be provided for SearchTool.")
-        self.search_url = search_url
         self.topk = topk
         self.timeout = timeout
 
