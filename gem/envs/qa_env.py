@@ -13,7 +13,7 @@ from gem.utils.qa_em import em_check
 
 logger = logging.getLogger(__name__)
 
-
+# TODO: refactor later
 def apply_prompt(example, question_key: str):
     prompt_template = "Answer the given question. Question: {question}\n"
     example[question_key] = prompt_template.format(question=example[question_key])
