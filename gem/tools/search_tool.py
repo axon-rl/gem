@@ -18,14 +18,10 @@ class SearchTool(BaseTool):
 
     def __init__(self, num_workers=1, search_url=None, topk=3, timeout=TIMEOUT):
         super().__init__(num_workers)
-        if search_url:
-            self.search_url = search_url
-        elif os.environ.get("SEARCH_URL"):
-            self.search_url = os.environ.get("SEARCH_URL")
-        else:
-            raise ValueError("search_url must be provided for SearchTool.")
+        self.search_url = search_url
         self.topk = topk
         self.timeout = timeout
+        self._search_url_resolved = self.search_url is not None
 
     def _parse_action(self, action: str) -> Tuple[str, str, bool]:
         """
@@ -47,6 +43,13 @@ class SearchTool(BaseTool):
         Perform a search using the configured search_url.
         Returns a formatted string of search results.
         """
+        if not self._search_url_resolved:
+            self.search_url = self.search_url or os.environ.get("SEARCH_URL")
+            self._search_url_resolved = True
+
+        if not self.search_url:
+            raise ValueError("search_url must be provided for SearchTool.")
+
         payload = {"queries": [query], "topk": self.topk, "return_scores": True}
         try:
             response = requests.post(
