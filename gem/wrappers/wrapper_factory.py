@@ -1,6 +1,7 @@
 from functools import partial
 
 from gem.tools.python_code_tool import PythonCodeTool
+from gem.tools.search_tool import SearchTool
 from gem.tools.tool_env_wrapper import ToolEnvWrapper
 from gem.wrappers.episode_tracking_wrapper import EpisodeTrackingWrapper
 from gem.wrappers.observation_wrapper import ObservationWrapper
@@ -13,6 +14,12 @@ WRAPPER_FACTORY = {
     "python_tool": partial(
         ToolEnvWrapper,
         tools=[PythonCodeTool(timeout=5)],
+        tool_reward=0.1,
+        max_tool_uses=10,
+    ),
+    "search_tool": partial(
+        ToolEnvWrapper,
+        tools=[SearchTool(topk=3, timeout=5)],
         tool_reward=0.1,
         max_tool_uses=10,
     ),
