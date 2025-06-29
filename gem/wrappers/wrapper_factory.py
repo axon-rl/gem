@@ -50,6 +50,8 @@ WRAPPER_FACTORY = {
     "episode_tracking": EpisodeTrackingWrapper,
 }
 
+TOKENIZER_REQUIRED = ["concat_chat", "concat_chat_on_reset"]
+
 
 def get_wrapper_fns(wrappers: str, tokenizer=None):
     """Get a list of wrapper functions based on the provided wrapper names."""
@@ -60,7 +62,7 @@ def get_wrapper_fns(wrappers: str, tokenizer=None):
         print(f"Wrappers: {wrapper_fns}")
         for w in wrappers:
             wrapper_fn = WRAPPER_FACTORY[w]
-            if w == "concat_chat" and tokenizer is not None:
+            if w in TOKENIZER_REQUIRED and tokenizer is not None:
                 wrapper_fn = partial(wrapper_fn, tokenizer=tokenizer)
             wrapper_fns.append(wrapper_fn)
     return wrapper_fns
