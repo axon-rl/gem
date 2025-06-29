@@ -39,6 +39,12 @@ WRAPPER_FACTORY = {
         include_action=True,
         include_chat_template=False,
     ),
+    "concat_chat_on_reset": partial(
+        ObservationWrapper,
+        include_action=True,
+        include_chat_template=False,
+        apply_chat_template_on_reset=True,
+    ),
     ### 3. Finally, optionally add the episode tracking wrapper
     "episode_tracking": EpisodeTrackingWrapper,
 }

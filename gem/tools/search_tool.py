@@ -8,29 +8,32 @@ import requests
 
 from gem.tools.base_tool import BaseTool
 
+# Timeout for search request in seconds
+TIMEOUT = 5
+
 
 class SearchTool(BaseTool):
     tool_type = "search"
-    # TODO: add a timeout
 
-    def __init__(self, num_workers=1, search_url=None, topk=3):
+    def __init__(self, num_workers=1, search_url=None, topk=3, timeout=TIMEOUT):
         super().__init__(num_workers)
         if not search_url:
             raise ValueError("search_url must be provided for SearchTool.")
         self.search_url = search_url
         self.topk = topk
+        self.timeout = timeout
 
     def _parse_action(self, action: str) -> Tuple[str, str, bool]:
         """
         Parse the action string to extract the <search> content and the full matched tag.
         Returns (content, parsed_action, is_valid)
         """
-        # TODO: @changyu handle multiple search matches
+        # only take the first match
         pattern = r"<search>(.*?)</search>"
         match = re.search(pattern, action, re.DOTALL)
         if match:
             parsed_query = match.group(1).strip()
-            parsed_action = match.group(0)
+            parsed_action = action[: match.end()]  # including thinking process
             return parsed_query, parsed_action, True
         else:
             return "", "", False
@@ -43,7 +46,9 @@ class SearchTool(BaseTool):
         payload = {"queries": [query], "topk": self.topk, "return_scores": True}
         try:
             response = requests.post(
-                self.search_url, data=msgspec.msgpack.encode(payload)
+                self.search_url,
+                data=msgspec.msgpack.encode(payload),
+                timeout=self.timeout,
             )
             response.raise_for_status()
             result = msgspec.msgpack.decode(response.content)["result"][0]
@@ -61,7 +66,25 @@ class SearchTool(BaseTool):
         return format_reference
 
     def instruction_string(self) -> str:
-        return "You can execute search by wrapping it in <search>...</search> tags. "
+        return (
+            "You are provided with a search engine to help answer questions.\n\n"
+            "Instructions:\n"
+            "- Always conduct reasoning inside:\n"
+            "  <think> your reasoning here </think>\n"
+            "- After reasoning, if knowledge is missing, issue a search query:\n"
+            "  <search> your query </search>\n"
+            "- The search engine returns results inside:\n"
+            "  <information> ... </information>\n"
+            "- You can search as many times as needed.\n"
+            "- When ready, give the final concise answer using:\n"
+            "  <answer> your answer </answer>\n\n"
+            "Example:\n"
+            "<think> I need to find the capital of China. </think>\n"
+            "<search> capital of China </search>\n"
+            "<information> Beijing is the capital of China. </information>\n"
+            "<think> The capital is Beijing. </think>\n"
+            "<answer> Beijing </answer>"
+        )
 
     def execute_action(self, action: str):
         """

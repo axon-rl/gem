@@ -49,6 +49,8 @@ class ToolEnvWrapper(EnvWrapper):
 
         if tool_executed:
             self.tool_use_counter += 1
+            if self.tool_use_counter == self.max_tool_uses:
+                observation = f"{observation}\n\nNow reached the maximum number of tools. Please stop using tools."
             reward = self.tool_reward
             terminated, truncated = False, False
             info = {"parsed_action": parsed_action, "tool_type": tool.tool_type}

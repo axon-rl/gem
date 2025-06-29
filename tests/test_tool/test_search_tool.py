@@ -1,7 +1,5 @@
 import random
 from functools import partial
-from typing import List
-from unittest.mock import Mock, patch
 
 import fire
 from transformers import AutoTokenizer
@@ -15,111 +13,66 @@ from gem.wrappers.wrapper_factory import WRAPPER_FACTORY
 TEST_ACTIONS = [
     """<search>What is the capital of France?</search> ...""",
     """Dummy action""",
-    """<search>Python list comprehension examples</search> ...""",
+    """<think>I need to search for Python list comprehension examples</think><search>Python list comprehension examples</search> ...""",
     """```<search>First query</search> ... <search>Second query</search>``` ...""",
+    """```<search>Test the max number of tools</search> ...``` ...""",
 ]
 
-MOCK_SEARCH_RESPONSE = {
-    "result": [
-        [
-            {"document": {"contents": "Paris\nThe capital of France is Paris."}},
-            {"document": {"contents": "France\nFrance is a country in Europe."}},
-        ]
-    ]
-}
 
-
-def mock_post(*args, **kwargs):
-    mock_resp = Mock()
-    mock_resp.json.return_value = MOCK_SEARCH_RESPONSE
-    mock_resp.raise_for_status = lambda: None
-    return mock_resp
-
-
-def _should_use_real_requests(search_url: str) -> bool:
-    """Determine if we should use real requests based on the search_url."""
-    return (
-        search_url
-        and search_url != "http://dummy-search-url"
-        and not search_url.startswith("http://dummy")
-    )
-
-
-def test_single_action(
-    env_name: str = "ta:GuessTheNumber-v0", search_url: str = "http://dummy-search-url"
-):
-    env = gem.make(env_name, max_turns=3)
+def test_single_action(search_url: str, env_name: str = "ta:GuessTheNumber-v0"):
+    env = gem.make(env_name, max_turns=4)
     tool = SearchTool(search_url=search_url, topk=2)
-    env = ToolEnvWrapper(env, tools=[tool])
+    env = ToolEnvWrapper(env, tools=[tool], max_tool_uses=3)
     obs, info = env.reset()
 
-    use_real_requests = _should_use_real_requests(search_url)
-    print(
-        f"Using {'real' if use_real_requests else 'mocked'} requests with URL: {search_url}"
-    )
+    print(f"Using real requests with URL: {search_url}")
 
-    if use_real_requests:
-        # Send real requests
-        for i, test_action in enumerate(TEST_ACTIONS):
-            print(f"------ Test {i} ------")
-            print(f"Action: {test_action!r}")
-            try:
-                obs, reward, terminated, truncated, info = env.step(test_action)
-                print(f"Observation: {obs}")
-                print(f"Reward: {reward}")
-                print(f"Terminated: {terminated}")
-                print(f"Truncated: {truncated}")
-                print(f"Info: {info}\n")
-            except Exception as e:
-                print(f"Error during real request: {e}")
-                print("Observation: [Error occurred]")
-                print("Continuing with next test...\n")
-    else:
-        # Use mocked requests
-        with patch("requests.post", side_effect=mock_post):
-            for i, test_action in enumerate(TEST_ACTIONS):
-                print(f"------ Test {i} ------")
-                print(f"Action: {test_action!r}")
-                obs, reward, terminated, truncated, info = env.step(test_action)
-                print(f"Observation: {obs}")
-                print(f"Reward: {reward}")
-                print(f"Terminated: {terminated}")
-                print(f"Truncated: {truncated}")
-                print(f"Info: {info}\n")
+    for i, test_action in enumerate(TEST_ACTIONS):
+        print(f"------ Test {i} ------")
+        print(f"Action: {test_action!r}")
+        try:
+            obs, reward, terminated, truncated, info = env.step(test_action)
+            print(f"Observation: {obs}")
+            print(f"Reward: {reward}")
+            print(f"Terminated: {terminated}")
+            print(f"Truncated: {truncated}")
+            print(f"Info: {info}\n")
+        except Exception as e:
+            print(f"Error during real request: {e}")
+            print("Observation: [Error occurred]")
+            print("Continuing with next test...\n")
 
 
-def test_episode(
-    env_name: str = "ta:GuessTheNumber-v0", search_url: str = "http://dummy-search-url"
-):
+def test_episode(search_url: str, env_name: str = "ta:GuessTheNumber-v0"):
     env = gem.make(env_name, max_turns=3)
     policy = lambda _: random.choice(TEST_ACTIONS)
     tool = SearchTool(search_url=search_url, topk=2)
 
-    use_real_requests = _should_use_real_requests(search_url)
-    print(
-        f"Using {'real' if use_real_requests else 'mocked'} requests with URL: {search_url}"
-    )
+    print(f"Using real requests with URL: {search_url}")
 
     def run_episode_test(episode_name, wrapped_env, policy_func=None):
         print(f"\n{episode_name}")
-        if use_real_requests:
-            try:
-                run_and_print_episode(wrapped_env, policy_func or policy)
-            except Exception as e:
-                print(f"Error during real request episode: {e}")
-        else:
-            with patch("requests.post", side_effect=mock_post):
-                run_and_print_episode(wrapped_env, policy_func or policy)
+        try:
+            run_and_print_episode(wrapped_env, policy_func or policy)
+        except Exception as e:
+            print(f"Error during real request episode: {e}")
 
     # Episode 1: Default observation
     wrapped_env = ToolEnvWrapper(env, tools=[tool], max_tool_uses=3)
     run_episode_test("EPISODE 1: DEFAULT OBSERVATION", wrapped_env)
 
-    # Episode 3: Chat template observation
+    # Episode 2: Chat template observation
     tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen3-0.6B-Base")
     wrapped_env = ToolEnvWrapper(env, tools=[tool], max_tool_uses=3)
     wrapped_env = WRAPPER_FACTORY["concat_chat"](wrapped_env, tokenizer=tokenizer)
-    run_episode_test("EPISODE 3: CHAT TEMPLATE OBSERVATION", wrapped_env)
+    run_episode_test("EPISODE 2: CHAT TEMPLATE OBSERVATION", wrapped_env)
+
+    # Episode 3: Chat template observation on reset
+    wrapped_env = ToolEnvWrapper(env, tools=[tool], max_tool_uses=3)
+    wrapped_env = WRAPPER_FACTORY["concat_chat_on_reset"](
+        wrapped_env, tokenizer=tokenizer
+    )
+    run_episode_test("EPISODE 3: CHAT TEMPLATE OBSERVATION ON RESET", wrapped_env)
 
     # Batch episode: Sync vectorized env
     print("\nBATCH EPISODE: SYNC VECTORIZED ENV")
@@ -137,14 +90,22 @@ def test_episode(
 
 
 def test_llm_episode(
-    env_name: str = "ta:GuessTheNumber-v0",
-    model_name: str = "Qwen/Qwen3-0.6B-Base",
-    search_url: str = "http://dummy-search-url",
+    search_url: str,
+    env_name: str = "eval:QaOpen",
+    model_name: str = "PeterJinGo/SearchR1-nq_hotpotqa_train-qwen2.5-7b-em-ppo",
 ):
     """Test episode with LLM observation and Search tool."""
+    from datasets import Dataset
     from vllm import LLM, SamplingParams
 
     env = gem.make(env_name, max_turns=3)
+    # hack: fix the question and answer of the dataset
+    question = "Mike Barnett negotiated many contracts including which player that went on to become general manager of CSKA Moscow of the Kontinental Hockey League?"
+    prompt = f"Answer the given question. You must conduct reasoning inside <think> and </think> first every time you get new information. After reasoning, if you find you lack some knowledge, you can call a search engine by <search> query </search> and it will return the top searched results between <information> and </information>. You can search as many times as your want. If you find no further external knowledge needed, you can directly provide the answer inside <answer> and </answer>, without detailed illustrations. For example, <answer> Beijing </answer>. Question: {question}\n"
+    answer = "Sergei Fedorov"
+    dataset = Dataset.from_dict({"question": [prompt], "answer": [answer]})
+    env.dataset = dataset
+
     llm = LLM(
         model=model_name,
     )
@@ -154,7 +115,7 @@ def test_llm_episode(
         max_tokens=100,
         top_p=0.95,
     )
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    tokenizer = llm.get_tokenizer()
 
     def policy(obs):
         assert isinstance(
@@ -168,98 +129,106 @@ def test_llm_episode(
         action = response[0].outputs[0].text
         return action
 
-    def batch_policy(obss):
-        assert isinstance(
-            obss, List
-        ), f"Observation should be a string but is {type(obss)}."
-        response = llm.generate(
-            obss,
-            sampling_params=sampling_params,
-            use_tqdm=False,
-        )
-        actions = [r.outputs[0].text for r in response]
-        return actions
-
     tool = SearchTool(search_url=search_url, topk=2)
 
-    use_real_requests = _should_use_real_requests(search_url)
-    print(
-        f"Using {'real' if use_real_requests else 'mocked'} requests with URL: {search_url}"
-    )
+    print(f"Using real requests with URL: {search_url}")
 
     def run_episode_test(episode_name, wrapped_env, policy_func, **kwargs):
         print(f"\n{episode_name}")
-        if use_real_requests:
-            try:
-                run_and_print_episode(wrapped_env, policy_func, **kwargs)
-            except Exception as e:
-                print(f"Error during real request episode: {e}")
-        else:
-            with patch("requests.post", side_effect=mock_post):
-                run_and_print_episode(wrapped_env, policy_func, **kwargs)
+        try:
+            run_and_print_episode(wrapped_env, policy_func, **kwargs)
+        except Exception as e:
+            print(f"Error during real request episode: {e}")
 
-    print("\n" * 5, "EPISODE 1: DEFAULT OBSERVATION")
-    wrapped_env = ToolEnvWrapper(env, tools=[tool], max_tool_uses=3)
-    run_episode_test("EPISODE 1: DEFAULT OBSERVATION", wrapped_env, policy)
-
-    print("\n" * 5, "EPISODE 2: CHAT TEMPLATE OBSERVATION")
     wrapped_env = ToolEnvWrapper(env, tools=[tool], max_tool_uses=3)
     wrapped_env = WRAPPER_FACTORY["concat_chat"](wrapped_env, tokenizer=tokenizer)
-    run_episode_test("EPISODE 2: CHAT TEMPLATE OBSERVATION", wrapped_env, policy)
+    run_episode_test("EPISODE 1: CHAT TEMPLATE OBSERVATION", wrapped_env, policy)
 
-    print("\n" * 5, "BATCH EPISODE 1: SYNC VECTORIZED ENV")
-    num_envs = 2
-    tool_env_wrapper = partial(ToolEnvWrapper, tools=[tool], max_tool_uses=3)
-    chat_wrapper = partial(WRAPPER_FACTORY["concat_chat"], tokenizer=tokenizer)
-    ta_vec_env = gem.make_vec(
-        env_name,
-        num_envs=num_envs,
-        wrappers=[tool_env_wrapper, chat_wrapper],
-        async_mode=False,
-        max_turns=3,
+
+def evaluate(
+    search_url: str,
+    model_name: str = "PeterJinGo/SearchR1-nq_hotpotqa_train-qwen2.5-7b-em-ppo",
+    max_tokens: int = 1024,
+    n_examples: int = 500,
+    max_tool_uses: int = 4,
+    obs_wrapper: str = "concat_chat",
+    verbose: bool = False,
+):
+    """Evaluate the model on the QaOpen dataset with the Search tool."""
+    from tqdm import tqdm
+    from vllm import LLM, SamplingParams
+
+    llm = LLM(
+        model=model_name,
     )
-    run_episode_test(
-        "BATCH EPISODE 1: SYNC VECTORIZED ENV",
-        ta_vec_env,
-        policy_func=batch_policy,
-        ignore_done=True,
-        max_steps=2,
+    sampling_params = SamplingParams(
+        n=1,
+        temperature=0.6,
+        max_tokens=max_tokens,
+        top_p=0.95,
+    )
+    tokenizer = llm.get_tokenizer()
+
+    tool = SearchTool(search_url=search_url, topk=3)
+    base_env = gem.make("eval:QaOpen", seed=42)
+    dataset = base_env.dataset
+    dataset = dataset.select(range(n_examples))
+    base_env.dataset = dataset
+
+    print(
+        "First question:\n",
+        "-" * 20,
+        "\n",
+        dataset[0]["question"],
+        "\n",
+        "-" * 20,
+        "\n",
     )
 
-    print("\n" * 5, "BATCH EPISODE 2: ASYNC VECTORIZED ENV")
-    num_envs = 2
-    tool_env_wrapper = partial(ToolEnvWrapper, tools=[tool], max_tool_uses=3)
-    chat_wrapper = partial(WRAPPER_FACTORY["concat_chat"], tokenizer=tokenizer)
-    ta_vec_env = gem.make_vec(
-        env_name,
-        num_envs=num_envs,
-        wrappers=[tool_env_wrapper, chat_wrapper],
-        async_mode=True,
-        max_turns=3,
-    )
-    run_episode_test(
-        "BATCH EPISODE 2: ASYNC VECTORIZED ENV",
-        ta_vec_env,
-        policy_func=batch_policy,
-        ignore_done=True,
-        max_steps=2,
-    )
+    wrapped_env = ToolEnvWrapper(base_env, tools=[tool], max_tool_uses=max_tool_uses)
+    wrapped_env = WRAPPER_FACTORY[obs_wrapper](wrapped_env, tokenizer=tokenizer)
+
+    all_pass = 0
+    for _ in tqdm(range(n_examples)):
+        obs, info = wrapped_env.reset()
+        terminated = False
+        truncated = False
+        while not (terminated or truncated):
+            response = llm.generate(
+                [obs], sampling_params=sampling_params, use_tqdm=False
+            )
+            action = response[0].outputs[0].text
+            next_obs, reward, terminated, truncated, info = wrapped_env.step(action)
+            obs = next_obs
+        if reward == 1:
+            all_pass += 1
+
+        if verbose:
+            print(f"Action: {action!r}")
+            print(f"Answer: {base_env.answer!r}")
+            print(f"Observation: {obs!r}")
+            print(f"Reward: {reward}")
+            print(f"Terminated: {terminated}")
+            print(f"Truncated: {truncated}")
+            print(f"Info: {info!r}")
+
+    print(f"Tested {len(dataset)} questions; Accuracy: {all_pass / len(dataset)}")
 
 
 def main():
     """Run with:
-    python -m tests.test_tool.test_search_tool single_action
-
     # To test with real search server:
     python -m tests.test_tool.test_search_tool single_action --search_url http://localhost:8000/retrieve
     python -m tests.test_tool.test_search_tool episode --search_url http://localhost:8000/retrieve
     python -m tests.test_tool.test_search_tool llm_episode --search_url http://localhost:8000/retrieve
+    python -m tests.test_tool.test_search_tool evaluate --search_url http://localhost:8000/retrieve --n_examples 1 --verbose
     """
     fire.Fire(
         {
             "single_action": test_single_action,
             "episode": test_episode,
             "llm_episode": test_llm_episode,
+            "evaluate": evaluate,
         }
     )
 
