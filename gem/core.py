@@ -49,14 +49,6 @@ class Env(abc.ABC):
         """Samples a random action given the current state."""
         raise NotImplementedError
 
-    def get_initial_state(self) -> Tuple[Any, ...]:
-        """Returns the initial state of the environment."""
-        raise NotImplementedError
-    
-    def reset_to_initial_state(self, initial_state: Tuple[Any, ...]) -> Tuple[ObsType, dict[str, Any]]:
-        """Resets the environment to the initial state."""
-        raise NotImplementedError
-
 
 class EnvWrapper(Env):
     def __init__(self, env: Env):

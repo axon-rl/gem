@@ -142,56 +142,97 @@ register(
     only_real_words=False,
     max_turns=8,
 )
-register(
-    "ta:FifteenPuzzle-v0",
-    "gem.envs.textarena.fifteen_puzzle:FifteenPuzzleEnv",
-    num_rows=3,
-    max_turns=20,
-)
-register(
-    "ta:FifteenPuzzle-v0-easy",
-    "gem.envs.textarena.fifteen_puzzle:FifteenPuzzleEnv",
-    num_rows=2,
-    max_turns=10,
-)
-register(
-    "ta:FifteenPuzzle-v0-hard",
-    "gem.envs.textarena.fifteen_puzzle:FifteenPuzzleEnv",
-    num_rows=4,
-    max_turns=50,
-)
 
 
 # Register math dataset environments
+from datasets import load_dataset
+_wait_time = 5
+_num_retries = 10
 
+for i in range(_num_retries):
+    # Retry in case network error when accessing HF.
+    try:
+        math_12k_dataset = load_dataset("axon-rl/MATH-12k", split="train")
+        break
+    except Exception as e:
+        # In case of timeout.
+        time.sleep(_wait_time)
+        _wait_time *= 1.2
+        logging.warning(f"{e}")
+        logging.warning(f"Try {i}/{_num_retries}. Trying again...")
+else:
+    raise RuntimeError("Cannot load axon-rl/MATH-12k dataset")
 register(
     "math:Math12K",
     "gem.envs.math_env:MathEnv",
-    dataset_name="axon-rl/MATH-12k",
+    # dataset_name="axon-rl/MATH-12k",
+    dataset=math_12k_dataset,
     question_key="problem",
     answer_key="answer",
 )
 
+for i in range(_num_retries):
+    # Retry in case network error when accessing HF.
+    try:
+        asdiv_2k_dataset = load_dataset("axon-rl/ASDIV-2k", split="train")
+        break
+    except Exception as e:
+        # In case of timeout.
+        time.sleep(_wait_time)
+        _wait_time *= 1.2
+        logging.warning(f"{e}")
+        logging.warning(f"Try {i}/{_num_retries}. Trying again...")
+else:
+    raise RuntimeError("Cannot load axon-rl/ASDIV-2k dataset")
 register(
     "math:ASDIV2k",
     "gem.envs.math_env:MathEnv",
-    dataset_name="axon-rl/ASDIV-2k",
+    # dataset_name="axon-rl/ASDIV-2k",
+    dataset=asdiv_2k_dataset,
     question_key="problem",
     answer_key="answer",
 )
 
+for i in range(_num_retries):
+    # Retry in case network error when accessing HF.
+    try:
+        gsm_8k_dataset = load_dataset("axon-rl/GSM-8k", split="train")
+        break
+    except Exception as e:
+        # In case of timeout.
+        time.sleep(_wait_time)
+        _wait_time *= 1.2
+        logging.warning(f"{e}")
+        logging.warning(f"Try {i}/{_num_retries}. Trying again...")
+else:
+    raise RuntimeError("Cannot load axon-rl/GSM-8k dataset")
 register(
     "math:GSM8k",
     "gem.envs.math_env:MathEnv",
-    dataset_name="axon-rl/GSM-8k",
+    # dataset_name="axon-rl/GSM-8k",
+    dataset=gsm_8k_dataset,
     question_key="problem",
     answer_key="answer",
 )
 
+for i in range(_num_retries):
+    # Retry in case network error when accessing HF.
+    try:
+        orz_57k_dataset = load_dataset("axon-rl/ORZ-57k", split="train")
+        break
+    except Exception as e:
+        # In case of timeout.
+        time.sleep(_wait_time)
+        _wait_time *= 1.2
+        logging.warning(f"{e}")
+        logging.warning(f"Try {i}/{_num_retries}. Trying again...")
+else:
+    raise RuntimeError("Cannot load axon-rl/ORZ-57k dataset")
 register(
     "math:ORZ57k",
     "gem.envs.math_env:MathEnv",
-    dataset_name="axon-rl/ORZ-57k",
+    # dataset_name="axon-rl/ORZ-57k",
+    dataset=orz_57k_dataset,
     question_key="problem",
     answer_key="answer",
 )
@@ -216,19 +257,6 @@ register(
     test_key="tests",
 )
 
-# Register qa dataset environments
-
-for i in [0, 1, 2, 3, 5]:
-    register(
-        f"logic:RuleTaker-d{i}",
-        "gem.envs.qa_env:QaEnv",
-        dataset_name=f"axon-rl/RuleTaker-d{i}-70k",
-        split="train",
-        extract_boxed=True,
-        question_key="question",
-        answer_key="answer",
-    )
-
 # Register datasets from ReasoningGym
 
 for name in rg.factory.DATASETS.keys():
@@ -243,10 +271,24 @@ for name in rg.factory.DATASETS.keys():
 # Register evaluation datasets
 
 ## MATH500
+for i in range(_num_retries):
+    # Retry in case network error when accessing HF.
+    try:
+        math_500_dataset = load_dataset("axon-rl/Eval-MATH500", split="train")
+        break
+    except Exception as e:
+        # In case of timeout.
+        time.sleep(_wait_time)
+        _wait_time *= 1.2
+        logging.warning(f"{e}")
+        logging.warning(f"Try {i}/{_num_retries}. Trying again...")
+else:
+    raise RuntimeError("Cannot load axon-rl/Eval-MATH500 dataset")
 register(
     "eval:MATH500",
     "gem.envs.math_env:MathEnv",
-    dataset_name="axon-rl/Eval-MATH500",
+    # dataset_name="axon-rl/Eval-MATH500",
+    dataset=math_500_dataset,
     question_key="problem",
     answer_key="answer",
 )
@@ -259,13 +301,4 @@ register(
     split="test",
     question_key="problem",
     test_key="tests",
-)
-
-register(
-    "eval:QaOpen",
-    "gem.envs.qa_env:QaEnv",
-    dataset_name="google-research-datasets/nq_open",
-    split="validation",
-    question_key="question",
-    answer_key="answer",
 )
