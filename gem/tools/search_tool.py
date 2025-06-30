@@ -50,7 +50,7 @@ class SearchTool(BaseTool):
         if not self.search_url:
             raise ValueError("search_url must be provided for SearchTool.")
 
-        payload = {"queries": [query], "topk": self.topk, "return_scores": True}
+        payload = {"query": query, "topk": self.topk, "return_scores": True}
         try:
             response = requests.post(
                 self.search_url,
@@ -58,7 +58,7 @@ class SearchTool(BaseTool):
                 timeout=self.timeout,
             )
             response.raise_for_status()
-            result = msgspec.msgpack.decode(response.content)["result"][0]
+            result = msgspec.msgpack.decode(response.content)["result"]
             return self._passages2string(result)
         except Exception as e:
             return f"[SearchTool Error: {e}]"
