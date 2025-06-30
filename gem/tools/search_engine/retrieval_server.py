@@ -441,6 +441,12 @@ if __name__ == "__main__":
         help="Maximum wait time for batching requests",
     )
     parser.add_argument(
+        "--max_batch_size",
+        type=int,
+        default=10,
+        help="Maximum batch size for the retrieval server.",
+    )
+    parser.add_argument(
         "--num_workers",
         type=int,
         default=1,
@@ -468,7 +474,7 @@ if __name__ == "__main__":
     runtime = Runtime(
         worker=RetrievalWorker,
         num=args.num_workers,
-        max_batch_size=10,
+        max_batch_size=args.max_batch_size,
         max_wait_time=args.max_wait_time,
         timeout=30,  # BUG: timeout is ignored
         env=[{"CONFIG": json.dumps(config)} for _ in range(args.num_workers)],
