@@ -2,7 +2,7 @@
 
 import random
 import re
-from typing import Any, Dict, List, Optional, Text, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple
 
 from gem.core import Env
 from gem.utils.constants import TERMINAL_STATE, TextArenaGameReward

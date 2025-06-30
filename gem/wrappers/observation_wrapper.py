@@ -20,28 +20,45 @@ class ObservationWrapper(EnvWrapper):
         env: Env,
         include_action: bool = True,
         include_chat_template: bool = True,
+        apply_chat_template_on_reset: bool = False,
         max_history_length: Optional[int] = None,
         tokenizer=None,
     ):
         super().__init__(env)
         self.include_action = include_action
         self.include_chat_template = include_chat_template
+        self.apply_chat_template_on_reset = apply_chat_template_on_reset
         self.obs_queue = deque(
             maxlen=max_history_length + 1 if max_history_length else None
         )
         self.act_queue = deque(maxlen=max_history_length)
         self.tokenizer = tokenizer
 
+        if include_chat_template and apply_chat_template_on_reset:
+            raise ValueError(
+                "include_chat_template and apply_chat_template_on_reset cannot both be True at the same time."
+            )
         if include_chat_template:
             assert (
                 tokenizer is not None
             ), "Tokenizer must be provided for chat template."
             assert include_action, f"Action must be included if using chat template."
 
+        if apply_chat_template_on_reset:
+            assert (
+                tokenizer is not None
+            ), "Tokenizer must be provided for chat template."
+
     def reset(self, seed: Optional[int] = None) -> Tuple[str, dict[str, Any]]:
         self.act_queue.clear()
         self.obs_queue.clear()
         obs, info = self.env.reset(seed=seed)
+        if self.apply_chat_template_on_reset:
+            obs = self.tokenizer.apply_chat_template(
+                [{"role": "user", "content": obs}],
+                tokenize=False,
+                add_generation_prompt=True,
+            )
         self.obs_queue.append(obs)
         return self.observation(info), info
 

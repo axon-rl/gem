@@ -169,14 +169,6 @@ register(
 # Register math dataset environments
 
 register(
-    "eval:MATH500",
-    "gem.envs.math_env:MathEnv",
-    dataset_name="axon-rl/Eval-MATH500",
-    question_key="problem",
-    answer_key="answer",
-)
-
-register(
     "math:Math12K",
     "gem.envs.math_env:MathEnv",
     dataset_name="axon-rl/MATH-12k",
@@ -185,6 +177,59 @@ register(
 )
 
 # Register code dataset environments
+
+register(
+    "code:CodeContest",
+    "gem.envs.code_env:CodeEnv",
+    dataset_name="axon-rl/CodeContest",
+    split="train",
+    question_key="problem",
+    test_key="tests",
+)
+
+register(
+    "code:Taco8k",
+    "gem.envs.code_env:CodeEnv",
+    dataset_name="axon-rl/TACO-8k",
+    split="train",
+    question_key="problem",
+    test_key="tests",
+)
+
+# Register qa dataset environments
+
+for i in [0, 1, 2, 3, 5]:
+    register(
+        f"logic:RuleTaker-d{i}",
+        "gem.envs.qa_env:QaEnv",
+        dataset_name=f"axon-rl/RuleTaker-d{i}-70k",
+        split="train",
+        extract_boxed=True,
+        question_key="question",
+        answer_key="answer",
+    )
+
+# Register datasets from ReasoningGym
+
+for name in rg.factory.DATASETS.keys():
+    register(
+        f"rg:{name}",
+        "gem.envs.reasoning_gym:ReasoningGymEnv",
+        name=name,
+        size=500,
+        seed=42,
+    )
+
+# Register evaluation datasets
+
+## MATH500
+register(
+    "eval:MATH500",
+    "gem.envs.math_env:MathEnv",
+    dataset_name="axon-rl/Eval-MATH500",
+    question_key="problem",
+    answer_key="answer",
+)
 
 ## The test split of deepmind/code_contests, with merged test cases.
 register(
@@ -196,12 +241,11 @@ register(
     test_key="tests",
 )
 
-# Register datasets from ReasoningGym
-for name in rg.factory.DATASETS.keys():
-    register(
-        f"rg:{name}",
-        "gem.envs.reasoning_gym:ReasoningGymEnv",
-        name=name,
-        size=500,
-        seed=42,
-    )
+register(
+    "eval:QaOpen",
+    "gem.envs.qa_env:QaEnv",
+    dataset_name="google-research-datasets/nq_open",
+    split="validation",
+    question_key="question",
+    answer_key="answer",
+)

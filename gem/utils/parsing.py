@@ -61,3 +61,24 @@ def extract_code_from_model(model_response: str):
     if not code_blocks:
         return None
     return code_blocks[-1].strip()
+
+
+def extract_last_tagged_answer(model_response: str):
+    """
+    Extracts the last answer enclosed in <answer>...</answer> tags from the model response.
+
+    Parameters:
+        model_response (str): The text output from the LLM.
+
+    Returns:
+        str or None: The extracted answer, or None if not found.
+    """
+
+    answer_pattern = r"<answer>(.*?)</answer>"
+    match = re.finditer(answer_pattern, model_response, re.DOTALL)
+    matches = list(match)
+
+    if len(matches) == 0:
+        return None
+
+    return matches[-1].group(1).strip()
