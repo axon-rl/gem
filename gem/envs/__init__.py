@@ -12,6 +12,13 @@ register(
     max_turns=10,
 )
 register(
+    "ta:GuessTheNumber-v0-hard_wo_maxturns",
+    "gem.envs.textarena.guess_the_number:GuessTheNumberEnv",
+    min_number=1,
+    max_number=50,
+    max_turns=50,
+)
+register(
     "ta:GuessTheNumber-v0-hard",
     "gem.envs.textarena.guess_the_number:GuessTheNumberEnv",
     min_number=1,

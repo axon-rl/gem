@@ -189,3 +189,6 @@ evals/game/results*
 
 # neovim
 .nvim/
+
+# misc
+.DS_Store
