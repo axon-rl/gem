@@ -68,6 +68,28 @@ class MathEnv(Env):
             reward = 1.0 if is_correct else 0.0
         return TERMINAL_STATE, reward, True, True, {}
 
+    # def step(
+    #     self, action: str
+    # ) -> Tuple[str, SupportsFloat, bool, bool, dict[str, Any]]:
+    #     model_answer = extract_last_boxed_answer(action)
+    #     if model_answer is None:
+    #         next_obs = f"No answer found. Please try again."
+    #         terminated = False
+    #         reward = 0.0
+    #     else:
+    #         next_obs = TERMINAL_STATE
+    #         terminated = True
+    #         res = self.mp_pool.apply_async(
+    #             self.check_correct, (model_answer, self.answers)
+    #         )
+    #         try:
+    #             is_correct = res.get(timeout=1)
+    #         except TimeoutError:
+    #             is_correct = False
+    #         reward = 1.0 if is_correct else 0.0
+    #     truncated = False
+    #     return next_obs, reward, terminated, truncated, {}
+
     def reset(self, seed: Optional[None] = None) -> Tuple[str, dict[str, Any]]:
         """Sample a question from the dataset."""
         del seed

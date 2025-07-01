@@ -274,7 +274,7 @@ for name in rg.factory.DATASETS.keys():
 for i in range(_num_retries):
     # Retry in case network error when accessing HF.
     try:
-        math_500_dataset = load_dataset("axon-rl/Eval-MATH500", split="train")
+        math_500_dataset = load_dataset("axon-rl/Eval-MATH500", split="test")
         break
     except Exception as e:
         # In case of timeout.
@@ -288,6 +288,7 @@ register(
     "eval:MATH500",
     "gem.envs.math_env:MathEnv",
     # dataset_name="axon-rl/Eval-MATH500",
+    # split="test"
     dataset=math_500_dataset,
     question_key="problem",
     answer_key="answer",
