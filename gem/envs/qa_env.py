@@ -17,7 +17,13 @@ logger = logging.getLogger(__name__)
 
 # TODO: refactor later
 def apply_prompt(example, question_key: str = 'question'):
-    prompt_template = "Answer the given question. Question: {question}\n"
+    prompt_template = (
+        "For any question, always reason through your thought process using:\n"
+        "<think> your reasoning here </think>\n"
+        "Then, provide your final answer using:\n"
+        "<answer> your answer here </answer>\n\n"
+        "Question: {question}\n"
+    )
     example[question_key] = prompt_template.format(question=example[question_key])
     return example
 
