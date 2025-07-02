@@ -85,6 +85,12 @@ def get_python_output(
     # command.extend(["python3", "-c", code])
     command.extend(["python3", file_path])
     has_error = False
+
+    if code == "...":
+        result = "SyntaxError: invalid syntax"
+        has_error = True
+        return result, has_error
+
     try:
         # Execute the command
         result = subprocess.run(
@@ -156,7 +162,7 @@ class PythonCodeTool(BaseTool):
     def instruction_string(self) -> str:
         return (
             "You can execute Python code by wrapping it in <python>...</python> tags or "
-            "using ```python...``` code blocks. "
+            "using ```python...``` code blocks, and put your final answer within \\boxed{}."
         )
 
     def execute_action(self, action):
@@ -173,7 +179,7 @@ class PythonCodeTool(BaseTool):
         if not is_valid:
             # observation = "No valid Python code found. Please provide code in either <python>...</python> tags or ```python...``` code blocks."
             observation = ""
-            done = False
+            has_error = True
         else:
             execution_result, has_error = get_python_output(
                 parsed_code,
@@ -212,4 +218,4 @@ class PythonCodeTool(BaseTool):
             else:
                 observation = "\n" + observation + "\n"
 
-        return is_valid, observation, parsed_action
+        return is_valid, has_error, observation, parsed_action

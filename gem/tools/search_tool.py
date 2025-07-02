@@ -104,8 +104,10 @@ class SearchTool(BaseTool):
             # observation = "No valid search query found. Please provide your query within <search>...</search> tags."
             observation = ""
             valid = False
+            has_error = True
         else:
             search_result = self._search(parsed_query)
             observation = f"\n\n<information>{search_result}</information>\n\n"
             valid = True
-        return valid, observation, parsed_action
+            has_error = "[SearchTool Error:" in search_result
+        return valid, has_error, observation, parsed_action
