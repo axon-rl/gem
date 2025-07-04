@@ -39,6 +39,7 @@ class ToolEnvWrapper(EnvWrapper):
         info["prev_ep_tool_use_counter"] = prev_ep_tool_uses
         info["tool_success_counter"] = self.tool_success_counter
         info["prev_ep_tool_success_counter"] = prev_ep_tool_success
+        info["use_tool"] = False  # The initial context is not a tool result
         return obs, info
 
     def step(
@@ -81,4 +82,5 @@ class ToolEnvWrapper(EnvWrapper):
 
         info["tool_use_counter"] = self.tool_use_counter
         info["tool_success_counter"] = self.tool_success_counter
+        info["use_tool"] = True
         return observation, reward, terminated, truncated, info

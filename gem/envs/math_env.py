@@ -1,7 +1,7 @@
 """Env for math datasets."""
 
 import logging
-from multiprocessing import Pool
+import multiprocessing
 from typing import Any, Optional, SupportsFloat, Tuple
 
 from datasets import Dataset, DatasetDict, load_dataset
@@ -49,7 +49,7 @@ class MathEnv(Env):
         self.idx = 0
         self.epoch = 0
         # Process pool is used to enable the timeout mechanism for answer grading in a potential distributed training setup
-        self.mp_pool = Pool(2)
+        self.mp_pool = multiprocessing.Pool(1)
 
     def step(
         self, action: str
@@ -63,7 +63,7 @@ class MathEnv(Env):
             )
             try:
                 is_correct = res.get(timeout=1)
-            except TimeoutError:
+            except multiprocessing.context.TimeoutError:
                 is_correct = False
             reward = 1.0 if is_correct else 0.0
         return TERMINAL_STATE, reward, True, True, {}

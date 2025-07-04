@@ -59,7 +59,7 @@ class ObservationWrapper(EnvWrapper):
                 tokenize=False,
                 add_generation_prompt=True,
             )
-        self.obs_queue.append(obs)
+        self.obs_queue.append((obs, info.get("use_tool", False)))
         return self.observation(info), info
 
     def step(
@@ -69,7 +69,7 @@ class ObservationWrapper(EnvWrapper):
         self.act_queue.append(
             info["parsed_action"] if "parsed_action" in info else action
         )
-        self.obs_queue.append(next_obs)
+        self.obs_queue.append((next_obs, info.get("use_tool", False)))
         return self.observation(info), reward, terminated, truncated, info
 
     def observation(self, info: dict[str, Any]):
@@ -85,11 +85,18 @@ class ObservationWrapper(EnvWrapper):
 
             if self.include_chat_template:
                 chat_messages = []
-                for o, a in zip(obs_list, act_list):
-                    chat_messages.append({"role": "user", "content": o})
+                for (o, use_tool), a in zip(obs_list, act_list):
+                    if use_tool:
+                        chat_messages.append({"role": "tool", "content": o})
+                    else:
+                        chat_messages.append({"role": "user", "content": o})
                     chat_messages.append({"role": "assistant", "content": a})
-                next_obs = self.obs_queue[-1]
-                chat_messages.append({"role": "user", "content": next_obs})
+
+                next_obs, use_tool = self.obs_queue[-1]
+                if use_tool:
+                    chat_messages.append({"role": "tool", "content": next_obs})
+                else:
+                    chat_messages.append({"role": "user", "content": next_obs})
 
                 wrapped_obs = self.tokenizer.apply_chat_template(
                     chat_messages,
@@ -98,7 +105,9 @@ class ObservationWrapper(EnvWrapper):
                 )
             else:
                 wrapped_obs = ""
-                for o, a in zip(obs_list, act_list):
+                for (o, use_tool), a in zip(obs_list, act_list):
+                    # We may need a unified way to format tool's output,
+                    # but the formatting might have been done at the tool side.
                     wrapped_obs += maybe_add_new_line(o)
                     wrapped_obs += maybe_add_new_line(a)
                 wrapped_obs += maybe_add_new_line(self.obs_queue[-1])
