@@ -14,8 +14,9 @@ WRAPPER_FACTORY = {
     "python_tool": partial(
         ToolEnvWrapper,
         tools=[PythonCodeTool(timeout=5)],
-        tool_reward=0.1,
-        max_tool_uses=10,
+        tool_reward=0.05,
+        tool_success_reward=0.05,
+        max_tool_uses=5,
     ),
     "python_tool_no_int_reward": partial(
         ToolEnvWrapper,

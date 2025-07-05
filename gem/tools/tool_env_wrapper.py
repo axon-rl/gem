@@ -9,8 +9,8 @@ class ToolEnvWrapper(EnvWrapper):
         self,
         env: Env,
         tools: List[BaseTool],
-        tool_reward: float = 0.2,
-        tool_success_reward: float = 0.3,
+        tool_reward: float = 0.05,
+        tool_success_reward: float = 0.05,
         max_tool_uses: Optional[int] = 10,
     ):
         super().__init__(env)
@@ -61,7 +61,7 @@ class ToolEnvWrapper(EnvWrapper):
         if tool_parsed:
             self.tool_use_counter += 1
             if self.tool_use_counter == self.max_tool_uses:
-                observation = f"{observation}\n\nNow reached the maximum number of tools. Please stop using tools."
+                observation = f"{observation}\n\nReached the maximum number of tool use. Please output final answer directly."
             reward += self.tool_reward
             terminated, truncated = False, False
             info = {"parsed_action": parsed_action, "tool_type": tool.tool_type}
