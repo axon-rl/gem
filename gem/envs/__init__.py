@@ -161,12 +161,155 @@ register(
 
 # Register math dataset environments
 
+import time
+import logging
+from datasets import load_dataset
+_wait_time = 5
+_num_retries = 10
+
+for i in range(_num_retries):
+    # Retry in case network error when accessing HF.
+    try:
+        math_12k_dataset = load_dataset("axon-rl/MATH-12k", split="train")
+        break
+    except Exception as e:
+        # In case of timeout.
+        time.sleep(_wait_time)
+        _wait_time *= 1.2
+        logging.warning(f"{e}")
+        logging.warning(f"Try {i}/{_num_retries}. Trying again...")
+else:
+    raise RuntimeError("Cannot load axon-rl/MATH-12k dataset")
 register(
-    "math:Math12K",
+    "math:Math12k-v0",
     "gem.envs.math_env:MathEnv",
-    dataset_name="axon-rl/MATH-12k",
+    # dataset_name="axon-rl/MATH-12k",
+    dataset=math_12k_dataset,
     question_key="problem",
     answer_key="answer",
+    unformatted_penalty=-0.1,
+    formatted_reward=0.0,
+    is_correct_reward=1.0,
+)
+register(
+    "math:Math12k-v1",
+    "gem.envs.math_env:MathEnv",
+    # dataset_name="axon-rl/MATH-12k",
+    dataset=math_12k_dataset,
+    question_key="problem",
+    answer_key="answer",
+    unformatted_penalty=0.0,
+    formatted_reward=0.1,
+    is_correct_reward=1.0,
+)
+
+for i in range(_num_retries):
+    # Retry in case network error when accessing HF.
+    try:
+        asdiv_2k_dataset = load_dataset("axon-rl/ASDIV-2k", split="train")
+        break
+    except Exception as e:
+        # In case of timeout.
+        time.sleep(_wait_time)
+        _wait_time *= 1.2
+        logging.warning(f"{e}")
+        logging.warning(f"Try {i}/{_num_retries}. Trying again...")
+else:
+    raise RuntimeError("Cannot load axon-rl/ASDIV-2k dataset")
+register(
+    "math:ASDIV2k-v0",
+    "gem.envs.math_env:MathEnv",
+    # dataset_name="axon-rl/ASDIV-2k",
+    dataset=asdiv_2k_dataset,
+    question_key="problem",
+    answer_key="answer",
+    unformatted_penalty=-0.1,
+    formatted_reward=0.0,
+    is_correct_reward=1.0,
+)
+register(
+    "math:ASDIV2k-v1",
+    "gem.envs.math_env:MathEnv",
+    # dataset_name="axon-rl/ASDIV-2k",
+    dataset=asdiv_2k_dataset,
+    question_key="problem",
+    answer_key="answer",
+    unformatted_penalty=0.0,
+    formatted_reward=0.1,
+    is_correct_reward=1.0,
+)
+
+
+for i in range(_num_retries):
+    # Retry in case network error when accessing HF.
+    try:
+        gsm_8k_dataset = load_dataset("axon-rl/GSM-8k", split="train")
+        break
+    except Exception as e:
+        # In case of timeout.
+        time.sleep(_wait_time)
+        _wait_time *= 1.2
+        logging.warning(f"{e}")
+        logging.warning(f"Try {i}/{_num_retries}. Trying again...")
+else:
+    raise RuntimeError("Cannot load axon-rl/GSM-8k dataset")
+register(
+    "math:GSM8k-v0",
+    "gem.envs.math_env:MathEnv",
+    # dataset_name="axon-rl/GSM-8k",
+    dataset=gsm_8k_dataset,
+    question_key="problem",
+    answer_key="answer",
+    unformatted_penalty=-0.1,
+    formatted_reward=0.0,
+    is_correct_reward=1.0,
+)
+register(
+    "math:GSM8k-v1",
+    "gem.envs.math_env:MathEnv",
+    # dataset_name="axon-rl/GSM-8k",
+    dataset=gsm_8k_dataset,
+    question_key="problem",
+    answer_key="answer",
+    unformatted_penalty=0.0,
+    formatted_reward=0.1,
+    is_correct_reward=1.0,
+)
+
+for i in range(_num_retries):
+    # Retry in case network error when accessing HF.
+    try:
+        orz_57k_dataset = load_dataset("axon-rl/ORZ-57k", split="train")
+        break
+    except Exception as e:
+        # In case of timeout.
+        time.sleep(_wait_time)
+        _wait_time *= 1.2
+        logging.warning(f"{e}")
+        logging.warning(f"Try {i}/{_num_retries}. Trying again...")
+else:
+    raise RuntimeError("Cannot load axon-rl/ORZ-57k dataset")
+register(
+    "math:ORZ57k-v0",
+    "gem.envs.math_env:MathEnv",
+    # dataset_name="axon-rl/ORZ-57k",
+    dataset=orz_57k_dataset,
+    question_key="problem",
+    answer_key="answer",
+    unformatted_penalty=-0.1,
+    formatted_reward=0.0,
+    is_correct_reward=1.0,
+)
+register(
+    "math:ORZ57k-v1",
+    "gem.envs.math_env:MathEnv",
+    # dataset_name="axon-rl/ORZ-57k",
+    dataset=orz_57k_dataset,
+    question_key="problem",
+    answer_key="answer",
+    unformatted_penalty=0.0,
+    formatted_reward=0.1,
+    is_correct_reward=1.0,
 )
 
 # Register code dataset environments

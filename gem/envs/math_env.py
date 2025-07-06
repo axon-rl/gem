@@ -25,12 +25,18 @@ class MathEnv(Env):
         question_key: str = "problem",
         answer_key: str = "answer",
         seed: int = 0,
+        unformatted_penalty: float = -0.1,
+        formatted_reward: float = 0.0,
+        is_correct_reward: float = 1.0,
         **_,
     ):
         super().__init__()
         self.seed = seed
         self.question_key = question_key
         self.answer_key = answer_key
+        self.unformatted_penalty = unformatted_penalty
+        self.formatted_reward = formatted_reward
+        self.is_correct_reward = is_correct_reward
         if dataset is None:
             dataset = load_dataset(dataset_name)
             logger.info(f"Loaded: {dataset=}")
@@ -56,7 +62,8 @@ class MathEnv(Env):
     ) -> Tuple[str, SupportsFloat, bool, bool, dict[str, Any]]:
         model_answer = extract_last_boxed_answer(action)
         if model_answer is None:
-            reward = -0.1
+            reward = self.unformatted_penalty
+            info = {"formatted": False, "is_correct": False}
         else:
             res = self.mp_pool.apply_async(
                 self.check_correct, (model_answer, self.answer)
@@ -65,8 +72,9 @@ class MathEnv(Env):
                 is_correct = res.get(timeout=1)
             except TimeoutError:
                 is_correct = False
-            reward = 1.0 if is_correct else 0.0
-        return TERMINAL_STATE, reward, True, True, {}
+            reward = self.is_correct_reward if is_correct else self.formatted_reward
+            info = {"formatted": True, "is_correct": is_correct}
+        return TERMINAL_STATE, reward, True, True, info
 
     def reset(self, seed: Optional[None] = None) -> Tuple[str, dict[str, Any]]:
         """Sample a question from the dataset."""
@@ -110,6 +118,7 @@ class MathEnv(Env):
     def sample_random_action(self) -> str:
         """Sample a random action."""
         return "\\boxed{42}"
+
 
 
 if __name__ == "__main__":
