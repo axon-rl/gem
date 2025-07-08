@@ -110,7 +110,7 @@ class ObservationWrapper(EnvWrapper):
                     # but the formatting might have been done at the tool side.
                     wrapped_obs += maybe_add_new_line(o)
                     wrapped_obs += maybe_add_new_line(a)
-                wrapped_obs += maybe_add_new_line(self.obs_queue[-1])
+                wrapped_obs += maybe_add_new_line(self.obs_queue[-1][0])
         else:
             wrapped_obs = ""
             for obs in self.obs_queue:

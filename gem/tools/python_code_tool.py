@@ -43,7 +43,9 @@ class PythonCodeTool(BaseTool):
     def instruction_string(self) -> str:
         return (
             "You can execute Python code by wrapping it in <python>...</python> tags or "
-            "using ```python...``` code blocks, and put your final answer within \\boxed{}."
+            "using ```python...``` code blocks, and the execution result is provided inside "
+            "the <output>...</output> block to aid your reasoning and help you get the final answer. "
+            "After step-by-step reasoning and code execution, put your final answer within \\boxed{}."
         )
 
     def execute_action(self, action):
