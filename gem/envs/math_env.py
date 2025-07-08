@@ -65,7 +65,7 @@ class MathEnv(Env):
                 is_correct = res.get(timeout=1)
             except multiprocessing.context.TimeoutError:
                 is_correct = False
-            reward = 1.0 if is_correct else 0.1
+            reward = 1.0 if is_correct else 0
         return TERMINAL_STATE, reward, True, True, {}
 
     def reset(self, seed: Optional[None] = None) -> Tuple[str, dict[str, Any]]:

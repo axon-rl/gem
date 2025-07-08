@@ -42,10 +42,11 @@ class PythonCodeTool(BaseTool):
 
     def instruction_string(self) -> str:
         return (
-            "You can execute Python code by wrapping it in <python>...</python> tags or "
-            "using ```python...``` code blocks, and the execution result is provided inside "
-            "the <output>...</output> block to aid your reasoning and help you get the final answer. "
-            "After step-by-step reasoning and code execution, put your final answer within \\boxed{}."
+            "Solve the above problem step by step. You now have the ability to selectively write "
+            "executable Python code to enhance your reasoning process. The Python code will be executed by an external sandbox, "
+            'and the output (after "Code execution result: ") is returned to aid your reasoning and help you arrive at the final answer. '
+            "The Python code should be complete scripts, including necessary imports, wrapped within <python>...</python> tags or using ```python...``` code block."
+            "Return your final answer within \\boxed{}."
         )
 
     def execute_action(self, action):
@@ -72,27 +73,28 @@ class PythonCodeTool(BaseTool):
 
             observation = execution_result.lstrip(" \n")
 
-            if action.endswith("```output"):
-                observation = "\n" + observation + "\n```\n"
-            elif action.endswith("</tool_call>"):
-                observation = "\n```output\n" + observation + "\n```\n"
-            elif action.endswith("<output>"):
-                observation = "\n" + observation + "\n</output>\n"
-            elif action.endswith("</python>") or "</python>" in action:
-                observation = "\n<output>\n" + observation + "\n</output>\n"
-            elif "<|calling system for feedback|>" in action:
-                if "```python" in action:
-                    observation = "\n```output\n" + observation + "\n```\n"
-                elif "<python>" in action:
-                    observation = "\n<output>\n" + observation + "\n</output>\n"
-                else:
-                    observation = "\n" + observation + "\n"
-            elif action.strip(" \n").endswith("```") or "```python" in action:
-                if action.count("```") % 2 == 0:
-                    observation = "\n```output\n" + observation + "\n```\n"
-                else:
-                    observation = "output\n" + observation + "\n```\n"
-            else:
-                observation = "\n" + observation + "\n"
+            observation = "Code execution result: " + observation + "\n"
+            # if action.endswith("```output"):
+            #     observation = "\n" + observation + "\n```\n"
+            # elif action.endswith("</tool_call>"):
+            #     observation = "\n```output\n" + observation + "\n```\n"
+            # elif action.endswith("<output>"):
+            #     observation = "\n" + observation + "\n</output>\n"
+            # elif action.endswith("</python>") or "</python>" in action:
+            #     observation = "\n<output>\n" + observation + "\n</output>\n"
+            # elif "<|calling system for feedback|>" in action:
+            #     if "```python" in action:
+            #         observation = "\n```output\n" + observation + "\n```\n"
+            #     elif "<python>" in action:
+            #         observation = "\n<output>\n" + observation + "\n</output>\n"
+            #     else:
+            #         observation = "\n" + observation + "\n"
+            # elif action.strip(" \n").endswith("```") or "```python" in action:
+            #     if action.count("```") % 2 == 0:
+            #         observation = "\n```output\n" + observation + "\n```\n"
+            #     else:
+            #         observation = "output\n" + observation + "\n```\n"
+            # else:
+            #     observation = "\n" + observation + "\n"
 
         return is_valid, has_error, observation, parsed_action

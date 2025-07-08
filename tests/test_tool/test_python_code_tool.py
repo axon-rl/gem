@@ -59,11 +59,13 @@ def test_episode(env_name: str = "ta:GuessTheNumber-v0"):
     wrapped_env = ToolEnvWrapper(env, tools=[tool], max_tool_uses=3)
     wrapped_env = WRAPPER_FACTORY["concat_chat"](wrapped_env, tokenizer=tokenizer)
     run_and_print_episode(wrapped_env, policy)
-    
+
     print("\n" * 5, "EPISODE 3: CHAT ON RESET TEMPLATE OBSERVATION")
     tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen3-0.6B-Base")
     wrapped_env = ToolEnvWrapper(env, tools=[tool], max_tool_uses=3)
-    wrapped_env = WRAPPER_FACTORY["concat_chat_on_reset"](wrapped_env, tokenizer=tokenizer)
+    wrapped_env = WRAPPER_FACTORY["concat_chat_on_reset"](
+        wrapped_env, tokenizer=tokenizer
+    )
     run_and_print_episode(wrapped_env, policy)
 
     print("\n" * 5, "BATCH EPISODE 1: SYNC VECTORIZED ENV")

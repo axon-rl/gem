@@ -15,7 +15,7 @@ WRAPPER_FACTORY = {
         ToolEnvWrapper,
         tools=[PythonCodeTool(timeout=5)],
         tool_reward=0.05,
-        tool_success_reward=0.05,
+        tool_success_reward=0.25,
         max_tool_uses=5,
     ),
     "python_tool_no_int_reward": partial(
@@ -28,8 +28,9 @@ WRAPPER_FACTORY = {
     "search_tool": partial(
         ToolEnvWrapper,
         tools=[SearchTool(topk=3, timeout=5)],
-        tool_reward=0.1,
-        max_tool_uses=10,
+        tool_reward=0.05,
+        tool_success_reward=0.25,
+        max_tool_uses=5,
     ),
     ### 2. Then choose an observation wrapper
     "concat": partial(
