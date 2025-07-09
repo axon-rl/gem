@@ -1,0 +1,14 @@
+.vscode/*
+.ruff_cache
+**cache**
+wandb**
+output**
+*.gif
+*.pkl
+runs
+*.html
+*.pdf
+.hydra
+*.pt
+.git
+output
