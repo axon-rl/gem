@@ -109,4 +109,5 @@ class SearchTool(BaseTool):
             search_result, has_error = self._search(parsed_query)
             observation = f"\n\n<information>{search_result}</information>\n\n"
             valid = True
+            has_error = "[SearchTool Error:" in search_result
         return valid, has_error, observation, parsed_action

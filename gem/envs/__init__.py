@@ -314,6 +314,14 @@ register(
 #     is_correct_reward=1.0,
 # )
 
+register(
+    "math:GSM8K",
+    "gem.envs.math_env:MathEnv",
+    dataset_name="axon-rl/GSM-8k",
+    question_key="problem",
+    answer_key="answer",
+)
+
 # Register code dataset environments
 
 register(
@@ -329,6 +337,15 @@ register(
     "code:Taco8k",
     "gem.envs.code_env:CodeEnv",
     dataset_name="axon-rl/TACO-8k",
+    split="train",
+    question_key="problem",
+    test_key="tests",
+)
+
+register(
+    "code:PrimeIntellect15k",
+    "gem.envs.code_env:CodeEnv",
+    dataset_name="axon-rl/PrimeIntellect-15k",
     split="train",
     question_key="problem",
     test_key="tests",

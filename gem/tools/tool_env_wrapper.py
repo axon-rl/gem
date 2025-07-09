@@ -9,8 +9,8 @@ class ToolEnvWrapper(EnvWrapper):
         self,
         env: Env,
         tools: List[BaseTool],
-        tool_reward: float = 0.0,
-        tool_success_reward: float = 0.0,
+        tool_reward: float = 0.05,
+        tool_success_reward: float = 0.25,
         max_tool_uses: Optional[int] = 10,
         obs_suffix: str = "",
     ):
@@ -18,7 +18,6 @@ class ToolEnvWrapper(EnvWrapper):
         self.tools = tools
         self.tool_reward = tool_reward
         self.tool_success_reward = tool_success_reward
-        self.obs_suffix = obs_suffix
         self.max_tool_uses = (
             max_tool_uses if max_tool_uses is not None else float("inf")
         )
@@ -38,7 +37,10 @@ class ToolEnvWrapper(EnvWrapper):
             tool_instructions = f"Available tools:\n{tool_instructions}"
         obs = f"{obs}\n{tool_instructions}"
         info["tool_use_counter"] = self.tool_use_counter
+        info["prev_ep_tool_use_counter"] = prev_ep_tool_uses
         info["tool_success_counter"] = self.tool_success_counter
+        info["prev_ep_tool_success_counter"] = prev_ep_tool_success
+        info["use_tool"] = False  # The initial context is not a tool result
         return obs, info
 
     def step(
@@ -60,7 +62,7 @@ class ToolEnvWrapper(EnvWrapper):
         if tool_parsed:
             self.tool_use_counter += 1
             if self.tool_use_counter == self.max_tool_uses:
-                observation = f"{observation}\n\nNow reached the maximum number of tools. Please stop using tools."
+                observation = f"{observation}\n\nReached the maximum number of tool use. Please output final answer directly."
             reward += self.tool_reward
             terminated, truncated = False, False
             info = {
@@ -79,7 +81,6 @@ class ToolEnvWrapper(EnvWrapper):
                     print(
                         f"Tool executed: {tool.name}, tool use count: {self.tool_use_counter}"
                     )
-            observation = f"{observation}\n{self.obs_suffix}"
         # if no tool was executed, step the environment
         else:
             observation, reward, terminated, truncated, info = self.env.step(action)
