@@ -76,7 +76,7 @@ class QaEnv(Env):
     ) -> Tuple[str, SupportsFloat, bool, bool, dict[str, Any]]:
         model_answer = self.extractor(action)
         if model_answer is None:
-            reward = -0.1
+            reward = 0.0
         else:
             is_correct = self.check_correct(model_answer, self.answer)
             reward = 1.0 if is_correct else 0.0
