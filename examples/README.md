@@ -1,4 +1,4 @@
-# RL Training with GEM
+# Reinforcement Learning with GEM
 
 ## Training with Oat
 [Oat](https://github.com/sail-sg/oat) is natively supported as the RL framework to integrate with GEM.
@@ -14,6 +14,9 @@ export LD_LIBRARY_PATH=$(python -c "import sysconfig; print(sysconfig.get_config
 
 ### Math
 #### Solving Math Problems Using Natural Languages
+
+<details>
+<summary>Click Me for the Command</summary>
 
 ```bash
 python examples/train_oat.py \
@@ -59,9 +62,12 @@ python examples/train_oat.py \
     --wb_project goat \
     --debug
 ```
+</details>
 
 #### Solving Math Problems Using *Python Tools*
 
+<details>
+<summary>Click Me for the Command</summary>
 ```diff
 python examples/train_oat.py \
     --env_id math:Math12K \
@@ -106,3 +112,4 @@ python examples/train_oat.py \
     --wb_project goat \
     --debug
 ```
+</details>
