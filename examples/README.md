@@ -68,7 +68,8 @@ python examples/train_oat.py \
 
 <details>
 <summary>Click Me for the Command</summary>
-```diff
+
+```bash
 python examples/train_oat.py \
     --env_id math:Math12K \
 +   --wrappers "python_tool_no_int_reward,concat_chat" \
