@@ -162,9 +162,9 @@ register(
 # Register math dataset environments
 
 register(
-    "math:Math12K",
+    "math:ASDiv2K",
     "gem.envs.math_env:MathEnv",
-    dataset_name="axon-rl/MATH-12k",
+    dataset_name="axon-rl/ASDIV-2k",
     question_key="problem",
     answer_key="answer",
 )
@@ -176,6 +176,31 @@ register(
     question_key="problem",
     answer_key="answer",
 )
+
+register(
+    "math:Math12K",
+    "gem.envs.math_env:MathEnv",
+    dataset_name="axon-rl/MATH-12k",
+    question_key="problem",
+    answer_key="answer",
+)
+
+register(
+    "math:Orz57K",
+    "gem.envs.math_env:MathEnv",
+    dataset_name="axon-rl/ORZ-57k",
+    question_key="problem",
+    answer_key="answer",
+)
+
+register(
+    "math:DeepScaleR40K",
+    "gem.envs.math_env:MathEnv",
+    dataset_name="axon-rl/DeepScaleR-40K",
+    question_key="problem",
+    answer_key="answer",
+)
+
 
 # Register code dataset environments
 
