@@ -40,6 +40,7 @@ class QaEnv(Env):
         answer_key: str = "answer",
         seed: int = 0,
         extract_boxed: bool = False,
+        load_from_cache_file: bool = True,  # False to force re-run the apply_prompt_func, useful when apply_prompt is changed
         **_,
     ):
         super().__init__()
@@ -61,7 +62,9 @@ class QaEnv(Env):
                 )
         assert isinstance(dataset, Dataset), f"Expected a Dataset, got {type(dataset)}"
         apply_prompt_func = partial(apply_prompt, question_key=question_key)
-        dataset = dataset.map(apply_prompt_func)
+        dataset = dataset.map(
+            apply_prompt_func, load_from_cache_file=load_from_cache_file
+        )
         self.dataset = dataset.shuffle(seed=self.seed)
         self.idx = 0
         self.epoch = 0
