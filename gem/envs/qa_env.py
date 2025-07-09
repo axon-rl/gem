@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 # TODO: refactor later
-def apply_prompt(example, question_key: str = 'question'):
+def apply_prompt(example, question_key: str = "question"):
     prompt_template = (
         "For any question, always reason through your thought process using:\n"
         "<think> your reasoning here </think>\n"
@@ -68,7 +68,9 @@ class QaEnv(Env):
                 )
         assert isinstance(dataset, Dataset), f"Expected a Dataset, got {type(dataset)}"
         apply_prompt_func = partial(apply_prompt, question_key=question_key)
-        dataset = dataset.map(apply_prompt_func, load_from_cache_file=load_from_cache_file)
+        dataset = dataset.map(
+            apply_prompt_func, load_from_cache_file=load_from_cache_file
+        )
         self.dataset = dataset.shuffle(seed=self.seed)
         self.idx = 0
         self.epoch = 0
@@ -104,7 +106,7 @@ class QaEnv(Env):
         self.first_obs = data[self.question_key]
         self.answer = data[self.answer_key]
         self.idx += 1
-        return self.first_obs, {}
+        return self.first_obs, {'answer': self.answer}
 
     @staticmethod
     def check_correct(model_answer: str, gt_answer: Any) -> bool:

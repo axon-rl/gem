@@ -34,5 +34,3 @@ class DummyEnv(Env):
     def sample_random_action(self) -> str:
         """Sample a random action."""
         return "```python\nprint('Hello, World!')\n```"
-
-

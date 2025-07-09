@@ -9,8 +9,8 @@ class ToolEnvWrapper(EnvWrapper):
         self,
         env: Env,
         tools: List[BaseTool],
-        tool_reward: float = 0.2,
-        tool_success_reward: float = 0.3,
+        tool_reward: float = 0.0,
+        tool_success_reward: float = 0.0,
         max_tool_uses: Optional[int] = 10,
         obs_suffix: str = "",
     ):
@@ -63,7 +63,11 @@ class ToolEnvWrapper(EnvWrapper):
                 observation = f"{observation}\n\nNow reached the maximum number of tools. Please stop using tools."
             reward += self.tool_reward
             terminated, truncated = False, False
-            info = {"parsed_action": parsed_action, "tool_type": tool.tool_type, "tool_used": True}
+            info = {
+                "parsed_action": parsed_action,
+                "tool_type": tool.tool_type,
+                "tool_used": True,
+            }
             if verbose:
                 print(
                     f"Tool parsed: {tool.name}, tool use count: {self.tool_use_counter}"

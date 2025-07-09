@@ -3,6 +3,7 @@ from functools import partial
 from gem.tools.python_code_tool import PythonCodeTool
 from gem.tools.search_tool import SearchTool
 from gem.tools.tool_env_wrapper import ToolEnvWrapper
+from gem.wrappers.complete_traj_verify_wrapper import TrajVerifyWrapper
 from gem.wrappers.episode_tracking_wrapper import EpisodeTrackingWrapper
 from gem.wrappers.observation_wrapper import ObservationWrapper
 
@@ -42,6 +43,24 @@ WRAPPER_FACTORY = {
         tool_reward=0.1,
         max_tool_uses=10,
     ),
+    "search_tool_no_reward": partial(
+        ToolEnvWrapper,
+        tools=[SearchTool(topk=3, timeout=5)],
+        tool_reward=0.0,
+        max_tool_uses=10,
+    ),
+    "search_tool_03_reward": partial(
+        ToolEnvWrapper,
+        tools=[SearchTool(topk=3, timeout=5)],
+        tool_reward=0.3,
+        max_tool_uses=10,
+    ),
+    "search_tool_05_reward": partial(
+        ToolEnvWrapper,
+        tools=[SearchTool(topk=3, timeout=5)],
+        tool_reward=0.5,
+        max_tool_uses=10,
+    ),
     ### 2. Then choose an observation wrapper
     "concat": partial(
         ObservationWrapper,
@@ -65,7 +84,12 @@ WRAPPER_FACTORY = {
         include_chat_template=False,
         apply_chat_template_on_reset=True,
     ),
-    ### 3. Finally, optionally add the episode tracking wrapper
+    ### 3. Then choose a trajectory verification wrapper
+    "traj_verify": partial(
+        TrajVerifyWrapper,
+        formatted_reward=0.2,
+    ),
+    ### 4. Finally, optionally add the episode tracking wrapper
     "episode_tracking": EpisodeTrackingWrapper,
 }
 
