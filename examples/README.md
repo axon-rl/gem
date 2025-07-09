@@ -45,7 +45,6 @@ python examples/train_oat.py \
     --beta 0 \
     --max_model_len 12800 \
     --generate_max_length 4096 \
-    --ignore_no_eos \
     --temperature 1.0 \
     --top_p 1 \
     --eval_steps -1 \
@@ -93,7 +92,6 @@ python examples/train_oat.py \
     --beta 0 \
     --max_model_len 12800 \
     --generate_max_length 4096 \
-    --ignore_no_eos \
     --temperature 1.0 \
     --top_p 1 \
     --eval_steps -1 \
