@@ -8,7 +8,7 @@
 
 ```console
 # reasoning gym
-pip install git+https://github.com/open-thought/reasoning-gym@0699e2f
+pip install git+https://github.com/open-thought/reasoning-gym@1c98584
 
 # sandbox
 conda install bubblewrap

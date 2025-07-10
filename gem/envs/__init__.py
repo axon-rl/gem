@@ -212,12 +212,45 @@ register(
 # Register math dataset environments
 
 register(
+    "math:ASDiv2K",
+    "gem.envs.math_env:MathEnv",
+    dataset_name="axon-rl/ASDIV-2k",
+    question_key="problem",
+    answer_key="answer",
+)
+
+register(
+    "math:GSM8K",
+    "gem.envs.math_env:MathEnv",
+    dataset_name="axon-rl/GSM-8k",
+    question_key="problem",
+    answer_key="answer",
+)
+
+register(
     "math:Math12K",
     "gem.envs.math_env:MathEnv",
     dataset_name="axon-rl/MATH-12k",
     question_key="problem",
     answer_key="answer",
 )
+
+register(
+    "math:Orz57K",
+    "gem.envs.math_env:MathEnv",
+    dataset_name="axon-rl/ORZ-57k",
+    question_key="problem",
+    answer_key="answer",
+)
+
+register(
+    "math:DeepScaleR40K",
+    "gem.envs.math_env:MathEnv",
+    dataset_name="axon-rl/DeepScaleR-40K",
+    question_key="problem",
+    answer_key="answer",
+)
+
 
 # Register code dataset environments
 
@@ -239,6 +272,15 @@ register(
     test_key="tests",
 )
 
+register(
+    "code:PrimeIntellect15k",
+    "gem.envs.code_env:CodeEnv",
+    dataset_name="axon-rl/PrimeIntellect-15k",
+    split="train",
+    question_key="problem",
+    test_key="tests",
+)
+
 # Register qa dataset environments
 
 for i in [0, 1, 2, 3, 5]:
@@ -251,6 +293,24 @@ for i in [0, 1, 2, 3, 5]:
         question_key="question",
         answer_key="answer",
     )
+
+register(
+    "qa:NaturalQuestions",
+    "gem.envs.qa_env:QaEnv",
+    dataset_name="axon-rl/NaturalQuestions",
+    split="train",
+    question_key="problem",
+    answer_key="answer",
+)
+
+register(
+    "qa:HotpotQA",
+    "gem.envs.qa_env:QaEnv",
+    dataset_name="axon-rl/HotpotQA",
+    split="train",
+    question_key="problem",
+    answer_key="answer",
+)
 
 # Register datasets from ReasoningGym
 
@@ -284,6 +344,7 @@ register(
     test_key="tests",
 )
 
+## QaOpen
 register(
     "eval:QaOpen",
     "gem.envs.qa_env:QaEnv",

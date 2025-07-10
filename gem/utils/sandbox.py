@@ -62,6 +62,12 @@ def subprocess_run(
     stdin: Optional[str] = None,
     timeout: int = DEFAULT_TIMEOUT,
 ):
+    # Dealing with special cases for immediate return.
+    if code == "...":
+        stdout = ""
+        stderr = "SyntaxError: invalid syntax"
+        return False, stdout, stderr
+
     # Create a minimal environment instead of copying everything
     original_env = os.environ.copy()
     env = {}

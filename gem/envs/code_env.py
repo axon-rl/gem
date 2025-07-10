@@ -111,7 +111,10 @@ class CodeEnv(Env):
 
     def _check_correct(self, model_code: str) -> bool:
         assert any(
-            [x in self.dataset_name.lower() for x in ["taco", "apps", "codecontest"]]
+            [
+                x in self.dataset_name.lower()
+                for x in ["taco", "apps", "codecontest", "primeintellect"]
+            ]
         )
         tests = self.tests
 

@@ -116,10 +116,24 @@ def test_llm_episode(model_name: str = "agentica-org/DeepCoder-1.5B-Preview"):
     env.step(action)
 
 
+def apply_code_template(question: str) -> str:
+    return (
+        "You are an expert Python programmer. "
+        "You will be given a question (problem specification) and will generate a correct "
+        "Python program that matches the specification and passes all tests."
+        f"\nQuestion: {question}"
+        "\nPlease reason step by step, and write your code in markdown format, e.g., ```python\n# YOUR CODE HERE\n```."
+    )
+
+
+TEMPLATE = {"code": apply_code_template}
+
+
 def evaluate(
     model_name: str = "agentica-org/DeepCoder-1.5B-Preview",
-    end_id: str = "code:Taco8k",
+    end_id: str = "eval:CodeContest",
     max_tokens: int = 32752,
+    template: str = "",
 ):
     from vllm import LLM, SamplingParams
 
@@ -137,6 +151,11 @@ def evaluate(
     )
 
     tokenizer = llm.get_tokenizer()
+    if template in TEMPLATE:
+        print("applying template ", template)
+        _template_fn = TEMPLATE[template]
+    else:
+        _template_fn = lambda x: x
 
     env = gem.make(end_id, verbose=True)
     dataset = env.dataset[:NUM_TEST]
@@ -144,7 +163,7 @@ def evaluate(
 
     formatted_obss = [
         tokenizer.apply_chat_template(
-            [{"content": obs, "role": "user"}],
+            [{"content": _template_fn(obs), "role": "user"}],
             add_generation_prompt=True,
             tokenize=False,
         )

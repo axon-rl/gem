@@ -350,14 +350,14 @@ class Config:
         self.retrieval_batch_size = retrieval_batch_size
 
 
-class QueryRequest(Struct, kw_only=True):
-    queries: List[str]
+class QueryRequest(Struct):
+    query: str
     topk: Optional[int] = None
     return_scores: bool = False
 
 
-class RetrievalResponse(Struct, kw_only=True):
-    result: List[List[Dict]]
+class RetrievalResponse(Struct):
+    result: List[Dict]
 
 
 class RetrievalWorker(TypedMsgPackMixin, Worker):
@@ -366,32 +366,39 @@ class RetrievalWorker(TypedMsgPackMixin, Worker):
         self.config = Config(**json.loads(os.environ.get("CONFIG")))
         self.retriever = get_retriever(self.config)
 
-    def forward(self, request: QueryRequest) -> RetrievalResponse:
+    def forward(self, requests: List[QueryRequest]) -> RetrievalResponse:
         """
         Perform retrieval based on the request.
         """
-        if not request.topk:
-            request.topk = self.config.retrieval_topk  # fallback to default
+        if not requests[0].topk:
+            topk = self.config.retrieval_topk  # fallback to default
+        else:
+            topk = requests[0].topk
+        return_scores = requests[0].return_scores
 
         # Perform batch retrieval
+        query_list = [request.query for request in requests]
         results, scores = self.retriever.batch_search(
-            query_list=request.queries,
-            num=request.topk,
-            return_score=request.return_scores,
+            query_list=query_list,
+            num=topk,
+            return_score=return_scores,
         )
 
         # Format response
-        resp = []
+        resps = []
         for i, single_result in enumerate(results):
-            if request.return_scores:
+            if return_scores:
                 # If scores are returned, combine them with results
                 combined = []
                 for doc, score in zip(single_result, scores[i]):
                     combined.append({"document": doc, "score": score})
-                resp.append(combined)
+                resps.append(combined)
             else:
-                resp.append(single_result)
-        return RetrievalResponse(result=resp)
+                combined = []
+                for doc in single_result:
+                    combined.append({"document": doc, "score": None})
+                resps.append(combined)
+        return [RetrievalResponse(result=resp) for resp in resps]
 
 
 if __name__ == "__main__":
@@ -430,8 +437,14 @@ if __name__ == "__main__":
     parser.add_argument(
         "--max_wait_time",
         type=int,
-        default=10,
+        default=50,
         help="Maximum wait time for batching requests",
+    )
+    parser.add_argument(
+        "--max_batch_size",
+        type=int,
+        default=10,
+        help="Maximum batch size for the retrieval server.",
     )
     parser.add_argument(
         "--num_workers",
@@ -461,9 +474,9 @@ if __name__ == "__main__":
     runtime = Runtime(
         worker=RetrievalWorker,
         num=args.num_workers,
-        max_batch_size=1,
+        max_batch_size=args.max_batch_size,
         max_wait_time=args.max_wait_time,
-        timeout=30,
+        timeout=30,  # BUG: timeout is ignored
         env=[{"CONFIG": json.dumps(config)} for _ in range(args.num_workers)],
     )
 

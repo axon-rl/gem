@@ -1,6 +1,7 @@
 from functools import partial
 
 from gem.tools.python_code_tool import PythonCodeTool
+from gem.tools.search_tool import SearchTool
 from gem.tools.tool_env_wrapper import ToolEnvWrapper
 from gem.wrappers.episode_tracking_wrapper import EpisodeTrackingWrapper
 from gem.wrappers.observation_wrapper import ObservationWrapper
@@ -13,8 +14,23 @@ WRAPPER_FACTORY = {
     "python_tool": partial(
         ToolEnvWrapper,
         tools=[PythonCodeTool(timeout=5)],
-        tool_reward=0.1,
-        max_tool_uses=10,
+        tool_reward=0.05,
+        tool_success_reward=0.25,
+        max_tool_uses=5,
+    ),
+    "python_tool_no_int_reward": partial(
+        ToolEnvWrapper,
+        tools=[PythonCodeTool(timeout=5)],
+        tool_reward=0.0,
+        tool_success_reward=0.0,
+        max_tool_uses=5,
+    ),
+    "search_tool": partial(
+        ToolEnvWrapper,
+        tools=[SearchTool(topk=3, timeout=5)],
+        tool_reward=0.05,
+        tool_success_reward=0.25,
+        max_tool_uses=5,
     ),
     ### 2. Then choose an observation wrapper
     "concat": partial(
@@ -43,6 +59,8 @@ WRAPPER_FACTORY = {
     "episode_tracking": EpisodeTrackingWrapper,
 }
 
+TOKENIZER_REQUIRED = ["concat_chat", "concat_chat_on_reset"]
+
 
 def get_wrapper_fns(wrappers: str, tokenizer=None):
     """Get a list of wrapper functions based on the provided wrapper names."""
@@ -53,7 +71,7 @@ def get_wrapper_fns(wrappers: str, tokenizer=None):
         print(f"Wrappers: {wrapper_fns}")
         for w in wrappers:
             wrapper_fn = WRAPPER_FACTORY[w]
-            if w == "concat_chat" and tokenizer is not None:
+            if w in TOKENIZER_REQUIRED and tokenizer is not None:
                 wrapper_fn = partial(wrapper_fn, tokenizer=tokenizer)
             wrapper_fns.append(wrapper_fn)
     return wrapper_fns

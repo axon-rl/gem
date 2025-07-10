@@ -1,5 +1,6 @@
 # Adapted from https://github.com/PeterGriffinJin/Search-R1
 
+import os
 import re
 from typing import Tuple
 
@@ -17,11 +18,10 @@ class SearchTool(BaseTool):
 
     def __init__(self, num_workers=1, search_url=None, topk=3, timeout=TIMEOUT):
         super().__init__(num_workers)
-        if not search_url:
-            raise ValueError("search_url must be provided for SearchTool.")
         self.search_url = search_url
         self.topk = topk
         self.timeout = timeout
+        self._search_url_resolved = self.search_url is not None
 
     def _parse_action(self, action: str) -> Tuple[str, str, bool]:
         """
@@ -43,7 +43,14 @@ class SearchTool(BaseTool):
         Perform a search using the configured search_url.
         Returns a formatted string of search results.
         """
-        payload = {"queries": [query], "topk": self.topk, "return_scores": True}
+        if not self._search_url_resolved:
+            self.search_url = self.search_url or os.environ.get("SEARCH_URL")
+            self._search_url_resolved = True
+
+        if not self.search_url:
+            raise ValueError("search_url must be provided for SearchTool.")
+
+        payload = {"query": query, "topk": self.topk, "return_scores": True}
         try:
             response = requests.post(
                 self.search_url,
@@ -51,7 +58,7 @@ class SearchTool(BaseTool):
                 timeout=self.timeout,
             )
             response.raise_for_status()
-            result = msgspec.msgpack.decode(response.content)["result"][0]
+            result = msgspec.msgpack.decode(response.content)["result"]
             return self._passages2string(result)
         except Exception as e:
             return f"[SearchTool Error: {e}]"
@@ -67,23 +74,16 @@ class SearchTool(BaseTool):
 
     def instruction_string(self) -> str:
         return (
-            "You are provided with a search engine to help answer questions.\n\n"
-            "Instructions:\n"
-            "- Always conduct reasoning inside:\n"
-            "  <think> your reasoning here </think>\n"
-            "- After reasoning, if knowledge is missing, issue a search query:\n"
-            "  <search> your query </search>\n"
-            "- The search engine returns results inside:\n"
+            "You have access to a search engine to help answer questions.\n\n"
+            "Additional instructions:\n"
+            "- If your initial reasoning in <think> shows you lack some knowledge, explain what you need to find next inside a new <think> block.\n"
+            "- Then issue a search query using:\n"
+            "  <search> your query here </search>\n"
+            "- The search engine will provide results inside:\n"
             "  <information> ... </information>\n"
-            "- You can search as many times as needed.\n"
-            "- When ready, give the final concise answer using:\n"
-            "  <answer> your answer </answer>\n\n"
-            "Example:\n"
-            "<think> I need to find the capital of China. </think>\n"
-            "<search> capital of China </search>\n"
-            "<information> Beijing is the capital of China. </information>\n"
-            "<think> The capital is Beijing. </think>\n"
-            "<answer> Beijing </answer>"
+            "- You may repeat the <think> and <search> steps as many times as needed.\n"
+            "- When you are ready, give your final answer in:\n"
+            "  <answer> your answer here </answer>"
         )
 
     def execute_action(self, action: str):
@@ -104,8 +104,10 @@ class SearchTool(BaseTool):
             # observation = "No valid search query found. Please provide your query within <search>...</search> tags."
             observation = ""
             valid = False
+            has_error = True
         else:
             search_result = self._search(parsed_query)
             observation = f"\n\n<information>{search_result}</information>\n\n"
             valid = True
-        return valid, observation, parsed_action
+            has_error = "[SearchTool Error:" in search_result
+        return valid, has_error, observation, parsed_action
