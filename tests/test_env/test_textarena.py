@@ -14,7 +14,7 @@ class HumanAgent:
 
 
 def test(env_name: str = "ta:GuessTheNumber-v0"):
-    env = gem.make(env_name, max_turns=20)
+    env = gem.make(env_name, max_turns=3)
     # policy = lambda _: env.sample_random_action()
     policy = HumanAgent()
 
@@ -59,4 +59,7 @@ if __name__ == "__main__":
         python -m tests.test_env.test_textarena --env_name ta:Wordle-v0
         python -m tests.test_env.test_textarena --env_name eval:MATH500
         python -m tests.test_env.test_textarena --env_name ta:FifteenPuzzle-v0-easy
+        python -m tests.test_env.test_textarena --env_name ta:Hangman-v0-easy
+        python -m tests.test_env.test_textarena --env_name ta:Sudoku-v0-easy
+        python -m tests.test_env.test_textarena --env_name ta:TowerofHanoi-v0-easy
     """

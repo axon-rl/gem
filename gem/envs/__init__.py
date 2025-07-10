@@ -118,33 +118,15 @@ register(
     "ta:Wordle-v0",
     "gem.envs.textarena.wordle:WordleEnv",
     word_length=5,
-    hardcore=False,
     only_real_words=True,
-    max_turns=6,
+    max_turns=15,
 )
 register(
     "ta:Wordle-v0-easy",
     "gem.envs.textarena.wordle:WordleEnv",
     word_length=3,
-    hardcore=False,
     only_real_words=True,
-    max_turns=6,
-)
-register(
-    "ta:Wordle-v0-random",
-    "gem.envs.textarena.wordle:WordleEnv",
-    word_length=None,
-    hardcore=False,
-    only_real_words=True,
-    max_turns=8,
-)
-register(
-    "ta:Wordle-v0-lenient",
-    "gem.envs.textarena.wordle:WordleEnv",
-    word_length=5,
-    hardcore=False,
-    only_real_words=False,
-    max_turns=8,
+    max_turns=15,
 )
 register(
     "ta:FifteenPuzzle-v0",
@@ -165,6 +147,67 @@ register(
     max_turns=50,
 )
 
+register(
+    "ta:Hangman-v0",
+    "gem.envs.textarena.hangman:HangmanEnv",
+    word_length=5,
+    hardcore=False,
+    max_turns=15,
+)
+register(
+    "ta:Hangman-v0-easy",
+    "gem.envs.textarena.hangman:HangmanEnv",
+    word_length=3,
+    hardcore=False,
+    max_turns=15,
+)
+register(
+    "ta:Hangman-v0-hard",
+    "gem.envs.textarena.hangman:HangmanEnv",
+    word_length=7,
+    hardcore=False,
+    max_turns=20,
+)
+register(
+    "ta:Sudoku-v0-easy",
+    "gem.envs.textarena.sudoku:SudokuEnv",
+    clues=10,
+    max_turns=15,
+    scale=4,
+)
+register(
+    "ta:Sudoku-v0-easy-v2",
+    "gem.envs.textarena.sudoku:SudokuEnv",
+    clues=10,
+    max_turns=15,
+    scale=4,
+    invalid_action_reward_type="v2",
+)
+register(
+    "ta:Sudoku-v0",
+    "gem.envs.textarena.sudoku:SudokuEnv",
+    clues=50,
+    max_turns=50,
+    scale=9,
+)
+register(
+    "ta:TowerofHanoi-v0-easy",
+    "gem.envs.textarena.tower_of_hanoi:TowerofHanoiEnv",
+    num_disks=3,
+    max_turns=10,
+)
+register(
+    "ta:TowerofHanoi-v0",
+    "gem.envs.textarena.tower_of_hanoi:TowerofHanoiEnv",
+    num_disks=4,
+    max_turns=20,
+)
+register(
+    "ta:TowerofHanoi-v0-hard",
+    "gem.envs.textarena.tower_of_hanoi:TowerofHanoiEnv",
+    num_disks=5,
+    max_turns=50,
+)
 
 # Register math dataset environments
 

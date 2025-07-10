@@ -9,7 +9,6 @@ from gem.utils.constants import TERMINAL_STATE, TextArenaGameReward
 
 
 class MastermindEnv(Env):
-
     def __init__(
         self,
         code_length: Optional[int] = 4,
@@ -39,6 +38,9 @@ class MastermindEnv(Env):
             "Enter your first guess to start the game.\n"
         )
 
+    def get_task_suffix(self) -> str:
+        return "Enter your guess."
+
     def reset(self, seed: Optional[int] = None) -> Tuple[str, dict[str, Any]]:
         super().reset(seed)
         if self.is_random:
@@ -49,82 +51,63 @@ class MastermindEnv(Env):
         self.game_code = sample_fn(available_numbers, k=self.code_length)
         self.previous_guesses = set()
         self.turn_count = 0
+        self.milestone = 0
         return self._get_instructions(), {}
 
     def step(self, action: str) -> Tuple[str, float, bool, bool, dict[str, Any]]:
         self.turn_count += 1
-
         action_search_pattern = re.compile(r"\\boxed{(\d+(?:\s+\d+)*)}")
         matches = list(action_search_pattern.finditer(action))
         clean_action = matches[-1] if matches else None
         try:
-            player_guess = (
-                list(map(int, clean_action.group(1).split()))
-                if clean_action is not None
-                else None
-            )
+            player_guess = list(map(int, clean_action.group(1).split()))
         except Exception:
             player_guess = None
 
         if not player_guess:
+            next_obs = f"At turn {self.turn_count}, you did not provide a valid guess."
+            reward = TextArenaGameReward.format_error_reward
             return (
-                TERMINAL_STATE,
-                TextArenaGameReward.format_error_reward,
+                next_obs,
+                reward,
                 True,
                 self.turn_count == self.max_turns,
-                {},
+                {"suffix": self.get_task_suffix()},
             )
+        elif not len(player_guess) == self.code_length:  # invalid action
+            next_obs = f"At turn {self.turn_count}, you guessed {player_guess} which has {len(player_guess)} entries but the code has length {self.code_length}."
+            reward = TextArenaGameReward.invalid_action_reward
+        elif any(num < 1 or num > self.num_numbers for num in player_guess):
+            next_obs = f"At turn {self.turn_count}, you guessed {player_guess}, which has numbers outside the range 1 to {self.num_numbers}."
+            reward = TextArenaGameReward.invalid_action_reward
+        elif tuple(player_guess) in self.previous_guesses:
+            next_obs = f"At turn {self.turn_count}, you guessed {player_guess}, which has been already guessed before."
+            reward = TextArenaGameReward.invalid_action_reward
         else:
-            length_correct, black_pegs, white_pegs = self._evaluate_guess(player_guess)
-            if self.turn_count >= self.max_turns:
-                reward = (
-                    TextArenaGameReward.invalid_action_reward
-                    if not length_correct
-                    else (black_pegs + 0.5 * white_pegs) / self.code_length
+            self.previous_guesses.add(tuple(player_guess))
+            black_pegs, white_pegs = self._evaluate_guess(player_guess)
+            next_obs = f"At turn {self.turn_count}, you guessed {player_guess}. This guess receives {black_pegs} black peg(s) and {white_pegs} white peg(s)."
+            reward = self.get_current_success_internal_reward(black_pegs)
+            if black_pegs == self.code_length:
+                terminate_obs = f"Congratulations! You guessed the correct code {self.game_code} in {self.turn_count} turns."
+                return (
+                    terminate_obs,
+                    reward,
+                    True,
+                    False,
+                    {"suffix": self.get_task_suffix()},
                 )
-                return TERMINAL_STATE, reward, True, True, {}
+        if self.turn_count >= self.max_turns:  # reach max_turns
+            terminate_obs = "You have reached the maximum number of turns."
+            return terminate_obs, reward, True, True, {"suffix": self.get_task_suffix()}
+        return next_obs, reward, False, False, {"suffix": self.get_task_suffix()}
 
-            if not length_correct:
-                next_obs = f"At turn {self.turn_count}, you guessed {player_guess} which has {len(player_guess)} entires but the code has length {self.code_length}."
-                reward, terminated, truncated = (
-                    TextArenaGameReward.invalid_action_reward,
-                    False,
-                    False,
-                )
-            elif any(num < 1 or num > self.num_numbers for num in player_guess):
-                next_obs = f"At turn {self.turn_count}, you guessed {player_guess}, which has numbers outside the range 1 to {self.num_numbers}."
-                reward, terminated, truncated = (
-                    TextArenaGameReward.invalid_action_reward,
-                    False,
-                    False,
-                )
-            elif tuple(player_guess) in self.previous_guesses:
-                next_obs = f"At turn {self.turn_count}, you guessed {player_guess}, which has been already guessed before."
-                reward, terminated, truncated = (
-                    TextArenaGameReward.invalid_action_reward,
-                    False,
-                    False,
-                )
-            else:
-                self.previous_guesses.add(tuple(player_guess))
-                if black_pegs == self.code_length:
-                    next_obs = f"Congratulations! You guessed the correct code {self.game_code} in {self.turn_count} turns."
-                    reward, terminated, truncated = (
-                        TextArenaGameReward.success_reward,
-                        True,
-                        False,
-                    )
-                else:
-                    next_obs = f"At turn {self.turn_count}, you guessed {player_guess}. This guess receives {black_pegs} black peg(s) and {white_pegs} white peg(s)."
-                    reward, terminated, truncated = (
-                        TextArenaGameReward.internal_step_reward,
-                        False,
-                        False,
-                    )
-
-        if not terminated:
-            next_obs += "\nEnter your next guess."
-        return next_obs, reward, terminated, truncated, {}
+    def get_current_success_internal_reward(self, blackpeg) -> float:
+        if blackpeg > self.milestone:
+            reward = (blackpeg - self.milestone) / self.code_length
+            self.milestone = blackpeg
+            return reward
+        return 0.0
 
     def sample_random_action(self):
         return (
@@ -146,10 +129,7 @@ class MastermindEnv(Env):
         Args: player_guess (List[int]): The player's guess.
         Returns: Tuple[int, int]: Number of black and white pegs.
         """
-        length_correct = len(player_guess) == self.code_length
-        if not length_correct:  # not need for evaluation
-            return length_correct, None, None
-
+        assert len(player_guess) == self.code_length
         black_pegs = 0
         white_pegs = 0
 
@@ -171,4 +151,4 @@ class MastermindEnv(Env):
                 # Remove the first occurrence to prevent over-counting
                 code_copy[code_copy.index(guess_copy[i])] = None
 
-        return length_correct, black_pegs, white_pegs
+        return black_pegs, white_pegs

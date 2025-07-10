@@ -8,15 +8,13 @@ import nltk
 from nltk.corpus import words
 
 from gem.core import Env
-from gem.utils.constants import TERMINAL_STATE, TextArenaGameReward
+from gem.utils.constants import TextArenaGameReward
 
 
 class WordleEnv(Env):
-
     def __init__(
         self,
         word_length: Optional[int] = 5,
-        hardcore: Optional[bool] = False,
         only_real_words: Optional[bool] = True,
         max_turns: Optional[int] = 20,
         **_,
@@ -24,11 +22,10 @@ class WordleEnv(Env):
         super().__init__()
         nltk.download("words")
         self.word_length = word_length
-        self.hardcore = hardcore
         self.only_real_words = only_real_words
         self.max_turns = max_turns
         self.is_random = word_length is None
-        self.all_words = words.words("en") if hardcore else words.words("en-basic")
+        self.all_words = words.words("en-basic")
         self.reset()
 
     def _get_instructions(self) -> str:
@@ -42,22 +39,25 @@ class WordleEnv(Env):
             "After thinking, format your final answer inside \\boxed{...},"
             f" for example, {self.sample_random_action()}.\n"
             "As you play, the history of your guesses will be appended below. Use the information to complete the game before you run out of guesses.\n"
-            "Enter your first guess to start the game.\n"
         )
+
+    def get_task_suffix(self) -> str:
+        return "Enter your guess."
 
     def reset(self, seed: Optional[int] = None) -> Tuple[str, dict[str, Any]]:
         super().reset(seed)
         if self.is_random:
             self.word_length = random.randint(3, 6)
-        available_words = [
+        self.available_words = [
             word
             for word in self.all_words
             if len(word) == self.word_length and word.isalpha() and word.islower()
         ]
-        self.secret_word = random.choice(available_words).upper()
+        self.secret_word = random.choice(self.available_words).upper()
         self.previous_guesses = set()
+        self.milestones = [0] * len(self.secret_word)
         self.turn_count = 0
-        return self._get_instructions(), {}
+        return self._get_instructions(), {"suffix": self.get_task_suffix()}
 
     def step(self, action: str) -> Tuple[str, float, bool, bool, dict[str, Any]]:
         self.turn_count += 1
@@ -65,86 +65,64 @@ class WordleEnv(Env):
         action_search_pattern = re.compile(r"\\boxed{([a-zA-Z]+(?:\s+[a-zA-Z]+)*)}")
         matches = list(action_search_pattern.finditer(action))
         clean_action = matches[-1] if matches else None
+        # get player guess
         try:
-            if clean_action is not None:
-                player_guess = clean_action.group(1).upper().replace(" ", "")
-            else:
-                player_guess = None
+            player_guess = clean_action.group(1).upper().replace(" ", "")
         except Exception:
             player_guess = None
 
-        if not player_guess:
+        if not player_guess:  # format error
+            next_obs = f"At turn {self.turn_count}, you did not provide a valid guess."
+            reward = TextArenaGameReward.format_error_reward
             return (
-                TERMINAL_STATE,
-                TextArenaGameReward.format_error_reward,
+                next_obs,
+                reward,
                 True,
                 self.turn_count == self.max_turns,
-                {},
+                {"suffix": self.get_task_suffix()},
             )
-        else:
-            length_correct, feedback = self._evaluate_guess(player_guess)
-            if self.turn_count >= self.max_turns:
-                reward = (
-                    TextArenaGameReward.invalid_action_reward
-                    if not length_correct
-                    else (feedback.count("G") + 0.5 * feedback.count("Y"))
-                    / self.word_length
+        elif len(player_guess) != self.word_length:  # invalid action
+            next_obs = f"At turn {self.turn_count}, you guessed {player_guess} which has {len(player_guess)} letters but the secret word has {self.word_length} letters."
+            reward = TextArenaGameReward.invalid_action_reward
+        elif player_guess in self.previous_guesses:  # invalid action
+            next_obs = f"At turn {self.turn_count}, you guessed {player_guess}, which has been already guessed before."
+            reward = TextArenaGameReward.invalid_action_reward
+        else:  # valid action
+            self.previous_guesses.add(player_guess)
+            feedback = self._evaluate_guess(player_guess)
+            reward = self.get_current_success_internal_reward(feedback)
+            next_obs = f"At turn {self.turn_count}, you guessed {player_guess}\nFeedback:\n{player_guess}\n{feedback}"
+            if feedback.count("G") == self.word_length:  # finished
+                terminate_obs = f"Congratulations! You guessed the secret word {self.secret_word} in {self.turn_count} turns."
+                reward += TextArenaGameReward.success_reward * 0.5
+                return (
+                    terminate_obs,
+                    reward,
+                    True,
+                    False,
+                    {"suffix": self.get_task_suffix()},
                 )
-                return TERMINAL_STATE, reward, True, True, {}
 
-            if len(player_guess) != self.word_length:
-                next_obs = f"At turn {self.turn_count}, you guessed {player_guess} which has {len(player_guess)} letters but the secret word has {self.word_length} letters."
-                reward, terminated, truncated = (
-                    TextArenaGameReward.invalid_action_reward,
-                    False,
-                    False,
-                )
-            elif player_guess.lower() not in self.all_words and self.only_real_words:
-                next_obs = f"At turn {self.turn_count}, you guessed {player_guess}. This word is not a valid English word. All guesses must be valid English words."
-                reward, terminated, truncated = (
-                    TextArenaGameReward.invalid_action_reward,
-                    False,
-                    False,
-                )
-            elif player_guess in self.previous_guesses:
-                next_obs = f"At turn {self.turn_count}, you guessed {player_guess}, which has been already guessed before."
-                reward, terminated, truncated = (
-                    TextArenaGameReward.invalid_action_reward,
-                    False,
-                    False,
-                )
-            else:
-                self.previous_guesses.add(player_guess)
-                if feedback.count("G") == self.word_length:
-                    next_obs = f"Congratulations! You guessed the secret word {self.secret_word} in {self.turn_count} turns."
-                    reward, terminated, truncated = (
-                        TextArenaGameReward.success_reward,
-                        True,
-                        False,
-                    )
-                else:
-                    next_obs = f"At turn {self.turn_count}, you guessed {player_guess}.\nFeedback:\n"
-                    next_obs += " ".join(player_guess) + "\n"
-                    next_obs += " ".join(feedback)
-                    reward, terminated, truncated = (
-                        TextArenaGameReward.internal_step_reward,
-                        False,
-                        False,
-                    )
+        if self.turn_count >= self.max_turns:  # reach max_turns
+            terminate_obs = "You have reached the maximum number of turns."
+            return terminate_obs, reward, True, True, {"suffix": self.get_task_suffix()}
+        return next_obs, reward, False, False, {"suffix": self.get_task_suffix()}
 
-        if not terminated:
-            next_obs += "\nEnter your next guess."
-        return next_obs, reward, terminated, truncated, {}
+    def get_current_success_internal_reward(self, feedback) -> float:
+        reward = 0
+        for i, (f, m) in enumerate(zip(feedback, self.milestones)):
+            if f == "G" and m == 0:
+                reward += 1 / len(self.milestones) * 0.5
+                # update milestones
+                self.milestones[i] = 1
+        return reward
 
     def sample_random_action(self):
         """Samples a random word"""
-        return f"\\boxed{{{random.choice(self.all_words).upper()}}}"
+        return f"\\boxed{{{random.choice(self.available_words).upper()}}}"
 
     def _evaluate_guess(self, player_guess: str) -> List[str]:
         """Evaluates the player's guess against the secret word"""
-        length_correct = len(player_guess) == self.word_length
-        if not length_correct:
-            return length_correct, None
         feedback = [None] * self.word_length
         secret_list = list(self.secret_word.upper())
         guess_list = list(player_guess.upper())
@@ -166,4 +144,4 @@ class WordleEnv(Env):
                 else:
                     feedback[i] = "X"
 
-        return length_correct, feedback
+        return feedback

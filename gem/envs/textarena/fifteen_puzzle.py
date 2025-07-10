@@ -56,55 +56,53 @@ class FifteenPuzzleEnv(Env):
             player_guess = None
 
         if player_guess is None:
+            terminate_obs = (
+                f"At turn {self.turn_count}, you did not provide a valid guess"
+            )
             return (
-                TERMINAL_STATE,
+                terminate_obs,
                 TextArenaGameReward.format_error_reward,
                 True,
                 self.turn_count == self.max_turns,
                 {"suffix": self.get_task_suffix()},
             )
         else:
-            if self.turn_count >= self.max_turns:
-                # TODO: how to give a soft reward here?
-                reward = TextArenaGameReward.fail_reward
-                return (
-                    TERMINAL_STATE,
-                    reward,
-                    True,
-                    True,
-                    {"suffix": self.get_task_suffix()},
-                )
-
             is_valid_move = self._move(player_guess)
-            if not is_valid_move:
+            if not is_valid_move:  # invalid action
                 next_obs = f"At turn {self.turn_count}, you chose a move {player_guess} that is outside the bounds of the board."
-                reward, terminated, truncated = (
-                    TextArenaGameReward.invalid_action_reward,
-                    False,
-                    False,
-                )
+                reward = TextArenaGameReward.invalid_action_reward
             else:
                 if self._is_solved():
-                    next_obs = "Congratulations! You have solved the puzzle!"
-                    reward, terminated, truncated = (
-                        TextArenaGameReward.success_reward,
+                    terminate_obs = "Congratulations! You have solved the puzzle!"
+                    reward = TextArenaGameReward.success_reward
+                    return (
+                        terminate_obs,
+                        reward,
                         True,
                         False,
+                        {"suffix": self.get_task_suffix()},
                     )
                 else:
                     next_obs = f"At turn {self.turn_count}, you made a valid move: {player_guess}.\n"
-                    reward, terminated, truncated = (
-                        TextArenaGameReward.internal_step_reward,
-                        False,
-                        False,
-                    )
-            return (
-                next_obs,
-                reward,
-                terminated,
-                truncated,
-                {"suffix": self.get_task_suffix()},
-            )
+                    reward = TextArenaGameReward.internal_step_reward
+
+        if self.turn_count >= self.max_turns:
+            terminate_obs = "You have reached the maximum number of turns."
+            reward += self._get_soft_reward()
+            return terminate_obs, reward, True, True, {"suffix": self.get_task_suffix()}
+        return next_obs, reward, False, False, {"suffix": self.get_task_suffix()}
+
+    def _get_soft_reward(self) -> float:
+        def _is_equal(a, b) -> bool:
+            return a == b or (a is None and b is None)
+
+        correct_tiles = list(range(1, self.greatest_num + 1)) + [None]
+        current_tiles = [tile for row in self.board for tile in row]
+        reward = 0
+        for cor, cur in zip(correct_tiles, current_tiles):
+            if _is_equal(cor, cur):
+                reward += 1 / (self.greatest_num + 1)
+        return reward
 
     def _generate_board(self) -> List[List[Optional[int]]]:
         tiles = list(range(1, self.greatest_num + 1)) + [None]
