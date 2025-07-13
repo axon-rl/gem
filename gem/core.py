@@ -49,6 +49,15 @@ class Env(abc.ABC):
         """Samples a random action given the current state."""
         raise NotImplementedError
 
+    @property
+    def unwrapped(self) -> "Env":
+        """Returns the base non-wrapped environment.
+
+        Returns:
+            Env: The base non-wrapped :class:`gem.Env` instance
+        """
+        return self
+
 
 class EnvWrapper(Env):
     def __init__(self, env: Env):
@@ -58,3 +67,12 @@ class EnvWrapper(Env):
         for attr in dir(env):
             if not attr.startswith("_") and not hasattr(self, attr):
                 setattr(self, attr, getattr(env, attr))
+
+    @property
+    def unwrapped(self) -> "Env":
+        """Returns the base environment of the wrapper.
+
+        Returns:
+            Env: The base environment of the wrapper :class:`gem.Env` instance
+        """
+        return self.env.unwrapped
