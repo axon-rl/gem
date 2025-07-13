@@ -28,8 +28,15 @@ WRAPPER_FACTORY = {
     "search_tool": partial(
         ToolEnvWrapper,
         tools=[SearchTool(topk=3, timeout=5)],
-        tool_reward=0.05,
-        tool_success_reward=0.25,
+        tool_reward=0.3,
+        tool_success_reward=0.0,
+        max_tool_uses=5,
+    ),
+    "search_tool_no_int_reward": partial(
+        ToolEnvWrapper,
+        tools=[SearchTool(topk=3, timeout=5)],
+        tool_reward=0.0,
+        tool_success_reward=0.0,
         max_tool_uses=5,
     ),
     ### 2. Then choose an observation wrapper

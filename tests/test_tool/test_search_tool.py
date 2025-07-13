@@ -43,8 +43,12 @@ def test_single_action(search_url: str, env_name: str = "ta:GuessTheNumber-v0"):
             print("Continuing with next test...\n")
 
 
-def test_episode(search_url: str, env_name: str = "ta:GuessTheNumber-v0"):
-    env = gem.make(env_name, max_turns=3)
+def test_episode(
+    search_url: str,
+    env_name: str = "ta:GuessTheNumber-v0",
+    tokenizer_name: str = "PeterJinGo/SearchR1-nq_hotpotqa_train-qwen2.5-7b-em-ppo",
+):
+    env = gem.make(env_name, max_turns=3, load_from_cache_file=False)
     policy = lambda _: random.choice(TEST_ACTIONS)
     tool = SearchTool(search_url=search_url, topk=2)
 
@@ -62,7 +66,7 @@ def test_episode(search_url: str, env_name: str = "ta:GuessTheNumber-v0"):
     run_episode_test("EPISODE 1: DEFAULT OBSERVATION", wrapped_env)
 
     # Episode 2: Chat template observation
-    tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen3-0.6B-Base")
+    tokenizer = AutoTokenizer.from_pretrained(tokenizer_name)
     wrapped_env = ToolEnvWrapper(env, tools=[tool], max_tool_uses=3)
     wrapped_env = WRAPPER_FACTORY["concat_chat"](wrapped_env, tokenizer=tokenizer)
     run_episode_test("EPISODE 2: CHAT TEMPLATE OBSERVATION", wrapped_env)
@@ -85,7 +89,7 @@ def test_episode(search_url: str, env_name: str = "ta:GuessTheNumber-v0"):
         wrappers=[tool_env_wrapper, chat_wrapper],
         max_turns=3,
     )
-    batch_policy = lambda _: [random.choice([TEST_ACTIONS[2]]) for _ in range(num_envs)]
+    batch_policy = lambda _: [random.choice(TEST_ACTIONS) for _ in range(num_envs)]
     run_episode_test("", ta_vec_env, batch_policy)
 
 
