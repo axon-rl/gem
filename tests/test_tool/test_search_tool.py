@@ -1,5 +1,6 @@
 import random
 from functools import partial
+from typing import Optional
 
 import fire
 from transformers import AutoTokenizer
@@ -45,7 +46,7 @@ def test_single_action(search_url: str, env_name: str = "game:GuessTheNumber-v0"
 
 def test_episode(
     search_url: str,
-    env_name: str = "game:GuessTheNumber-v0",
+    env_name: str = "qa:NaturalQuestions",
     tokenizer_name: str = "PeterJinGo/SearchR1-nq_hotpotqa_train-qwen2.5-7b-em-ppo",
 ):
     env = gem.make(env_name, max_turns=3, load_from_cache_file=False)
@@ -150,11 +151,12 @@ def test_llm_episode(
 
 
 def evaluate(
-    search_url: str,
+    search_url: Optional[str] = None,
     model_name: str = "PeterJinGo/SearchR1-nq_hotpotqa_train-qwen2.5-7b-em-ppo",
+    env_name: str = "eval:QaOpen",
     max_tokens: int = 1024,
     n_examples: int = 500,
-    max_tool_uses: int = 4,
+    max_tool_uses: int = 5,
     obs_wrapper: str = "concat_chat",
     verbose: bool = False,
 ):
@@ -173,30 +175,44 @@ def evaluate(
     )
     tokenizer = llm.get_tokenizer()
 
-    tool = SearchTool(search_url=search_url, topk=3)
-    base_env = gem.make("eval:QaOpen", seed=42)
+    base_env = gem.make(env_name, seed=42)
     dataset = base_env.dataset
     dataset = dataset.select(range(n_examples))
     base_env.dataset = dataset
 
-    print(
-        "First question:\n",
-        "-" * 20,
-        "\n",
-        dataset[0]["question"],
-        "\n",
-        "-" * 20,
-        "\n",
-    )
+    if verbose:
+        print(
+            "First question:\n",
+            "-" * 20,
+            "\n",
+            dataset[0]["question"],
+            "\n",
+            "-" * 20,
+            "\n",
+        )
 
-    wrapped_env = ToolEnvWrapper(base_env, tools=[tool], max_tool_uses=max_tool_uses)
+    tool = SearchTool(search_url=search_url, topk=3, timeout=5)
+    wrapped_env = ToolEnvWrapper(
+        base_env,
+        tools=[tool],
+        max_tool_uses=max_tool_uses,
+        tool_reward=0.0,
+        tool_success_reward=0.0,
+    )
     wrapped_env = WRAPPER_FACTORY[obs_wrapper](wrapped_env, tokenizer=tokenizer)
 
+    progress_bar = tqdm(total=len(dataset))
+    num_done = 0
     all_pass = 0
-    for _ in tqdm(range(n_examples)):
+    
+    while True:
         obs, info = wrapped_env.reset()
         terminated = False
         truncated = False
+
+        if wrapped_env.unwrapped.epoch > 0:  # force to end if traversed full dataset
+            break
+
         while not (terminated or truncated):
             response = llm.generate(
                 [obs], sampling_params=sampling_params, use_tqdm=False
@@ -206,6 +222,9 @@ def evaluate(
             obs = next_obs
         if reward == 1:
             all_pass += 1
+        num_done += 1
+        progress_bar.update(1)
+        progress_bar.set_description(f"{env_name} | Accuracy: {all_pass / num_done:.2%}")
 
         if verbose:
             print(f"Action: {action!r}")
