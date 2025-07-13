@@ -410,7 +410,7 @@ data_names = [
     ("popqa", "PopQA"),
     ("tq", "TriviaQA"),
     ("hotpotqa", "HotpotQA"),
-    ("Bamboogle", "Bamboogle"),
+    ("bamboogle", "Bamboogle"),
     ("nq", "NaturalQuestions"),
     ("musique", "Musique"),
 ]

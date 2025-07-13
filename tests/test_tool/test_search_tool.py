@@ -154,31 +154,38 @@ def evaluate(
     search_url: Optional[str] = None,
     model_name: str = "PeterJinGo/SearchR1-nq_hotpotqa_train-qwen2.5-7b-em-ppo",
     env_name: str = "eval:QaOpen",
-    max_tokens: int = 1024,
-    n_examples: int = 500,
+    max_tokens: int = 3000,
+    temperature: float = 0.0,
+    top_p: float = 1.0,
+    n_examples: int = -1,
     max_tool_uses: int = 5,
     obs_wrapper: str = "concat_chat",
     verbose: bool = False,
-):
+) -> tuple[float, list[list[dict]]]:
     """Evaluate the model on the QaOpen dataset with the Search tool."""
     from tqdm import tqdm
     from vllm import LLM, SamplingParams
+
+    stop_tokens = ["/answer>", "</search>"]
 
     llm = LLM(
         model=model_name,
     )
     sampling_params = SamplingParams(
         n=1,
-        temperature=0.6,
+        temperature=temperature,
         max_tokens=max_tokens,
-        top_p=0.95,
+        top_p=top_p,
+        stop=stop_tokens,
+        include_stop_str_in_output=True,
     )
     tokenizer = llm.get_tokenizer()
 
     base_env = gem.make(env_name, seed=42)
     dataset = base_env.dataset
-    dataset = dataset.select(range(n_examples))
-    base_env.dataset = dataset
+    if n_examples > 0:
+        dataset = dataset.select(range(n_examples))
+        base_env.dataset = dataset
 
     if verbose:
         print(
@@ -204,11 +211,14 @@ def evaluate(
     progress_bar = tqdm(total=len(dataset))
     num_done = 0
     all_pass = 0
-    
+    episodes = []
+
     while True:
         obs, info = wrapped_env.reset()
         terminated = False
         truncated = False
+        ground_truth = wrapped_env.unwrapped.answer
+        episode = []
 
         if wrapped_env.unwrapped.epoch > 0:  # force to end if traversed full dataset
             break
@@ -219,12 +229,28 @@ def evaluate(
             )
             action = response[0].outputs[0].text
             next_obs, reward, terminated, truncated, info = wrapped_env.step(action)
+            done = terminated or truncated
+
+            episode.append(
+                {
+                    "obs": obs,
+                    "action": action,
+                    "reward": reward,
+                    "done": done,
+                    "ground_truth": ground_truth,
+                }
+            )
+
             obs = next_obs
+
         if reward == 1:
             all_pass += 1
         num_done += 1
+        episodes.append(episode)
         progress_bar.update(1)
-        progress_bar.set_description(f"{env_name} | Accuracy: {all_pass / num_done:.2%}")
+        progress_bar.set_description(
+            f"{env_name} | Accuracy: {all_pass / num_done:.2%}"
+        )
 
         if verbose:
             print(f"Action: {action!r}")
@@ -235,7 +261,10 @@ def evaluate(
             print(f"Truncated: {truncated}")
             print(f"Info: {info!r}")
 
-    print(f"Tested {len(dataset)} questions; Accuracy: {all_pass / len(dataset)}")
+    acc = all_pass / len(dataset)
+    print(f"Tested {len(dataset)} questions; Accuracy: {acc:.2%}")
+
+    return acc, episodes
 
 
 def main():
