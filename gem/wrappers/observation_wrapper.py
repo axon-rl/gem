@@ -113,7 +113,7 @@ class ObservationWrapper(EnvWrapper):
                 wrapped_obs += maybe_add_new_line(self.obs_queue[-1][0])
         else:
             wrapped_obs = ""
-            for obs in self.obs_queue:
+            for obs, use_tool in self.obs_queue:
                 wrapped_obs += maybe_add_new_line(obs)
         if "prefix" in info:
             wrapped_obs = info["prefix"] + wrapped_obs

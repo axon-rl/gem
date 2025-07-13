@@ -34,7 +34,7 @@ from gem.wrappers.wrapper_factory import get_wrapper_fns
 INVALID_ACTION = "<｜INVALID_ACTION｜>"
 
 
-def apply_qwen3_template(observation: str) -> str:
+def apply_qwen3_game_template(observation: str) -> str:
     return (
         f"<|im_start|>user\nYou are playing language games. Make valid actions to win.\nObservation: {observation}"
         "\nPlease reason step by step, and put your final answer within \\boxed{}.<|im_end|>\n"
@@ -65,7 +65,7 @@ def apply_code_template(question: str) -> str:
 
 
 TEMPLATE_FACTORY = {
-    "qwen3": apply_qwen3_template,
+    "qwen3_game": apply_qwen3_game_template,
     "no": apply_no_template,
     "qwen3_general": apply_qwen3_general_template,
     "code": apply_code_template,
@@ -86,7 +86,7 @@ class Args(PPOArgs):
     async_env: bool = False
 
     # Template settings
-    prompt_template: Literal["qwen3", "no", "qwen3_general", "code"] = "qwen3"
+    prompt_template: Literal["qwen3_game", "no", "qwen3_general", "code"] = "qwen3_game"
 
     # Reward settings
     gamma: float = 1.0  # Discount factor for Monte Carlo returns
@@ -138,7 +138,6 @@ class Transition:
 
 
 class Actor(PPOActor):
-
     def init(self, actor_id, save_path):
         super().init(actor_id, save_path)
         self.args.seed += 233 ** (actor_id + 1)
@@ -203,21 +202,21 @@ class Actor(PPOActor):
             all_trajectories.extend(self.prepare_trajectories(ep))
 
         # logging infos
-        info[f"actor/num_trajectories"] = len(all_trajectories)
-        info[f"actor/mean_episode_len"] = np.mean([len(ep) for ep in finished_episodes])
-        info[f"actor/mean_episode_return"] = np.mean(
+        info["actor/num_trajectories"] = len(all_trajectories)
+        info["actor/mean_episode_len"] = np.mean([len(ep) for ep in finished_episodes])
+        info["actor/mean_episode_return"] = np.mean(
             [
                 sum(transition.reward for transition in episode)
                 for episode in finished_episodes
             ]
         )
-        info[f"actor/mean_episode_success"] = np.mean(
+        info["actor/mean_episode_success"] = np.mean(
             [episode[-1].reward == 1 for episode in finished_episodes]
         )  # NOTE: assuming success reward is always 1
 
         # update collection info
         info.update(
-            {k.replace("actor/", f"actor/"): v for k, v in collection_info.items()}
+            {k.replace("actor/", "actor/"): v for k, v in collection_info.items()}
         )
 
         # Subsample trajectories if they exceed the batch size
@@ -492,7 +491,7 @@ class Actor(PPOActor):
 
         try:
             formatted_action = None
-            if self.args.prompt_template in ["qwen3", "qwen3_general"] or (
+            if self.args.prompt_template in ["qwen3_game", "qwen3_general"] or (
                 self.args.prompt_template == "no"
                 and "qwen" in self.args.pretrain.lower()
             ):
@@ -539,7 +538,6 @@ class DummyPromptDataset(Dataset):
 
 
 class Learner(PPOLearner):
-
     def _init(self, args: Args, actors: List[Actor]) -> None:
         """
         Initialize the learner.

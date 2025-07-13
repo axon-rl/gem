@@ -5,8 +5,6 @@ import re
 from collections import deque
 from typing import Any, Optional, Tuple
 
-import numpy as np
-
 from gem.core import Env
 from gem.utils.constants import TERMINAL_STATE, TextArenaGameReward
 
@@ -94,8 +92,17 @@ class MinesweeperEnv(Env):
             action_type, row, col = None, None, None
 
         if action_type is None or row is None or col is None:
-            next_obs = f"At turn {self.turn_count}, you did not provide a valid guess."
+            terminate_obs = (
+                f"At turn {self.turn_count}, you did not provide a valid guess."
+            )
             reward = TextArenaGameReward.format_error_reward
+            return (
+                terminate_obs,
+                reward,
+                True,
+                self.turn_count == self.max_turns,
+                {"suffix": self.get_task_suffix()},
+            )
         elif not (0 <= row < self.rows and 0 <= col < self.cols):
             next_obs = f"At turn {self.turn_count}, you chose cell ({row}, {col}), which is outside the bounds of the grid."
             reward = TextArenaGameReward.invalid_action_reward
