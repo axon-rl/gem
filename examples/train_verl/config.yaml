@@ -1,0 +1,20 @@
+hydra:
+  searchpath:
+    # Assuming you are in the `gem/` directory and `verl/` is located at the same level as `gem/`, for example:
+    # $ ls ..
+    # gem verl ...(other directories)
+    - file://../verl/verl/trainer/config
+
+defaults:
+  - ppo_trainer
+  - _self_
+
+actor_rollout_ref:
+  env:
+    env_id: rg:leg_counting
+    wrappers: concat_chat
+    num_env: 2
+    async_env: True
+
+trainer:
+  project_name: verl-gem

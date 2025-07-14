@@ -34,7 +34,6 @@ from gem.wrappers.wrapper_factory import get_wrapper_fns
 INVALID_ACTION = "<｜INVALID_ACTION｜>"
 
 
-
 def apply_qwen3_game_template(observation: str) -> str:
     return (
         f"<|im_start|>user\nYou are playing language games. Make valid actions to win.\nObservation: {observation}"
