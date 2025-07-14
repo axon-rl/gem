@@ -13,7 +13,7 @@ class HumanAgent:
         return input(f"Observation: {observation}\nAction: ")
 
 
-def test(env_name: str = "ta:GuessTheNumber-v0"):
+def test(env_name: str = "game:GuessTheNumber-v0"):
     env = gem.make(env_name, max_turns=3)
     # policy = lambda _: env.sample_random_action()
     policy = HumanAgent()
@@ -52,14 +52,14 @@ if __name__ == "__main__":
     print(f"\n\nAll tests run.\n\n")
 
     """Run with:
-        python -m tests.test_env.test_textarena --env_name ta:GuessTheNumber-v0-sanitycheck
-        python -m tests.test_env.test_textarena --env_name ta:GuessTheNumber-v0
-        python -m tests.test_env.test_textarena --env_name ta:Mastermind-v0
-        python -m tests.test_env.test_textarena --env_name ta:Minesweeper-v0
-        python -m tests.test_env.test_textarena --env_name ta:Wordle-v0
-        python -m tests.test_env.test_textarena --env_name eval:MATH500
-        python -m tests.test_env.test_textarena --env_name ta:FifteenPuzzle-v0-easy
-        python -m tests.test_env.test_textarena --env_name ta:Hangman-v0-easy
-        python -m tests.test_env.test_textarena --env_name ta:Sudoku-v0-easy
-        python -m tests.test_env.test_textarena --env_name ta:TowerofHanoi-v0-easy
+        python -m tests.test_env.test_game --env_name game:GuessTheNumber-v0-sanitycheck
+        python -m tests.test_env.test_game --env_name game:GuessTheNumber-v0
+        python -m tests.test_env.test_game --env_name game:Mastermind-v0
+        python -m tests.test_env.test_game --env_name game:Minesweeper-v0
+        python -m tests.test_env.test_game --env_name game:Wordle-v0
+        python -m tests.test_env.test_game --env_name eval:MATH500
+        python -m tests.test_env.test_game --env_name game:FifteenPuzzle-v0-easy
+        python -m tests.test_env.test_game --env_name game:Hangman-v0-easy
+        python -m tests.test_env.test_game --env_name game:Sudoku-v0-easy
+        python -m tests.test_env.test_game --env_name game:TowerofHanoi-v0-easy
     """

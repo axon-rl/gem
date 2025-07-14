@@ -29,7 +29,7 @@ TEST_ACTIONS = [
 SLEEP_ACTION = """```<python>import time\ntime.sleep(30)\nprint('Hello from Python!')</python> ... <python>print('Hello again!')</python>``` ..."""
 
 
-def test_single_action(env_name: str = "ta:GuessTheNumber-v0"):
+def test_single_action(env_name: str = "game:GuessTheNumber-v0"):
     env = gem.make(env_name, max_turns=3)
     tool = PythonCodeTool(timeout=2)
     env = ToolEnvWrapper(env, tools=[tool])
@@ -45,7 +45,7 @@ def test_single_action(env_name: str = "ta:GuessTheNumber-v0"):
         print(f"Info: {info}\n")
 
 
-def test_episode(env_name: str = "ta:GuessTheNumber-v0"):
+def test_episode(env_name: str = "game:GuessTheNumber-v0"):
     env = gem.make(env_name, max_turns=3)
     policy = lambda _: random.choice(TEST_ACTIONS)
     tool = PythonCodeTool(timeout=2)
@@ -108,7 +108,7 @@ def test_episode(env_name: str = "ta:GuessTheNumber-v0"):
 
 
 def test_llm_episode(
-    env_name: str = "ta:GuessTheNumber-v0", model_name: str = "Qwen/Qwen3-0.6B-Base"
+    env_name: str = "game:GuessTheNumber-v0", model_name: str = "Qwen/Qwen3-0.6B-Base"
 ):
     """Test episode with LLM observation and Python code tool."""
     from vllm import LLM, SamplingParams
@@ -214,9 +214,9 @@ if __name__ == "__main__":
     print(f"\n\nAll tests run.\n\n")
 
     """Run with:
-    python -m tests.test_tool.test_python_code_tool single_action --env_name ta:GuessTheNumber-v0
-    python -m tests.test_tool.test_python_code_tool episode --env_name ta:GuessTheNumber-v0
-    python -m tests.test_tool.test_python_code_tool llm_episode --env_name ta:GuessTheNumber-v0 --model_name Qwen/Qwen3-0.6B-Base
+    python -m tests.test_tool.test_python_code_tool single_action --env_name game:GuessTheNumber-v0
+    python -m tests.test_tool.test_python_code_tool episode --env_name game:GuessTheNumber-v0
+    python -m tests.test_tool.test_python_code_tool llm_episode --env_name game:GuessTheNumber-v0 --model_name Qwen/Qwen3-0.6B-Base
     python -m tests.test_tool.test_python_code_tool episode --env_name eval:MATH500
     python -m tests.test_tool.test_python_code_tool llm_episode --env_name eval:MATH500 --model_name Qwen/Qwen3-0.6B-Base
     """

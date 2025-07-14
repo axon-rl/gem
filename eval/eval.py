@@ -109,7 +109,7 @@ def collect_episodes(
 
 
 def eval(
-    env_name: str = "ta:GuessTheNumber-v0",
+    env_name: str = "game:GuessTheNumber-v0",
     model_name: str = "Qwen/Qwen3-0.6B-Base",
     wrappers: Optional[
         str
@@ -219,8 +219,8 @@ if __name__ == "__main__":
     fire.Fire(eval)
 
     """Run with:
-    python -m eval.eval --env_name ta:GuessTheNumber-v0 --model_name Qwen/Qwen3-0.6B
-    python -m eval.eval --env_name ta:GuessTheNumber-v0 --model_name Qwen/Qwen3-0.6B --num_episodes 20 --batch_size 5
+    python -m eval.eval --env_name game:GuessTheNumber-v0 --model_name Qwen/Qwen3-0.6B
+    python -m eval.eval --env_name game:GuessTheNumber-v0 --model_name Qwen/Qwen3-0.6B --num_episodes 20 --batch_size 5
     python -m eval.eval --env_name eval:MATH500 --model_name GAIR/ToRL-1.5Bx
     python -m eval.eval --env_name eval:MATH500 --model_name GAIR/ToRL-1.5B --num_episodes 20 --batch_size 5 --wrappers "'python_tool,concat_with_action,episode_tracking'"
     python -m eval.eval --env_name eval:MATH500 --model_name GAIR/ToRL-1.5B --num_episodes 20 --batch_size 5 --max_tokens 100

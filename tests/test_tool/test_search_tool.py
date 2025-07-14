@@ -19,7 +19,7 @@ TEST_ACTIONS = [
 ]
 
 
-def test_single_action(search_url: str, env_name: str = "ta:GuessTheNumber-v0"):
+def test_single_action(search_url: str, env_name: str = "game:GuessTheNumber-v0"):
     env = gem.make(env_name, max_turns=4)
     tool = SearchTool(search_url=search_url, topk=2)
     env = ToolEnvWrapper(env, tools=[tool], max_tool_uses=3)
@@ -45,7 +45,7 @@ def test_single_action(search_url: str, env_name: str = "ta:GuessTheNumber-v0"):
 
 def test_episode(
     search_url: str,
-    env_name: str = "ta:GuessTheNumber-v0",
+    env_name: str = "game:GuessTheNumber-v0",
     tokenizer_name: str = "PeterJinGo/SearchR1-nq_hotpotqa_train-qwen2.5-7b-em-ppo",
 ):
     env = gem.make(env_name, max_turns=3, load_from_cache_file=False)
