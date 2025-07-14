@@ -6,7 +6,7 @@ import re
 from typing import Any, Optional, Tuple
 
 from gem.core import Env
-from gem.utils.constants import TextArenaGameReward
+from gem.utils.constants import LanguageGameReward
 
 
 class GuessTheNumberEnv(Env):
@@ -60,7 +60,7 @@ class GuessTheNumberEnv(Env):
             terminate_obs = (
                 f"At turn {self.turn_count}, you did not provide a valid guess."
             )
-            reward = TextArenaGameReward.format_error_reward
+            reward = LanguageGameReward.format_error_reward
             return (
                 terminate_obs,
                 reward,
@@ -70,18 +70,18 @@ class GuessTheNumberEnv(Env):
             )
         elif player_guess < self.min_number or player_guess > self.max_number:
             next_obs = f"At turn {self.turn_count}, you guessed {player_guess}, which is outside the range specified."
-            reward = TextArenaGameReward.invalid_action_reward
+            reward = LanguageGameReward.invalid_action_reward
         elif player_guess in self.previous_guesses:
             next_obs = f"At turn {self.turn_count}, you guessed {player_guess}, which has been already guessed before."
-            reward = TextArenaGameReward.invalid_action_reward
+            reward = LanguageGameReward.invalid_action_reward
         else:  # valid action
             self.previous_guesses.add(player_guess)
             hint = "lower" if player_guess > self.game_number else "higher"
             next_obs = f"At turn {self.turn_count}, you guessed {player_guess}, and the target number is {hint} than {player_guess}."
-            reward = TextArenaGameReward.internal_step_reward
+            reward = LanguageGameReward.internal_step_reward
             if player_guess == self.game_number:
                 terminate_obs = f"Congratulations! You guessed the correct number {self.game_number} in {self.turn_count} turns."
-                reward = TextArenaGameReward.success_reward
+                reward = LanguageGameReward.success_reward
                 return (
                     terminate_obs,
                     reward,

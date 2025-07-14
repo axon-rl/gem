@@ -2,7 +2,7 @@ import re
 from typing import Any, Dict, Optional, Tuple
 
 from gem.core import Env
-from gem.utils.constants import TextArenaGameReward
+from gem.utils.constants import LanguageGameReward
 
 
 class TowerofHanoiEnv(Env):
@@ -50,7 +50,7 @@ class TowerofHanoiEnv(Env):
             terminate_obs = "You did not provide a valid action."
             return (
                 terminate_obs,
-                TextArenaGameReward.format_error_reward,
+                LanguageGameReward.format_error_reward,
                 True,
                 self.turn_count == self.max_turns,
                 {"suffix": self.get_task_suffix()},
@@ -58,18 +58,18 @@ class TowerofHanoiEnv(Env):
 
         if not self.board[src]:
             next_obs = f"At turn {self.turn_count}, you tried to move from tower {src}, which is empty."
-            reward = TextArenaGameReward.invalid_action_reward
+            reward = LanguageGameReward.invalid_action_reward
         elif self.board[dst] and self.board[src][-1] > self.board[dst][-1]:
             next_obs = f"At turn {self.turn_count}, you tried to move from tower {src} to tower {dst}, but the top disk on tower {src} is larger than the top disk on tower {dst}."
-            reward = TextArenaGameReward.invalid_action_reward
+            reward = LanguageGameReward.invalid_action_reward
         else:  # valid action
             disk = self.board[src].pop()
             self.board[dst].append(disk)
             next_obs = f"At turn {self.turn_count}, you moved disk {disk} from tower {src} to tower {dst}."
-            reward = TextArenaGameReward.internal_step_reward
+            reward = LanguageGameReward.internal_step_reward
             if self.board["C"] == list(range(self.num_disks, 0, -1)):
                 terminate_obs = "Congratulations! You solved the Tower of Hanoi Puzzle"
-                reward = TextArenaGameReward.success_reward
+                reward = LanguageGameReward.success_reward
                 return (
                     terminate_obs,
                     reward,

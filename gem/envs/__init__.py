@@ -2,71 +2,71 @@ import reasoning_gym as rg
 
 from gem.envs.registration import register
 
-# Register games from our implementation of TextArena
+# Register games from our implementation of TextArena and beyond.
 # GuessTheNumber
 register(
-    "ta:GuessTheNumber-v0",
-    "gem.envs.textarena.guess_the_number:GuessTheNumberEnv",
+    "game:GuessTheNumber-v0",
+    "gem.envs.game_env.guess_the_number:GuessTheNumberEnv",
     min_number=1,
     max_number=20,
     max_turns=10,
 )
 register(
-    "ta:GuessTheNumber-v0-hard_wo_maxturns",
-    "gem.envs.textarena.guess_the_number:GuessTheNumberEnv",
+    "game:GuessTheNumber-v0-hard-no-max-turn",
+    "gem.envs.game_env.guess_the_number:GuessTheNumberEnv",
     min_number=1,
     max_number=50,
     max_turns=50,
 )
 register(
-    "ta:GuessTheNumber-v0-hard",
-    "gem.envs.textarena.guess_the_number:GuessTheNumberEnv",
+    "game:GuessTheNumber-v0-hard",
+    "gem.envs.game_env.guess_the_number:GuessTheNumberEnv",
     min_number=1,
     max_number=50,
     max_turns=7,
 )
 register(
-    "ta:GuessTheNumber-v0-easy",
-    "gem.envs.textarena.guess_the_number:GuessTheNumberEnv",
+    "game:GuessTheNumber-v0-easy",
+    "gem.envs.game_env.guess_the_number:GuessTheNumberEnv",
     min_number=1,
     max_number=10,
     max_turns=4,
 )
 register(
-    "ta:GuessTheNumber-v0-random",
-    "gem.envs.textarena.guess_the_number:GuessTheNumberEnv",
+    "game:GuessTheNumber-v0-random",
+    "gem.envs.game_env.guess_the_number:GuessTheNumberEnv",
     min_number=None,
     max_number=None,
     max_turns=None,
 )
 # Mastermind
 register(
-    "ta:Mastermind-v0",
-    "gem.envs.textarena.mastermind:MastermindEnv",
+    "game:Mastermind-v0",
+    "gem.envs.game_env.mastermind:MastermindEnv",
     code_length=4,
     num_numbers=6,
     max_turns=20,
     duplicate_numbers=False,
 )
 register(
-    "ta:Mastermind-v0-hard",
-    "gem.envs.textarena.mastermind:MastermindEnv",
+    "game:Mastermind-v0-hard",
+    "gem.envs.game_env.mastermind:MastermindEnv",
     code_length=4,
     num_numbers=8,
     max_turns=30,
     duplicate_numbers=False,
 )
 register(
-    "ta:Mastermind-v0-random",
-    "gem.envs.textarena.mastermind:MastermindEnv",
+    "game:Mastermind-v0-random",
+    "gem.envs.game_env.mastermind:MastermindEnv",
     code_length=None,
     num_numbers=None,
     max_turns=50,
     duplicate_numbers=False,
 )
 register(
-    "ta:Mastermind-v0-easy",
-    "gem.envs.textarena.mastermind:MastermindEnv",
+    "game:Mastermind-v0-easy",
+    "gem.envs.game_env.mastermind:MastermindEnv",
     code_length=2,
     num_numbers=6,
     max_turns=6,
@@ -74,40 +74,40 @@ register(
 )
 # Minesweeper
 register(
-    "ta:Minesweeper-v0",
-    "gem.envs.textarena.minesweeper:MinesweeperEnv",
+    "game:Minesweeper-v0",
+    "gem.envs.game_env.minesweeper:MinesweeperEnv",
     rows=8,
     cols=8,
     num_mines=10,
     max_turns=100,
 )
 register(
-    "ta:Minesweeper-v0-veryeasy",
-    "gem.envs.textarena.minesweeper:MinesweeperEnv",
+    "game:Minesweeper-v0-very-easy",
+    "gem.envs.game_env.minesweeper:MinesweeperEnv",
     rows=3,
     cols=3,
     num_mines=1,
     max_turns=10,
 )
 register(
-    "ta:Minesweeper-v0-easy",
-    "gem.envs.textarena.minesweeper:MinesweeperEnv",
+    "game:Minesweeper-v0-easy",
+    "gem.envs.game_env.minesweeper:MinesweeperEnv",
     rows=5,
     cols=5,
     num_mines=3,
     max_turns=10,
 )
 register(
-    "ta:Minesweeper-v0-hard",
-    "gem.envs.textarena.minesweeper:MinesweeperEnv",
+    "game:Minesweeper-v0-hard",
+    "gem.envs.game_env.minesweeper:MinesweeperEnv",
     rows=12,
     cols=12,
     num_mines=30,
     max_turns=100,
 )
 register(
-    "ta:Minesweeper-v0-random",
-    "gem.envs.textarena.minesweeper:MinesweeperEnv",
+    "game:Minesweeper-v0-random",
+    "gem.envs.game_env.minesweeper:MinesweeperEnv",
     rows=None,
     cols=None,
     num_mines=None,
@@ -115,96 +115,96 @@ register(
 )
 # Wordle
 register(
-    "ta:Wordle-v0",
-    "gem.envs.textarena.wordle:WordleEnv",
+    "game:Wordle-v0",
+    "gem.envs.game_env.wordle:WordleEnv",
     word_length=5,
     only_real_words=True,
     max_turns=15,
 )
 register(
-    "ta:Wordle-v0-easy",
-    "gem.envs.textarena.wordle:WordleEnv",
+    "game:Wordle-v0-easy",
+    "gem.envs.game_env.wordle:WordleEnv",
     word_length=3,
     only_real_words=True,
     max_turns=15,
 )
 register(
-    "ta:FifteenPuzzle-v0",
-    "gem.envs.textarena.fifteen_puzzle:FifteenPuzzleEnv",
+    "game:FifteenPuzzle-v0",
+    "gem.envs.game_env.fifteen_puzzle:FifteenPuzzleEnv",
     num_rows=3,
     max_turns=20,
 )
 register(
-    "ta:FifteenPuzzle-v0-easy",
-    "gem.envs.textarena.fifteen_puzzle:FifteenPuzzleEnv",
+    "game:FifteenPuzzle-v0-easy",
+    "gem.envs.game_env.fifteen_puzzle:FifteenPuzzleEnv",
     num_rows=2,
     max_turns=10,
 )
 register(
-    "ta:FifteenPuzzle-v0-hard",
-    "gem.envs.textarena.fifteen_puzzle:FifteenPuzzleEnv",
+    "game:FifteenPuzzle-v0-hard",
+    "gem.envs.game_env.fifteen_puzzle:FifteenPuzzleEnv",
     num_rows=4,
     max_turns=50,
 )
 
 register(
-    "ta:Hangman-v0",
-    "gem.envs.textarena.hangman:HangmanEnv",
+    "game:Hangman-v0",
+    "gem.envs.game_env.hangman:HangmanEnv",
     word_length=5,
     hardcore=False,
     max_turns=15,
 )
 register(
-    "ta:Hangman-v0-easy",
-    "gem.envs.textarena.hangman:HangmanEnv",
+    "game:Hangman-v0-easy",
+    "gem.envs.game_env.hangman:HangmanEnv",
     word_length=3,
     hardcore=False,
     max_turns=15,
 )
 register(
-    "ta:Hangman-v0-hard",
-    "gem.envs.textarena.hangman:HangmanEnv",
+    "game:Hangman-v0-hard",
+    "gem.envs.game_env.hangman:HangmanEnv",
     word_length=7,
     hardcore=False,
     max_turns=20,
 )
 register(
-    "ta:Sudoku-v0-easy",
-    "gem.envs.textarena.sudoku:SudokuEnv",
+    "game:Sudoku-v0-easy",
+    "gem.envs.game_env.sudoku:SudokuEnv",
     clues=10,
     max_turns=15,
     scale=4,
 )
 register(
-    "ta:Sudoku-v0-easy-v2",
-    "gem.envs.textarena.sudoku:SudokuEnv",
+    "game:Sudoku-v0-easy-v2",
+    "gem.envs.game_env.sudoku:SudokuEnv",
     clues=10,
     max_turns=15,
     scale=4,
     invalid_action_reward_type="v2",
 )
 register(
-    "ta:Sudoku-v0",
-    "gem.envs.textarena.sudoku:SudokuEnv",
+    "game:Sudoku-v0",
+    "gem.envs.game_env.sudoku:SudokuEnv",
     clues=50,
     max_turns=50,
     scale=9,
 )
 register(
-    "ta:TowerofHanoi-v0-easy",
-    "gem.envs.textarena.tower_of_hanoi:TowerofHanoiEnv",
+    "game:TowerofHanoi-v0-easy",
+    "gem.envs.game_env.tower_of_hanoi:TowerofHanoiEnv",
     num_disks=3,
     max_turns=10,
 )
 register(
-    "ta:TowerofHanoi-v0",
-    "gem.envs.textarena.tower_of_hanoi:TowerofHanoiEnv",
+    "game:TowerofHanoi-v0",
+    "gem.envs.game_env.tower_of_hanoi:TowerofHanoiEnv",
     num_disks=4,
     max_turns=20,
 )
 register(
-    "ta:TowerofHanoi-v0-hard",
-    "gem.envs.textarena.tower_of_hanoi:TowerofHanoiEnv",
+    "game:TowerofHanoi-v0-hard",
+    "gem.envs.game_env.tower_of_hanoi:TowerofHanoiEnv",
     num_disks=5,
     max_turns=50,
 )

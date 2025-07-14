@@ -8,7 +8,7 @@ import nltk
 from nltk.corpus import words
 
 from gem.core import Env
-from gem.utils.constants import TextArenaGameReward
+from gem.utils.constants import LanguageGameReward
 
 
 class HangmanEnv(Env):
@@ -75,7 +75,7 @@ class HangmanEnv(Env):
             terminate_obs = "You did not provide a valid guess."
             return (
                 terminate_obs,
-                TextArenaGameReward.format_error_reward,
+                LanguageGameReward.format_error_reward,
                 True,
                 self.turn_count == self.max_turns,
                 {"suffix": self.get_task_suffix()},
@@ -85,18 +85,18 @@ class HangmanEnv(Env):
                 next_obs = f"Congratulations! You guessed the word '{self.secret_word}' correctly!"
                 # reveal the other letters in the board to compute the reward
                 _r = sum(1 if d == "_" else 0 for d in self.board) / len(self.board)
-                reward = _r * 0.5 + TextArenaGameReward.success_reward * 0.5
+                reward = _r * 0.5 + LanguageGameReward.success_reward * 0.5
                 return next_obs, reward, True, False, {"suffix": self.get_task_suffix()}
             elif len(self.secret_word) != len(player_guess):
                 next_obs = f"At turn {self.turn_count}, You guessed '{player_guess}' which is of length {len(player_guess)}, but the secret word is of length {len(self.secret_word)}."
-                reward = TextArenaGameReward.invalid_action_reward
+                reward = LanguageGameReward.invalid_action_reward
             else:
                 next_obs = f"At turn {self.turn_count}, You guessed '{player_guess}' which is incorrect."
-                reward = TextArenaGameReward.internal_step_reward
+                reward = LanguageGameReward.internal_step_reward
         else:  # if player guesses a single letter
             if player_guess in self.guessed_letters:
                 next_obs = f"At turn {self.turn_count}, you guessed '{player_guess}', which has been already guessed before."
-                reward = TextArenaGameReward.invalid_action_reward
+                reward = LanguageGameReward.invalid_action_reward
             elif player_guess in self.secret_word:
                 self.guessed_letters.add(player_guess)
                 num_revealed = self._reveal_letter(player_guess)
@@ -105,7 +105,7 @@ class HangmanEnv(Env):
             else:
                 self.guessed_letters.add(player_guess)
                 next_obs = f"At turn {self.turn_count}, you guessed a letter '{player_guess}' that is not in the secret word."
-                reward = TextArenaGameReward.internal_step_reward
+                reward = LanguageGameReward.internal_step_reward
 
         if self.turn_count >= self.max_turns:
             terminate_obs = "You have reached the maximum number of turns."

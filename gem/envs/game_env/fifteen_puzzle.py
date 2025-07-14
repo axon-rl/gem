@@ -5,7 +5,7 @@ import re
 from typing import Any, Dict, List, Optional, Tuple
 
 from gem.core import Env
-from gem.utils.constants import TextArenaGameReward
+from gem.utils.constants import LanguageGameReward
 
 
 class FifteenPuzzleEnv(Env):
@@ -61,7 +61,7 @@ class FifteenPuzzleEnv(Env):
             )
             return (
                 terminate_obs,
-                TextArenaGameReward.format_error_reward,
+                LanguageGameReward.format_error_reward,
                 True,
                 self.turn_count == self.max_turns,
                 {"suffix": self.get_task_suffix()},
@@ -70,11 +70,11 @@ class FifteenPuzzleEnv(Env):
             is_valid_move = self._move(player_guess)
             if not is_valid_move:  # invalid action
                 next_obs = f"At turn {self.turn_count}, you chose a move {player_guess} that is outside the bounds of the board."
-                reward = TextArenaGameReward.invalid_action_reward
+                reward = LanguageGameReward.invalid_action_reward
             else:
                 if self._is_solved():
                     terminate_obs = "Congratulations! You have solved the puzzle!"
-                    reward = TextArenaGameReward.success_reward
+                    reward = LanguageGameReward.success_reward
                     return (
                         terminate_obs,
                         reward,
@@ -84,7 +84,7 @@ class FifteenPuzzleEnv(Env):
                     )
                 else:
                     next_obs = f"At turn {self.turn_count}, you made a valid move: {player_guess}.\n"
-                    reward = TextArenaGameReward.internal_step_reward
+                    reward = LanguageGameReward.internal_step_reward
 
         if self.turn_count >= self.max_turns:
             terminate_obs = "You have reached the maximum number of turns."

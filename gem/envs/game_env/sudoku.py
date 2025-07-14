@@ -6,7 +6,7 @@ import re
 from typing import Any, List, Optional, Tuple
 
 from gem.core import Env
-from gem.utils.constants import TextArenaGameReward
+from gem.utils.constants import LanguageGameReward
 
 
 class SudokuEnv(Env):
@@ -73,7 +73,7 @@ class SudokuEnv(Env):
             terminate_obs = "You did not provide a valid guess."
             return (
                 terminate_obs,
-                TextArenaGameReward.format_error_reward,
+                LanguageGameReward.format_error_reward,
                 True,
                 self.turn_count == self.max_turns,
                 {"suffix": self.get_task_suffix()},
@@ -85,12 +85,12 @@ class SudokuEnv(Env):
             and 1 <= guess_num <= self.scale
         ):
             next_obs = f"At turn {self.turn_count}, you tried to place {guess_num} at R{row} C{col}, which is out of bounds."
-            reward = TextArenaGameReward.invalid_action_reward
+            reward = LanguageGameReward.invalid_action_reward
         else:  # valid action
             row_idx, col_idx = row - 1, col - 1
             if self.board[row_idx][col_idx] != 0:
                 next_obs = f"At turn {self.turn_count}, you tried to place {guess_num} at R{row} C{col}, which is already filled. You cannot overwrite pre-filled cells."
-                reward = TextArenaGameReward.invalid_action_reward
+                reward = LanguageGameReward.invalid_action_reward
             elif self._is_move_correct(row_idx, col_idx, guess_num):
                 self.board[row_idx][col_idx] = guess_num
                 next_obs = f"At turn {self.turn_count}, you placed {guess_num} at R{row} C{col}, which is correct."
@@ -108,7 +108,7 @@ class SudokuEnv(Env):
                     )
             else:
                 next_obs = f"At turn {self.turn_count}, you tried to place {guess_num} at R{row} C{col}, which violates Sudoku rules."
-                reward = TextArenaGameReward.invalid_action_reward
+                reward = LanguageGameReward.invalid_action_reward
         if self.turn_count >= self.max_turns:
             terminate_obs = "You have reached the maximum number of turns."
             return terminate_obs, reward, True, True, {"suffix": self.get_task_suffix()}

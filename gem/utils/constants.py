@@ -1,7 +1,7 @@
 TERMINAL_STATE = "<｜TERMINAL_STATE｜>"
 
 
-class TextArenaGameReward:
+class LanguageGameReward:
     # the reward for successfully completing the task
     success_reward: float = 1.0
     # the reward for a step that does not end the game, e.g. a hint in Guess the Number

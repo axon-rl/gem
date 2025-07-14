@@ -5,7 +5,7 @@ import re
 from typing import Any, List, Optional, Tuple
 
 from gem.core import Env
-from gem.utils.constants import TextArenaGameReward
+from gem.utils.constants import LanguageGameReward
 
 
 class MastermindEnv(Env):
@@ -66,7 +66,7 @@ class MastermindEnv(Env):
 
         if not player_guess:
             next_obs = f"At turn {self.turn_count}, you did not provide a valid guess."
-            reward = TextArenaGameReward.format_error_reward
+            reward = LanguageGameReward.format_error_reward
             return (
                 next_obs,
                 reward,
@@ -76,13 +76,13 @@ class MastermindEnv(Env):
             )
         elif not len(player_guess) == self.code_length:  # invalid action
             next_obs = f"At turn {self.turn_count}, you guessed {player_guess} which has {len(player_guess)} entries but the code has length {self.code_length}."
-            reward = TextArenaGameReward.invalid_action_reward
+            reward = LanguageGameReward.invalid_action_reward
         elif any(num < 1 or num > self.num_numbers for num in player_guess):
             next_obs = f"At turn {self.turn_count}, you guessed {player_guess}, which has numbers outside the range 1 to {self.num_numbers}."
-            reward = TextArenaGameReward.invalid_action_reward
+            reward = LanguageGameReward.invalid_action_reward
         elif tuple(player_guess) in self.previous_guesses:
             next_obs = f"At turn {self.turn_count}, you guessed {player_guess}, which has been already guessed before."
-            reward = TextArenaGameReward.invalid_action_reward
+            reward = LanguageGameReward.invalid_action_reward
         else:
             self.previous_guesses.add(tuple(player_guess))
             black_pegs, white_pegs = self._evaluate_guess(player_guess)
