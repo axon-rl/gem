@@ -5,7 +5,7 @@ import re
 from typing import Any, List, Optional, Tuple
 
 from gem.core import Env
-from gem.utils.constants import TERMINAL_STATE, TextArenaGameReward
+from gem.utils.constants import TextArenaGameReward
 
 
 class MastermindEnv(Env):

@@ -236,6 +236,14 @@ register(
 )
 
 register(
+    "math:Math8K-3to5",
+    "gem.envs.math_env:MathEnv",
+    dataset_name="axon-rl/MATH-lvl3to5-8k",
+    question_key="problem",
+    answer_key="answer",
+)
+
+register(
     "math:Orz57K",
     "gem.envs.math_env:MathEnv",
     dataset_name="axon-rl/ORZ-57k",

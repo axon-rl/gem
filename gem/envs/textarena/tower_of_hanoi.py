@@ -1,10 +1,8 @@
-import copy
-import random
 import re
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, Optional, Tuple
 
 from gem.core import Env
-from gem.utils.constants import TERMINAL_STATE, TextArenaGameReward
+from gem.utils.constants import TextArenaGameReward
 
 
 class TowerofHanoiEnv(Env):

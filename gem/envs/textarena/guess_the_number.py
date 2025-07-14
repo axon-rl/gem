@@ -6,8 +6,7 @@ import re
 from typing import Any, Optional, Tuple
 
 from gem.core import Env
-from gem.utils.constants import TERMINAL_STATE, TextArenaGameReward
-from gem.utils.parsing import extract_last_boxed_answer
+from gem.utils.constants import TextArenaGameReward
 
 
 class GuessTheNumberEnv(Env):

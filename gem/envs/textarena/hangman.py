@@ -2,13 +2,13 @@
 
 import random
 import re
-from typing import Any, Dict, List, Optional, Text, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple
 
 import nltk
 from nltk.corpus import words
 
 from gem.core import Env
-from gem.utils.constants import TERMINAL_STATE, TextArenaGameReward
+from gem.utils.constants import TextArenaGameReward
 
 
 class HangmanEnv(Env):

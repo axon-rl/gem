@@ -6,7 +6,7 @@ from collections import deque
 from typing import Any, Optional, Tuple
 
 from gem.core import Env
-from gem.utils.constants import TERMINAL_STATE, TextArenaGameReward
+from gem.utils.constants import TextArenaGameReward
 
 
 class MinesweeperEnv(Env):
