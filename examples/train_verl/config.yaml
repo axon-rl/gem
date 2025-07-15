@@ -15,6 +15,19 @@ actor_rollout_ref:
     wrappers: concat_chat
     num_env: 2
     async_env: True
+  keep_generation_failed: True
+  dump_experience_every: -1
+  prompt_template: na
+  apply_chat_template: False
+  gamma: 1.0
+  rollout:
+    response_length: 4096
+    max_model_len: 12800
+    enable_chunked_prefill: False
+    gpu_memory_utilization: 0.8
+    rollout_batch_size_per_device: 16
+  actor:
+    loss_agg_mode: token-mean
 
 trainer:
   project_name: verl-gem

@@ -5,9 +5,17 @@ This file is largely borrowed from verl/trainer/main_ppo.py, with
 critical modifications labeled with "[GEM Notes]" (Ctrl+F to navigate).
 """
 
+import json
+import logging
 import os
+import re
 import socket
+import time
+import uuid
+from copy import deepcopy
+from dataclasses import dataclass
 from pprint import pprint
+from typing import List, Sequence, Tuple
 
 import hydra
 import numpy as np
@@ -16,7 +24,9 @@ import torch
 import torch.distributed as dist
 import torch.utils
 import torch.utils.data
+import tree
 from omegaconf import OmegaConf
+from tensordict import TensorDict
 from tqdm import tqdm
 from verl import DataProto
 from verl.experimental.dataset.sampler import AbstractCurriculumSampler
@@ -32,20 +42,24 @@ from verl.trainer.ppo.metric_utils import (compute_data_metrics,
 from verl.trainer.ppo.ray_trainer import (Dataset, RayPPOTrainer,
                                           ResourcePoolManager, Role,
                                           compute_response_mask)
-from verl.trainer.ppo.reward import (compute_reward, compute_reward_async,
-                                     load_reward_manager)
 from verl.utils.checkpoint.checkpoint_manager import should_save_ckpt_esi
 from verl.utils.debug import marked_timer
-from verl.utils.device import is_cuda_available
+from verl.utils.device import get_device_id, is_cuda_available
 from verl.utils.metric import reduce_metrics
-from verl.utils.profiler import DistProfiler
+from verl.utils.model import compute_position_id_with_mask
+from verl.utils.profiler import (DistProfiler, log_gpu_memory_usage,
+                                 simple_timer)
+from verl.utils.profiler.performance import reduce_timing
 from verl.utils.tracking import ValidationGenerationsLogger
 from verl.workers.fsdp_workers import ActorRolloutRefWorker
 
 import gem
+from gem.utils.parsing import extract_last_boxed_answer
 from gem.wrappers.wrapper_factory import get_wrapper_fns
 
 WorkerType = type[Worker]
+
+logger = logging.getLogger(__file__)
 
 
 @hydra.main(config_path="./", config_name="config", version_base=None)
@@ -100,12 +114,84 @@ def run_ppo(config) -> None:
         ray.timeline(filename=timeline_json_file)
 
 
+# Invalid action to be sent to the env to trigger format error penalty.
+INVALID_ACTION = "<｜INVALID_ACTION｜>"
+
+
+def apply_qwen3_game_template(observation: str) -> str:
+    return (
+        f"<|im_start|>user\nYou are playing language games. Make valid actions to win.\nObservation: {observation}"
+        "\nPlease reason step by step, and put your final answer within \\boxed{}.<|im_end|>\n"
+        "<|im_start|>assistant\n"
+    )
+
+
+def apply_no_template(observation: str) -> str:
+    return observation
+
+
+def apply_qwen3_general_template(question: str) -> str:
+    return (
+        f"<|im_start|>user\nQuestion: {question}"
+        "\nPlease reason step by step, and put your final answer within \\boxed{}.<|im_end|>\n"
+        "<|im_start|>assistant\n"
+    )
+
+
+def apply_code_template(question: str) -> str:
+    return (
+        "You are an expert Python programmer. "
+        "You will be given a question (problem specification) and will generate a correct "
+        "Python program that matches the specification and passes all tests."
+        f"\nQuestion: {question}"
+        "\nPlease reason step by step, and write your code in markdown format, e.g., ```python\n# YOUR CODE HERE\n```."
+    )
+
+
+TEMPLATE_FACTORY = {
+    "qwen3_game": apply_qwen3_game_template,
+    "na": apply_no_template,
+    "qwen3_general": apply_qwen3_general_template,
+    "code": apply_code_template,
+}
+
+
+@dataclass
+class Transition:
+    obs: str
+    action: str
+    reward: float
+    done: bool
+
+    prompt: str
+    prompt_ids: list
+    response: str
+    response_ids: list
+
+    attention_mask: list
+    position_ids: list
+
+    response_is_truncated: bool
+    action_is_formatted: bool
+
+    def format(self):
+        return {
+            "obs": self.obs,
+            "action": self.action,
+            "reward": self.reward,
+            "done": int(self.done),
+            "prompt": self.prompt,
+            "response": self.response,
+        }
+
+
 class GEMActorRolloutRefWorker(ActorRolloutRefWorker):
     @register(dispatch_mode=Dispatch.ONE_TO_ALL)
     def init_model(self):
         super().init_model()
-        actor_id = dist.get_rank()
-        seed = 233 ** (actor_id + 1)
+        self.actor_id = dist.get_rank()
+        self.step_count = 0
+        seed = 233 ** (self.actor_id + 1)
         # [GEM Notes] Init environment.
         # [GEM Notes] Get environment wrappers.
         wrappers = get_wrapper_fns(self.config.env.wrappers, tokenizer=self.tokenizer)
@@ -121,7 +207,372 @@ class GEMActorRolloutRefWorker(ActorRolloutRefWorker):
     @register(dispatch_mode=Dispatch.DP_COMPUTE_PROTO)
     @DistProfiler.annotate(color="red", role="rollout_generate")
     def generate_sequences(self, prompts):
-        print("sajoifjhoei")
+        """
+        [GEM Notes] This method is heavily modified to generate experiences
+        for learning by making the agent interact with GEM environments.
+        """
+        generate_st = time.time()
+        assert self._is_rollout
+
+        # The provided parameters are ignored since we generate prompts from the environment
+        del prompts
+        print(
+            f"Actor-{self.actor_id} starting to collect experiences at step {self.step_count}"
+        )
+
+        # Play multiple episodes to generate transitions (trajectories in language MDP)
+        all_trajectories = []
+
+        finished_episodes, collection_info = self.collect_experience(
+            self.env, self.config.rollout.rollout_batch_size_per_device
+        )
+        for ep in finished_episodes:
+            all_trajectories.extend(self.prepare_trajectories(ep))
+
+        ids = []
+        attention_mask = []
+        position_ids = []
+        responses = []
+        adv = []
+        for transition in all_trajectories:
+            ids.append(transition["prompt_ids"] + transition["response_ids"])
+            attention_mask.append(transition["attention_mask"])
+            position_ids.append(transition["position_ids"])
+            responses.append(transition["response_ids"])
+            adv.append(transition["adv"])
+        batch = TensorDict(
+            {
+                "input_ids": torch.tensor(ids),
+                "responses": torch.tensor(responses),
+                "attention_mask": torch.tensor(attention_mask),
+                "position_ids": torch.tensor(position_ids),
+                "advantages": torch.tensor(adv)[:, None],
+            },
+            batch_size=len(ids),
+        )
+        out = DataProto(batch=batch)
+        out.meta_info["timing"] = {"actor_time": time.time() - generate_st}
+        return out
+
+    def collect_experience(self, env, min_steps: int):
+        obs, _ = env.reset()
+        done = False
+        episodes = [[] for _ in range(env.num_envs)]
+        finished_episodes = []
+        finished_episodes_tool_uses = []
+        finished_episodes_tool_success = []
+        num_generation_failed = 0
+        while True:
+            action, extra = self.agent_act(obs)  # type: ignore
+            next_obs, reward, terminated, truncated, info = env.step(action)
+            done = terminated | truncated
+
+            for i in range(env.num_envs):
+                if extra[i]["generation_failed"]:
+                    num_generation_failed += 1
+                    if self.config.keep_generation_failed:
+                        episodes[i][-1].reward += reward[i]
+                        episodes[i][-1].done = True
+                        finished_episodes.append(deepcopy(episodes[i]))
+                        finished_episodes_tool_uses.append(
+                            info[i].get("prev_ep_tool_use_counter", 0)
+                            if done[i]
+                            else info[i].get("tool_use_counter", 0)
+                        )
+                        finished_episodes_tool_success.append(
+                            info[i].get("prev_ep_tool_success_counter", 0)
+                            if done[i]
+                            else info[i].get("tool_success_counter", 0)
+                        )
+                    episodes[i].clear()
+                    if not done[i]:
+                        next_obs[i] = env.envs[i].reset()[0]
+                else:
+                    transition = Transition(
+                        obs=obs[i],
+                        action=action[i],
+                        reward=reward[i],
+                        done=done[i],
+                        prompt=extra[i]["formatted_observation"],
+                        prompt_ids=extra[i]["prompt_ids"],
+                        response=extra[i]["response"],
+                        response_ids=extra[i]["response_ids"],
+                        attention_mask=extra[i]["attention_mask"],
+                        position_ids=extra[i]["position_ids"],
+                        response_is_truncated=extra[i]["response_is_truncated"],
+                        action_is_formatted=extra[i]["action_is_formatted"],
+                    )
+                    episodes[i].append(transition)
+                    if done[i]:
+                        finished_episodes.append(deepcopy(episodes[i]))
+                        finished_episodes_tool_uses.append(
+                            info[i].get("prev_ep_tool_use_counter", 0)
+                        )
+                        finished_episodes_tool_success.append(
+                            info[i].get("prev_ep_tool_success_counter", 0)
+                        )
+                        episodes[i].clear()
+
+            obs = next_obs
+            if len(tree.flatten(finished_episodes)) >= min_steps:
+                break
+
+        info = {
+            "actor/num_generation_failed": num_generation_failed,
+            "actor/prop_generation_failed": (
+                num_generation_failed / len(finished_episodes)
+                if self.config.keep_generation_failed
+                else num_generation_failed
+                / (len(finished_episodes) + num_generation_failed)
+            ),
+            "actor/num_tool_uses": np.mean(finished_episodes_tool_uses),
+            "actor/num_tool_success": np.mean(finished_episodes_tool_success),
+        }
+        if (
+            self.config.dump_experience_every > 0
+            and self.step_count % self.config.dump_experience_every == 0
+        ):
+            _to_dump = {}
+            for i, ep in enumerate(finished_episodes):
+                key = f"episode{i}"
+                _to_dump[key] = []
+                for transition in ep:
+                    _to_dump[key].append(transition.format())
+            with open(
+                os.path.join(
+                    self.game_state_save_path,
+                    f"actor{self.actor_id}_step{self.step_count}.json",
+                ),
+                "w",
+            ) as f:
+                json.dump(
+                    _to_dump,
+                    f,
+                    indent=4,
+                )
+        return finished_episodes, info
+
+    def agent_act(self, vec_observation: List[str]) -> Tuple[str, dict]:
+        """Use the current LLM as a policy to act.
+
+        Args:
+            vec_observation: Vectorized observation from TextArena environment.
+
+        Returns:
+            Tuple[str, dict]: Action and extra data.
+
+        """
+        formatted_observations = []
+        for observation in vec_observation:
+            observation = TEMPLATE_FACTORY[self.config.prompt_template](observation)
+            if self.config.apply_chat_template:
+                observation = self.tokenizer.apply_chat_template(
+                    [{"role": "user", "content": observation}],
+                    tokenize=False,
+                    add_generation_prompt=True,
+                )
+            formatted_observations.append(observation)
+
+        # Subsample to remove observations that exceed max model length
+        idss = self.tokenizer(formatted_observations).input_ids
+        exceeds_lengths = [
+            len(ids) >= self.config.rollout.max_model_len for ids in idss
+        ]
+        sub_formatted_observations = [
+            o for o, e in zip(formatted_observations, exceeds_lengths) if not e
+        ]
+
+        outs = self.tokenizer(
+            sub_formatted_observations,
+            return_tensors="pt",
+            add_special_tokens=False,
+            padding=True,
+            padding_side="left",
+        )
+        outs["position_ids"] = compute_position_id_with_mask(outs.attention_mask)
+        batch: DataProto = DataProto.from_single_dict(outs)
+
+        prompts = batch.pop(
+            batch_keys=["input_ids", "attention_mask", "position_ids"],
+            non_tensor_batch_keys=[],
+        )
+
+        # Move to device & Generate
+        prompts = prompts.to(get_device_id())
+        meta_info = {
+            "eos_token_id": (
+                self.generation_config.eos_token_id
+                if self.generation_config is not None
+                else self.tokenizer.eos_token_id
+            ),
+            "pad_token_id": (
+                self.generation_config.pad_token_id
+                if self.generation_config is not None
+                else self.tokenizer.pad_token_id
+            ),
+        }
+        prompts.meta_info.update(meta_info)
+        timing_generate = {}
+        with self.rollout_sharding_manager:
+            log_gpu_memory_usage(
+                "After entering rollout sharding manager", logger=logger
+            )
+
+            prompts = self.rollout_sharding_manager.preprocess_data(prompts)
+            with simple_timer("generate_sequences", timing_generate):
+                output = self.rollout.generate_sequences(prompts=prompts)
+
+            log_gpu_memory_usage("After rollout generation", logger=logger)
+
+            output = self.rollout_sharding_manager.postprocess_data(output)
+
+        timing_generate.update(self.rollout_sharding_manager.timing)
+        # We calculate the average timing across all ranks
+        # to make sure meta_info["timing"] is the same
+        timing_generate = reduce_timing(timing_generate)
+        output.meta_info["timing"] = timing_generate
+        output = output.to("cpu")
+
+        # Debugging purpose:
+        print(
+            self.tokenizer.decode(
+                output.batch["input_ids"][0].tolist(), skip_special_tokens=True
+            )
+        )
+        executable_actions = []
+        extras = []
+        sub_i = 0
+
+        for i, exceeds_length in enumerate(exceeds_lengths):
+            if exceeds_length:
+                # if prompt exceeds max model length we skipped the generation
+                executable_actions.append(INVALID_ACTION)
+                extras.append({"generation_failed": True})
+            else:
+                token_ids = output.batch["responses"][sub_i].tolist()
+                prompt_token_ids = output.batch["prompts"][sub_i].tolist()
+                attention_mask = output.batch["attention_mask"][sub_i].tolist()
+                position_ids = output.batch["position_ids"][sub_i].tolist()
+                raw_action = self.tokenizer.decode(token_ids, skip_special_tokens=True)
+                response_is_truncated = self.tokenizer.eos_token_id not in token_ids
+
+                # Valid extraction = proper eos + proper format
+                # Only used for metric logging
+                extracted_action = (
+                    INVALID_ACTION
+                    if response_is_truncated
+                    else self.extract_action(raw_action)
+                )
+                executable_actions.append(
+                    INVALID_ACTION if response_is_truncated else raw_action
+                )
+                extras.append(
+                    {
+                        "formatted_observation": formatted_observations[i],
+                        "prompt_ids": prompt_token_ids,
+                        "response": raw_action,
+                        "response_ids": token_ids,
+                        "attention_mask": attention_mask,
+                        "position_ids": position_ids,
+                        "response_is_truncated": response_is_truncated,
+                        "action_is_formatted": extracted_action != INVALID_ACTION,
+                        "generation_failed": False,
+                        "generation_max_length_reached": (
+                            len(prompt_token_ids) + len(token_ids)
+                            >= self.config.rollout.max_model_len
+                        ),
+                    }
+                )
+                sub_i += 1
+        return executable_actions, extras  # type: ignore
+
+    def extract_action(self, text: str) -> str:
+        """
+        Extract and format the actual action from the model's output.
+
+        This method handles different template formats and ensures the action
+        is properly formatted for the environment.
+
+        Args:
+            text: Raw text output from the model
+
+        Returns:
+            Cleaned and formatted action string ready for the environment
+        """
+        if not text:
+            return ""  # Handle empty text case
+
+        try:
+            formatted_action = None
+            if self.config.prompt_template in ["qwen3_game", "qwen3_general"] or (
+                self.config.prompt_template == "no"
+                and "qwen" in self.config.model.path.lower()
+            ):
+                formatted_action = extract_last_boxed_answer(text)
+                if formatted_action is None:
+                    formatted_action = text.strip()
+            elif self.config.prompt_template == "code":
+                code_blocks = re.findall(r"```(?:\w+)?\n(.*?)```", text, re.DOTALL)
+                if not code_blocks:
+                    formatted_action = None
+                else:
+                    formatted_action = code_blocks[-1].strip()
+            else:
+                raise NotImplementedError
+
+            if formatted_action is None:
+                formatted_action = INVALID_ACTION
+
+            return formatted_action
+
+        except Exception as e:
+            logging.error(f"Error in extract_action: {e}")
+            # Return invalid action if extraction fails.
+            return INVALID_ACTION
+
+    def prepare_trajectories(self, episode: Sequence[Transition]) -> List[dict]:
+        """
+        Prepare language trajectories (transitions of episode).
+
+        Args:
+            episode: A complete episode of the agent environment interaction.
+
+        Returns:
+            List of trajectory data
+        """
+        trajectory_data = []
+        rewards = [t.reward for t in episode]
+
+        # Compute returns
+        returns = np.zeros_like(rewards, dtype=np.float32)
+        cur = 0.0
+        for i in reversed(range(len(rewards))):
+            cur = rewards[i] + self.config.gamma * cur
+            returns[i] = cur
+
+        # Distribute turn-based returns to token-level returns
+        for i, step_data in enumerate(episode):
+            # Add trajectory data
+            trajectory_data.append(
+                dict(
+                    prompt=step_data.prompt,
+                    prompt_ids=step_data.prompt_ids,
+                    response=step_data.response,
+                    response_ids=step_data.response_ids,
+                    attention_mask=step_data.attention_mask,
+                    position_ids=step_data.position_ids,
+                    adv=returns[i],
+                    info={
+                        "actor/action_is_formatted": step_data.action_is_formatted,
+                        "actor/step_reward": rewards[i],
+                        "actor/discount_factor": self.config.gamma,
+                        "actor/discounted_step_return": returns[i],
+                        "actor/response_is_truncated": step_data.response_is_truncated,
+                    },
+                )
+            )
+
+        return trajectory_data
 
 
 class DummyPromptDataset(Dataset):
@@ -287,12 +738,11 @@ class ReinforceGEMTrainer(RayPPOTrainer):
                         timing_raw.update(gen_batch_output.meta_info["timing"])
                         gen_batch_output.meta_info.pop("timing", None)
 
-                    # batch.non_tensor_batch["uid"] = np.array(
-                    #     [str(uuid.uuid4()) for _ in range(len(batch.batch))], dtype=object
-                    # )
-                    # # repeat to align with repeated responses in rollout
-                    # batch = batch.repeat(repeat_times=self.config.actor_rollout_ref.rollout.n, interleave=True)
-                    # batch = batch.union(gen_batch_output)
+                    gen_batch_output.non_tensor_batch["uid"] = np.array(
+                        [str(uuid.uuid4()) for _ in range(len(gen_batch_output.batch))],
+                        dtype=object,
+                    )
+                    batch = gen_batch_output
 
                     if "response_mask" not in batch.batch.keys():
                         batch.batch["response_mask"] = compute_response_mask(batch)
@@ -301,28 +751,30 @@ class ReinforceGEMTrainer(RayPPOTrainer):
                     # which won't affect the advantage calculation (since it's based on uid),
                     # but might affect the loss calculation (due to the change of mini-batching).
                     # TODO: Decouple the DP balancing and mini-batching.
-                    # if self.config.trainer.balance_batch:
-                    #     self._balance_batch(batch, metrics=metrics)
+                    if self.config.trainer.balance_batch:
+                        self._balance_batch(batch, metrics=metrics)
 
                     # compute global_valid tokens
                     batch.meta_info["global_token_num"] = torch.sum(
                         batch.batch["attention_mask"], dim=-1
                     ).tolist()
 
-                    with marked_timer("reward", timing_raw, color="yellow"):
-                        # compute reward model score
-                        if self.use_rm:
-                            reward_tensor = self.rm_wg.compute_rm_score(batch)
-                            batch = batch.union(reward_tensor)
+                    # [GEM Notes] We do not compute reward here because the GEM envs
+                    # [GEM Notes] return rewards by design!
+                    # with marked_timer("reward", timing_raw, color="yellow"):
+                    #     # compute reward model score
+                    #     if self.use_rm:
+                    #         reward_tensor = self.rm_wg.compute_rm_score(batch)
+                    #         batch = batch.union(reward_tensor)
 
-                        if self.config.reward_model.launch_reward_fn_async:
-                            future_reward = compute_reward_async.remote(
-                                batch, self.config, self.tokenizer
-                            )
-                        else:
-                            reward_tensor, reward_extra_infos_dict = compute_reward(
-                                batch, self.reward_fn
-                            )
+                    #     if self.config.reward_model.launch_reward_fn_async:
+                    #         future_reward = compute_reward_async.remote(
+                    #             batch, self.config, self.tokenizer
+                    #         )
+                    #     else:
+                    #         reward_tensor, reward_extra_infos_dict = compute_reward(
+                    #             batch, self.reward_fn
+                    #         )
 
                     # recompute old_log_probs
                     with marked_timer("old_log_prob", timing_raw, color="blue"):
@@ -370,43 +822,10 @@ class ReinforceGEMTrainer(RayPPOTrainer):
                                 }
                             )
 
-                    with marked_timer("adv", timing_raw, color="brown"):
-                        # we combine with rule-based rm
-                        reward_extra_infos_dict: dict[str, list]
-                        if self.config.reward_model.launch_reward_fn_async:
-                            reward_tensor, reward_extra_infos_dict = ray.get(
-                                future_reward
-                            )
-                        batch.batch["token_level_scores"] = reward_tensor
-
-                        if reward_extra_infos_dict:
-                            batch.non_tensor_batch.update(
-                                {
-                                    k: np.array(v)
-                                    for k, v in reward_extra_infos_dict.items()
-                                }
-                            )
-
-                        # compute rewards. apply_kl_penalty if available
-                        batch.batch["token_level_rewards"] = batch.batch[
-                            "token_level_scores"
-                        ]
-
-                        # compute advantages, executed on the driver process
-
-                        norm_adv_by_std_in_grpo = self.config.algorithm.get(
-                            "norm_adv_by_std_in_grpo", True
-                        )  # GRPO adv normalization factor
-
-                        batch = compute_advantage(
-                            batch,
-                            adv_estimator=self.config.algorithm.adv_estimator,
-                            gamma=self.config.algorithm.gamma,
-                            lam=self.config.algorithm.lam,
-                            num_repeat=self.config.actor_rollout_ref.rollout.n,
-                            norm_adv_by_std_in_grpo=norm_adv_by_std_in_grpo,
-                            config=self.config.algorithm,
-                        )
+                    # Metric logging purpose.
+                    batch.batch["token_level_scores"] = batch.batch["advantages"]
+                    batch.batch["token_level_rewards"] = batch.batch["advantages"]
+                    batch.batch["returns"] = batch.batch["advantages"]
 
                     # update critic
                     if self.use_critic:
@@ -443,14 +862,12 @@ class ReinforceGEMTrainer(RayPPOTrainer):
                             outputs = self.tokenizer.batch_decode(
                                 batch.batch["responses"], skip_special_tokens=True
                             )
-                            scores = (
-                                batch.batch["token_level_scores"].sum(-1).cpu().tolist()
-                            )
+                            scores = batch.batch["advantages"].sum(-1).cpu().tolist()
                             self._dump_generations(
                                 inputs=inputs,
                                 outputs=outputs,
                                 scores=scores,
-                                reward_extra_infos_dict=reward_extra_infos_dict,
+                                reward_extra_infos_dict={},
                                 dump_path=rollout_data_dir,
                             )
 
@@ -545,9 +962,9 @@ class ReinforceGEMTrainer(RayPPOTrainer):
 
                 # this is experimental and may be changed/removed in the future
                 # in favor of a general-purpose data buffer pool
-                if hasattr(self.train_dataset, "on_batch_end"):
-                    # The dataset may be changed after each training batch
-                    self.train_dataset.on_batch_end(batch=batch)
+                # if hasattr(self.train_dataset, "on_batch_end"):
+                #     # The dataset may be changed after each training batch
+                #     self.train_dataset.on_batch_end(batch=batch)
 
 
 @ray.remote(num_cpus=1)  # please make sure main_task is not scheduled on head
@@ -654,19 +1071,6 @@ class TaskRunner:
             role_worker_mapping[Role.RefPolicy] = ray.remote(ActorRolloutRefWorker)
             mapping[Role.RefPolicy] = global_pool_id
 
-        # Load the reward manager for training and validation.
-        reward_fn = load_reward_manager(
-            config,
-            tokenizer,
-            num_examine=0,
-            **config.reward_model.get("reward_kwargs", {}),
-        )
-        val_reward_fn = load_reward_manager(
-            config,
-            tokenizer,
-            num_examine=1,
-            **config.reward_model.get("reward_kwargs", {}),
-        )
         resource_pool_manager = ResourcePoolManager(
             resource_pool_spec=resource_pool_spec, mapping=mapping
         )
@@ -679,8 +1083,9 @@ class TaskRunner:
             role_worker_mapping=role_worker_mapping,
             resource_pool_manager=resource_pool_manager,
             ray_worker_group_cls=ray_worker_group_cls,
-            reward_fn=reward_fn,
-            val_reward_fn=val_reward_fn,
+            # [GEM Notes] We don't need explicit reward functions.
+            # reward_fn=reward_fn,
+            # val_reward_fn=val_reward_fn,
             device_name=config.trainer.device,
         )
         # Initialize the workers of the trainer.
