@@ -20,14 +20,16 @@ actor_rollout_ref:
   prompt_template: na
   apply_chat_template: False
   gamma: 1.0
+  norm_adv: True
   rollout:
     response_length: 4096
     max_model_len: 12800
     enable_chunked_prefill: False
     gpu_memory_utilization: 0.8
-    rollout_batch_size_per_device: 16
+    rollout_batch_size: 128
   actor:
-    loss_agg_mode: token-mean
+    loss_agg_mode: seq-mean-token-sum-norm # remove length bias like in Dr. GRPO
+    ppo_epochs: 2
 
 trainer:
   project_name: verl-gem
