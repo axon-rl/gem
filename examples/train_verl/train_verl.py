@@ -636,10 +636,11 @@ class ReinforceGEMTrainer(RayPPOTrainer):
         adv = []
         max_prompt_len = max([len(x["prompt_ids"]) for x in all_trajectories])
         for transition in all_trajectories:
-            # Padding prompts to align the length
-            transition["prompt_ids"] = [self.tokenizer.pad_token_id] * (
-                max_prompt_len - len(transition["prompt_ids"])
-            ) + transition["prompt_ids"]
+            # Padding to align the length
+            num_to_pad = max_prompt_len - len(transition["prompt_ids"])
+            transition["prompt_ids"] = [self.tokenizer.pad_token_id] * num_to_pad + transition["prompt_ids"]
+            transition["attention_mask"] = [0] * num_to_pad + transition["attention_mask"]
+            transition["position_ids"] = [0] * num_to_pad + transition["position_ids"]
             ids.append(transition["prompt_ids"] + transition["response_ids"])
             attention_mask.append(transition["attention_mask"])
             position_ids.append(transition["position_ids"])
