@@ -33,3 +33,5 @@ actor_rollout_ref:
 
 trainer:
   project_name: verl-gem
+  save_freq: 999999
+  test_freq: 999999

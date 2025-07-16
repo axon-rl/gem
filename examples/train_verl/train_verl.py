@@ -637,11 +637,9 @@ class ReinforceGEMTrainer(RayPPOTrainer):
         max_prompt_len = max([len(x["prompt_ids"]) for x in all_trajectories])
         for transition in all_trajectories:
             # Padding prompts to align the length
-            transition["prompt_ids"] = (
-                [self.tokenizer.pad_token_id] * max_prompt_len
-                - len(transition["prompt_ids"])
-                + transition["prompt_ids"]
-            )
+            transition["prompt_ids"] = [self.tokenizer.pad_token_id] * (
+                max_prompt_len - len(transition["prompt_ids"])
+            ) + transition["prompt_ids"]
             ids.append(transition["prompt_ids"] + transition["response_ids"])
             attention_mask.append(transition["attention_mask"])
             position_ids.append(transition["position_ids"])
@@ -649,9 +647,6 @@ class ReinforceGEMTrainer(RayPPOTrainer):
             prompts.append(transition["prompt_ids"])
             adv.append(transition["adv"])
 
-        import pdb
-
-        pdb.set_trace()
         batch = TensorDict(
             {
                 "input_ids": torch.tensor(ids),

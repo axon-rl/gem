@@ -12,7 +12,7 @@ then, please patch `LD_LIBRARY_PATH` to avoid dependency errors:
 export LD_LIBRARY_PATH=$(python -c "import sysconfig; print(sysconfig.get_config_var('LIBDIR'))"):$LD_LIBRARY_PATH
 ```
 
-Next we give example command lines to run experiments for training LLM to do math, code, and general QA, as well as to use tools like python or search fo them.
+Next we give example command lines to run experiments for training LLM to do math, code, language game and general QA, as well as to use tools like python or search for them.
 
 > **_NOTE_**: All scripts below assume a single-node (8 GPUs) setup. You should modify the arguments following the example below to customize the training on different hardware setups.
 
@@ -29,9 +29,9 @@ python examples/train_oat.py \
     ...
 ```
 
-### Math
+### Math (with Tool)
 
-In this section we show examples of training LLMs as math solvers, with and without python tool usage. Note that we can train our model on different datasets by specifying a different `--env_id` (a distribution of math questions can be essentially treated as an environment).
+In this section we show examples of training LLMs as math solvers, with and without **python tool usage**. Note that we can train our model on different datasets by specifying a different `--env_id` (a distribution of math questions can be essentially treated as an environment).
 
 #### Solving Math Problems Using Natural Languages
 
@@ -135,6 +135,9 @@ python examples/train_oat.py \
 ```
 </details>
 
+### General QA (with Tool)
+
+### 
 ### Game
 
 In this section we show examples of training agents to solve multi-turn language games. Note that we set the discount factor `gamma=0.9` to encourage solutions with shorter horizon lengths, which are generally preferred for strategic games (i.e., the agent accomplishes goals faster).
@@ -187,3 +190,10 @@ python train.py \
 ```
 
 </details>
+
+### Reasoning Gym
+
+### Code
+
+## Training with VeRL
+[VeRL](https://github.com/volcengine/verl)
