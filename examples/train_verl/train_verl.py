@@ -638,8 +638,12 @@ class ReinforceGEMTrainer(RayPPOTrainer):
         for transition in all_trajectories:
             # Padding to align the length
             num_to_pad = max_prompt_len - len(transition["prompt_ids"])
-            transition["prompt_ids"] = [self.tokenizer.pad_token_id] * num_to_pad + transition["prompt_ids"]
-            transition["attention_mask"] = [0] * num_to_pad + transition["attention_mask"]
+            transition["prompt_ids"] = [
+                self.tokenizer.pad_token_id
+            ] * num_to_pad + transition["prompt_ids"]
+            transition["attention_mask"] = [0] * num_to_pad + transition[
+                "attention_mask"
+            ]
             transition["position_ids"] = [0] * num_to_pad + transition["position_ids"]
             ids.append(transition["prompt_ids"] + transition["response_ids"])
             attention_mask.append(transition["attention_mask"])

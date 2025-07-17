@@ -25,6 +25,7 @@ actor_rollout_ref:
     response_length: 4096
     max_model_len: 12800
     enable_chunked_prefill: False
+    enforce_eager: False
     gpu_memory_utilization: 0.8
     rollout_batch_size: 128
   actor:
@@ -35,3 +36,6 @@ trainer:
   project_name: verl-gem
   save_freq: 999999
   test_freq: 999999
+
+ray_init:
+  num_cpus: 64

@@ -137,7 +137,6 @@ python examples/train_oat.py \
 
 ### General QA (with Tool)
 
-### 
 ### Game
 
 In this section we show examples of training agents to solve multi-turn language games. Note that we set the discount factor `gamma=0.9` to encourage solutions with shorter horizon lengths, which are generally preferred for strategic games (i.e., the agent accomplishes goals faster).
@@ -197,3 +196,39 @@ python train.py \
 
 ## Training with VeRL
 [VeRL](https://github.com/volcengine/verl)
+
+Next we show a few example scripts for training LLM agents using VeRL.
+
+### Reasoning Gym
+<details>
+<summary>Click Me for the Script</summary>
+
+```bash
+n_gpus=8
+batch_size=128
+
+PYTHONUNBUFFERED=1 python -m examples.train_verl.train_verl \
+    actor_rollout_ref.env.env_id=$1 \
+    actor_rollout_ref.env.wrappers="" \
+    actor_rollout_ref.env.num_env=16 \
+    actor_rollout_ref.env.async_env=True \
+    actor_rollout_ref.prompt_template=qwen3_general \
+    actor_rollout_ref.model.path=Qwen/Qwen3-1.7B-Base \
+    actor_rollout_ref.actor.optim.lr=1e-6 \
+    actor_rollout_ref.actor.ppo_mini_batch_size=${batch_size} \
+    actor_rollout_ref.actor.ppo_micro_batch_size_per_gpu=1 \
+    actor_rollout_ref.rollout.log_prob_micro_batch_size_per_gpu=1 \
+    actor_rollout_ref.rollout.tensor_model_parallel_size=1 \
+    actor_rollout_ref.rollout.rollout_batch_size=${batch_size} \
+    trainer.logger=['console','wandb'] \
+    trainer.experiment_name=zichen-qwen3-1.7b-base-$1-norm_adv \
+    trainer.val_before_train=False \
+    trainer.n_gpus_per_node=${n_gpus} \
+    trainer.nnodes=1 \
+    trainer.save_freq=9999999 \
+    trainer.test_freq=9999999 \
+    trainer.total_epochs=15 2>&1 | tee verl_demo.log
+
+```
+
+</details>
