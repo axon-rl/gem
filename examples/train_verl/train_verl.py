@@ -628,6 +628,18 @@ class ReinforceGEMTrainer(RayPPOTrainer):
             [episode[-1].reward == 1 for episode in finished_episodes]
         )  # NOTE: assuming success reward is always 1
 
+        # Subsample trajectories if they exceed the batch size
+        if (
+            len(all_trajectories)
+            > self.config.actor_rollout_ref.rollout.rollout_batch_size
+        ):
+            subsample_indices = np.random.choice(
+                len(all_trajectories),
+                self.config.actor_rollout_ref.rollout.rollout_batch_size,
+                replace=False,
+            )
+            all_trajectories = [all_trajectories[si] for si in subsample_indices]
+
         ids = []
         attention_mask = []
         position_ids = []
