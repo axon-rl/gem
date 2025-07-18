@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Configuration
-SEARCH_URL="http://localhost:8000/retrieve"
+SEARCH_URL=$SEARCH_URL
 MAX_ATTEMPTS=30
 RETRY_DELAY=10
 SAVE_PATH_RETRIEVER=/change/to/your/path # the path to save the retrieval files

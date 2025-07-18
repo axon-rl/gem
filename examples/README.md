@@ -140,6 +140,130 @@ python examples/train_oat.py \
 
 ### General QA (with Tool)
 
+In this section, we show examples of training LLMs as general and multi-hop question-answering agents, with and without **search tool usage**. Note that we can train our model on different QA datasets by specifying a different `--env_id` similar to math environment.
+
+#### Training Questing-Answering Agents Using Natural Languages
+
+<details>
+<summary>Click Me for the Script</summary>
+
+```bash
+python examples/train_oat.py \
+    --env_id qa:HotpotQA \
+    --wrappers "concat_chat" \
+    --prompt_template "no" \
+    --gamma 1.0 \
+    --norm_adv \
+    --gpus 8 \
+    --zero_stage 2 \
+    --gradient-checkpointing \
+    --rollout_batch_size 128 \
+    --num_env 16 \
+    --async_env \
+    --rollout_batch_size_per_device 16 \
+    --pi_buffer_maxlen_per_device 16 \
+    --pretrain Qwen/Qwen3-4B-Base \
+    --enable_prefix_caching \
+    --collocate \
+    --vllm_sleep \
+    --vllm_gpu_ratio 0.45 \
+    --rnd-seed \
+    --learning_rate 0.000001 \
+    --lr_scheduler constant \
+    --lr_warmup_ratio 0 \
+    --num_ppo_epochs 2 \
+    --train_batch_size 128 \
+    --train_batch_size_per_device 1 \
+    --beta 0 \
+    --max_model_len 5120 \
+    --generate_max_length 500 \
+    --temperature 1.0 \
+    --top_p 1 \
+    --eval_steps -1 \
+    --save_steps -1 \
+    --eval_temperature 0.6 \
+    --eval_top_p 0.95 \
+    --eval_generate_max_length 500 \
+    --max_train 65000 \
+    --max_save_num 30 \
+    --use-wb \
+    --wb-run-name oat-Qwen3-4b-base-qa:HotpotQA \
+    --wb_project gem \
+    --debug
+```
+</details>
+
+#### Training Questing-Answering Agents Using *Search Tools*
+
+<details>
+<summary>Click Me for the Script</summary>
+
+This example chose the local dense retriever, provided in the search-R1, as the search engine. Detailed instructions are in the [search-R1 documents](https://github.com/PeterGriffinJin/Search-R1/blob/main/docs/retriever.md). 
+
+Download the indexing and corpus: 
+
+```bash
+save_path=/the/path/to/save
+huggingface-cli download PeterJinGo/wiki-18-corpus --repo-type dataset --local-dir $save_path
+huggingface-cli download PeterJinGo/wiki-18-e5-index-HNSW64 --repo-type dataset --local-dir $save_path
+
+gzip -d $save_path/wiki-18.jsonl.gz
+cat $save_path/part_* > $save_path/e5_HNSW64.index
+```
+
+Run local retriever and start training: 
+```bash
+# before run the script below, change SAVE_PATH_RETRIEVER in start_retrieval_server.sh
+#   to the dir where you download indexing and corpus 
+export SEARCH_URL="http://localhost:8000/retrieve"
+
+bash examples/start_retrieval_server.sh
+
+python examples/train_oat.py \
+    --env_id qa:HotpotQA \
++   --wrappers "search_tool_no_int_reward,concat_chat" \
+    --prompt_template "no" \
+    --gamma 1.0 \
+    --norm_adv \
+    --gpus 8 \
+    --zero_stage 2 \
+    --gradient-checkpointing \
+    --rollout_batch_size 128 \
+    --num_env 16 \
+    --async_env \
+    --rollout_batch_size_per_device 16 \
+    --pi_buffer_maxlen_per_device 16 \
+    --pretrain Qwen/Qwen3-4B-Base \
+    --enable_prefix_caching \
+    --collocate \
+    --vllm_sleep \
+    --vllm_gpu_ratio 0.45 \
+    --rnd-seed \
+    --learning_rate 0.000001 \
+    --lr_scheduler constant \
+    --lr_warmup_ratio 0 \
+    --num_ppo_epochs 2 \
+    --train_batch_size 128 \
+    --train_batch_size_per_device 1 \
+    --beta 0 \
+    --max_model_len 5120 \
+    --generate_max_length 500 \
+    --temperature 1.0 \
+    --top_p 1 \
+    --eval_steps -1 \
+    --save_steps -1 \
+    --eval_temperature 0.6 \
+    --eval_top_p 0.95 \
+    --eval_generate_max_length 500 \
+    --max_train 65000 \
+    --max_save_num 30 \
+    --use-wb \
++   --wb-run-name oat-Qwen3-4b-base-qa:HotpotQA-search-tool \
+    --wb_project gem \
+    --debug
+```
+</details>
+
 ### Game
 
 In this section we show examples of training agents to solve multi-turn language games. Note that we set the discount factor `gamma=0.9` to encourage solutions with shorter horizon lengths, which are generally preferred for strategic games (i.e., the agent accomplishes goals faster).
