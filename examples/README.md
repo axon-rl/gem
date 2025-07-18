@@ -198,7 +198,7 @@ python examples/train_oat.py \
 <details>
 <summary>Click Me for the Script</summary>
 
-This example chose the local dense retriever, provided in the search-R1, as the search engine. Detailed instructions are in the [search-R1 documents](https://github.com/PeterGriffinJin/Search-R1/blob/main/docs/retriever.md). 
+In this example we use the local dense retriever provided in the search-R1 as the search engine. Detailed instructions are in the [search-R1 documents](https://github.com/PeterGriffinJin/Search-R1/blob/main/docs/retriever.md). 
 
 Download the indexing and corpus: 
 
