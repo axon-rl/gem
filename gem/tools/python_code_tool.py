@@ -9,9 +9,15 @@ from gem.utils.sandbox import run_python
 class PythonCodeTool(BaseTool):
     tool_type = "python_code"
 
-    def __init__(self, timeout: int = 5, sandbox_type: str = "none"):
+    def __init__(
+        self,
+        timeout: int = 5,
+        sandbox_type: str = "none",
+        keep_error_last_line: bool = False,
+    ):
         self.timeout = timeout
         self.sandbox_type = sandbox_type
+        self.keep_error_last_line = keep_error_last_line
 
     def _parse_action(self, action: str) -> Tuple[str, bool]:
         """
@@ -69,6 +75,8 @@ class PythonCodeTool(BaseTool):
                 parsed_code, self.sandbox_type, timeout=self.timeout
             )
             has_error = not success
+            if stderr and self.keep_error_last_line:
+                stderr = stderr.split("\n")[-1]
             execution_result = f"{stdout}\n{stderr}" if stderr else stdout
 
             observation = execution_result.lstrip(" \n")

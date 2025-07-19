@@ -25,6 +25,13 @@ WRAPPER_FACTORY = {
         tool_success_reward=0.0,
         max_tool_uses=5,
     ),
+    "python_tool_no_int_reward_last_line_error": partial(
+        ToolEnvWrapper,
+        tools=[PythonCodeTool(timeout=5, keep_error_last_line=True)],
+        tool_reward=0.0,
+        tool_success_reward=0.0,
+        max_tool_uses=5,
+    ),
     "search_tool": partial(
         ToolEnvWrapper,
         tools=[SearchTool(topk=3, timeout=5)],

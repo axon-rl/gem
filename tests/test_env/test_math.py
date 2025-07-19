@@ -184,14 +184,12 @@ def benchmark(
                 model_name=model_name, test_set_name=env_name, **kwargs
             )
 
-            results.append(
-                {
-                    "env_name": env_name,
-                    "model_name": model_name,
-                    "accuracy": acc,
-                    "num_episodes": len(episodes),
-                }
-            )
+            result = {
+                "env_name": env_name,
+                "model_name": model_name,
+                "accuracy": acc,
+                "num_episodes": len(episodes),
+            }
 
             all_episodes[env_name] = episodes
 
@@ -199,20 +197,20 @@ def benchmark(
 
         except Exception as e:
             print(f"✗ {env_name}: Error - {str(e)}")
-            results.append(
-                {
-                    "env_name": env_name,
-                    "model_name": model_name,
-                    "accuracy": None,
-                    "num_episodes": 0,
-                    "error": str(e),
-                }
-            )
+            result = {
+                "env_name": env_name,
+                "model_name": model_name,
+                "accuracy": None,
+                "num_episodes": 0,
+                "error": str(e),
+            }
+
+        results.append(result)
 
         # Save results if output directory is determined
         if save_results:
             # Save accuracy results to CSV
-            df = pd.DataFrame(results)
+            df = pd.DataFrame({k: [v] for k, v in result.items()})
             csv_path = os.path.join(output_dir, "evaluation_results.csv")
             if os.path.exists(csv_path):
                 df.to_csv(csv_path, index=False, header=False, mode="a")

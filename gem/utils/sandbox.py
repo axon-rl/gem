@@ -189,6 +189,6 @@ def run_python(
         run_success, stdout, stderr = (
             False,
             "",
-            f"Execution timed out after {timeout} seconds.\n",
+            f"\nExecution timed out after {timeout} seconds.",
         )
     return run_success, stdout, stderr

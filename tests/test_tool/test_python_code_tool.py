@@ -18,6 +18,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 TEST_ACTIONS = [
+    """<python>from gem.tools.python_code_tool import PythonCodeTool\ntool = PythonCodeTool()\ntool.execute_action(1)</python> ...""",
     """<python>print('Hello from Python!')</python> ...""",
     """Dummy action""",
     """<python>import sys\n\nprint('Hello from Python!')\nprint(f'Arguments: {sys.argv[1:]}')\nfor i in range(5):\n    print(f'Number {i}')</python> ...""",
@@ -31,7 +32,7 @@ SLEEP_ACTION = """```<python>import time\ntime.sleep(30)\nprint('Hello from Pyth
 
 def test_single_action(env_name: str = "game:GuessTheNumber-v0"):
     env = gem.make(env_name, max_turns=3)
-    tool = PythonCodeTool(timeout=2)
+    tool = PythonCodeTool(timeout=2, keep_error_last_line=True)
     env = ToolEnvWrapper(env, tools=[tool])
     obs, info = env.reset()
     for i, test_action in enumerate(TEST_ACTIONS):
@@ -215,6 +216,7 @@ def evaluate(
     top_p: float = 0.95,
     n_examples: int = -1,
     max_tool_uses: int = 5,
+    keep_error_last_line: bool = False,
     obs_wrapper: str = "concat_chat",
     verbose: bool = False,
 ):
@@ -240,7 +242,7 @@ def evaluate(
         dataset = dataset.select(range(n_examples))
         base_env.dataset = dataset
 
-    tool = PythonCodeTool()
+    tool = PythonCodeTool(timeout=2, keep_error_last_line=keep_error_last_line)
     wrapped_env = ToolEnvWrapper(
         base_env,
         tools=[tool],
@@ -314,9 +316,10 @@ def evaluate(
 
 
 def benchmark(
-    env_names: str = "aime24,amc,math,minerva,olympiad_bench",
+    env_names: List[str] = ["aime24", "amc", "math", "minerva", "olympiad_bench"],
     model_name: str = "Qwen/Qwen3-1.7B",
     output_dir: str = None,
+    keep_error_last_line: bool = False,
     **kwargs,
 ):
     import json
@@ -357,7 +360,10 @@ def benchmark(
 
         try:
             acc, episodes = evaluate(
-                model_name=model_name, test_set_name=env_name, **kwargs
+                model_name=model_name,
+                test_set_name=env_name,
+                keep_error_last_line=keep_error_last_line,
+                **kwargs,
             )
 
             results.append(
