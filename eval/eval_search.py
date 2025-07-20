@@ -84,15 +84,15 @@ def eval_search(env_names: str = "eval:2Wiki,eval:PopQA,eval:TriviaQA,eval:Hotpo
                 json.dump(all_episodes, f, indent=2)
         
     # Print summary
-    print(f"\nAccuracy results saved to: {csv_path}")
-    print(f"Episodes saved to: {json_path}")
+    if save_results:
+        print(f"\nAccuracy results saved to: {csv_path}")
+        print(f"Episodes saved to: {json_path}")
     print(f"\nSummary:")
     print(f"Total environments: {len(env_names)}")
     successful_results = [r for r in results if r['accuracy'] is not None]
     if successful_results:
         avg_acc = sum(r['accuracy'] for r in successful_results) / len(successful_results)
         print(f"Average accuracy: {avg_acc:.2%}")
-    print(f"Results saved to: {output_dir}")
     
     return
 

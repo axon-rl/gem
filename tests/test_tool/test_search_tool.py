@@ -166,10 +166,12 @@ def evaluate(
     from tqdm import tqdm
     from vllm import LLM, SamplingParams
 
-    stop_tokens = ["/answer>", "</search>"]
+    stop_tokens = ["</answer>"]
 
     llm = LLM(
         model=model_name,
+        dtype="bfloat16",
+        enable_prefix_caching=True,
     )
     sampling_params = SamplingParams(
         n=1,
