@@ -68,8 +68,16 @@ def subprocess_run(
         stderr = "SyntaxError: invalid syntax"
         return False, stdout, stderr
 
+    # Set a temp working dir
+    code = (
+        'import os,shutil;import tempfile;temp_dir = tempfile.mkdtemp(dir=".");___original_cwd_1k2i3h1 = os.getcwd();os.chdir(temp_dir);'
+        + code
+        + ";os.chdir(___original_cwd_1k2i3h1);shutil.rmtree(temp_dir);"
+    )
+
     # Create a minimal environment instead of copying everything
     original_env = os.environ.copy()
+    os.make
     env = {}
 
     # Core system variables

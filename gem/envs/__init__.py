@@ -337,7 +337,48 @@ for name in rg.factory.DATASETS.keys():
 register(
     "eval:MATH500",
     "gem.envs.math_env:MathEnv",
-    dataset_name="axon-rl/Eval-MATH500",
+    dataset_name="axon-rl/math-eval",
+    split="math",
+    question_key="problem",
+    answer_key="answer",
+)
+
+## AMC
+register(
+    "eval:AMC",
+    "gem.envs.math_env:MathEnv",
+    dataset_name="axon-rl/math-eval",
+    split="amc",
+    question_key="problem",
+    answer_key="answer",
+)
+
+## OlympiadBench
+register(
+    "eval:OlympiadBench",
+    "gem.envs.math_env:MathEnv",
+    dataset_name="axon-rl/math-eval",
+    split="olympiad_bench",
+    question_key="problem",
+    answer_key="answer",
+)
+
+## Minerva
+register(
+    "eval:Minerva",
+    "gem.envs.math_env:MathEnv",
+    dataset_name="axon-rl/math-eval",
+    split="minerva",
+    question_key="problem",
+    answer_key="answer",
+)
+
+## AIME24
+register(
+    "eval:AIME24",
+    "gem.envs.math_env:MathEnv",
+    dataset_name="axon-rl/math-eval",
+    split="aime24",
     question_key="problem",
     answer_key="answer",
 )

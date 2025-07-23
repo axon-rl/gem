@@ -218,7 +218,7 @@ def evaluate(
     max_tool_uses: int = 5,
     keep_error_last_line: bool = False,
     obs_wrapper: str = "concat_chat",
-    verbose: bool = False,
+    dump_dir: str = "",
 ):
     from tqdm import tqdm
     from vllm import LLM, SamplingParams
@@ -236,9 +236,14 @@ def evaluate(
     )
     tokenizer = llm.get_tokenizer()
 
-    base_env = MathEnv(f"axon-rl/math-eval", test_set_name)
+    try:
+        base_env = gem.make(test_set_name)
+    except Exception:
+        base_env = MathEnv(f"axon-rl/math-eval", test_set_name)
+
     dataset = base_env.dataset
     if n_examples > 0:
+        dataset = dataset.shuffle()
         dataset = dataset.select(range(n_examples))
         base_env.dataset = dataset
 
@@ -300,19 +305,18 @@ def evaluate(
             f"{test_set_name} | Accuracy: {all_pass / num_done:.2%}"
         )
 
-        if verbose:
-            print(f"Action: {action!r}")
-            print(f"Answer: {base_env.answer!r}")
-            print(f"Observation: {obs!r}")
-            print(f"Reward: {reward}")
-            print(f"Terminated: {terminated}")
-            print(f"Truncated: {truncated}")
-            print(f"Info: {info!r}")
+    if dump_dir:
+        import json
+        import os
 
+        # Save episodes to JSON
+        json_path = os.path.join(dump_dir, "evaluation_episodes.json")
+        with open(json_path, "w") as f:
+            json.dump(episodes, f, indent=2)
     acc = all_pass / len(dataset)
     print(f"Tested {len(dataset)} questions; Accuracy: {acc:.2%}")
-
-    return acc, episodes
+    if not dump_dir:
+        return acc, episodes
 
 
 def benchmark(
@@ -430,7 +434,6 @@ if __name__ == "__main__":
             "benchmark": benchmark,
         }
     )
-    print(f"\n\nAll tests run.\n\n")
 
     """Run with:
     python -m tests.test_tool.test_python_code_tool single_action --env_name game:GuessTheNumber-v0
