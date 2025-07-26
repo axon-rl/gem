@@ -1,6 +1,6 @@
 SHELL=/bin/bash
 PROJECT_NAME=gem
-PROJECT_PATH=gem/ tests/ eval/
+PROJECT_PATH=gem/ tests/
 LINT_PATHS=${PROJECT_PATH}
 
 check_install = python3 -c "import $(1)" || pip3 install $(1) --upgrade

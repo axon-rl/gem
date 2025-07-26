@@ -1,13 +1,14 @@
 import copy
 import os
 import shlex
+import shutil
 import subprocess
 import sys
+import tempfile
 import uuid
 from tempfile import NamedTemporaryFile
-import tempfile
 from typing import List, Optional
-import shutil
+
 from gem.utils.constants import BASE_IMPORTS
 
 DEFAULT_TIMEOUT = 10
