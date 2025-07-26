@@ -1,0 +1,41 @@
+hydra:
+  searchpath:
+    # Assuming you are in the `gem/` directory and `verl/` is located at the same level as `gem/`, for example:
+    # $ ls ..
+    # gem verl ...(other directories)
+    - file://../verl/verl/trainer/config
+
+defaults:
+  - ppo_trainer
+  - _self_
+
+actor_rollout_ref:
+  env:
+    env_id: rg:leg_counting
+    wrappers: concat_chat
+    num_env: 2
+    async_env: True
+  keep_generation_failed: True
+  dump_experience_every: -1
+  prompt_template: na
+  apply_chat_template: False
+  gamma: 1.0
+  norm_adv: True
+  rollout:
+    response_length: 4096
+    max_model_len: 12800
+    enable_chunked_prefill: False
+    enforce_eager: False
+    gpu_memory_utilization: 0.8
+    rollout_batch_size: 128
+  actor:
+    loss_agg_mode: seq-mean-token-sum-norm # remove length bias like in Dr. GRPO
+    ppo_epochs: 2
+
+trainer:
+  project_name: verl-gem
+  save_freq: 999999
+  test_freq: 999999
+
+ray_init:
+  num_cpus: 64
