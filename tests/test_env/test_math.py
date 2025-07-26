@@ -56,8 +56,11 @@ def evaluate(
             "\nPlease reason step by step, and put your final answer within \\boxed{}.<|im_end|>\n"
             "<|im_start|>assistant\n"
         )
+    
+    def apply_qwen3_think_template(question: str) -> str:
+        return f"<|im_start|>user\n{question}<|im_end|>\n<|im_start|>assistant\n<think>"
 
-    TEMPLATE = {"": lambda x: x, "qwen3": apply_qwen3_general_template}
+    TEMPLATE = {"": lambda x: x, "qwen3": apply_qwen3_general_template, "qwen3_think": apply_qwen3_think_template}
 
     llm = LLM(
         model=model_name,

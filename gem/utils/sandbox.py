@@ -5,8 +5,9 @@ import subprocess
 import sys
 import uuid
 from tempfile import NamedTemporaryFile
+import tempfile
 from typing import List, Optional
-
+import shutil
 from gem.utils.constants import BASE_IMPORTS
 
 DEFAULT_TIMEOUT = 10
@@ -68,16 +69,8 @@ def subprocess_run(
         stderr = "SyntaxError: invalid syntax"
         return False, stdout, stderr
 
-    # Set a temp working dir
-    code = (
-        'import os,shutil;import tempfile;temp_dir = tempfile.mkdtemp(dir=".");___original_cwd_1k2i3h1 = os.getcwd();os.chdir(temp_dir);'
-        + code
-        + ";os.chdir(___original_cwd_1k2i3h1);shutil.rmtree(temp_dir);"
-    )
-
     # Create a minimal environment instead of copying everything
     original_env = os.environ.copy()
-    os.make
     env = {}
 
     # Core system variables
@@ -120,15 +113,22 @@ def subprocess_run(
         del env["PYTHONPATH"]
 
     if len(code) < CLI_ARG_SIZE_LIMIT:
+        temp_dir = tempfile.mkdtemp(dir=".")
         cmd_list.extend(["python", "-c", code])
-        result = subprocess.run(
-            cmd_list,
-            input=stdin.encode() if stdin else None,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            env=env,
-            timeout=timeout,
-        )
+        try:
+            result = subprocess.run(
+                cmd_list,
+                cwd=temp_dir,
+                input=stdin.encode() if stdin else None,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                env=env,
+                timeout=timeout,
+            )
+        except Exception as e:
+            shutil.rmtree(temp_dir)
+            raise e
+        shutil.rmtree(temp_dir)
     else:
         with NamedTemporaryFile(
             mode="wb", prefix=uuid.uuid4().hex, suffix=".py"

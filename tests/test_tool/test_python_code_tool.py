@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 
 TEST_ACTIONS = [
     """<python>from gem.tools.python_code_tool import PythonCodeTool\ntool = PythonCodeTool()\ntool.execute_action(1)</python> ...""",
+    """<python>import os;os.makedirs("tmp-dir")"""
     """<python>print('Hello from Python!')</python> ...""",
     """Dummy action""",
     """<python>import sys\n\nprint('Hello from Python!')\nprint(f'Arguments: {sys.argv[1:]}')\nfor i in range(5):\n    print(f'Number {i}')</python> ...""",
