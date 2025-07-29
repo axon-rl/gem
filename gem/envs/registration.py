@@ -31,7 +31,7 @@ def register(id: str, entry_point: Union[Callable, str], **kwargs: Any):
     ENV_REGISTRY[id] = EnvSpec(id=id, entry_point=entry_point, kwargs=kwargs)
 
 
-def pprint_registry_detailed():
+def print_envs():
     if not ENV_REGISTRY:
         print("No environments registered.")
     else:

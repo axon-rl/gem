@@ -1,4 +1,4 @@
-"""Synchronous (for loop) vectorized environment execution."""
+"""Asynchronous (thread pool) vectorized environment execution."""
 
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy

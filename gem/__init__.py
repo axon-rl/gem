@@ -6,7 +6,7 @@
 import logging
 
 from gem.core import Env
-from gem.envs.registration import make, make_vec, register
+from gem.envs.registration import make, make_vec, register, print_envs
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
@@ -19,4 +19,5 @@ __all__ = [
     "make",
     "make_vec",
     "register",
+    "print_envs",
 ]
