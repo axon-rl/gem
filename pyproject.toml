@@ -11,7 +11,10 @@ requires-python = ">=3.8"
 license = "MIT"
 keywords = []
 authors = [
-  { name = "Zichen", email = "liuzc@sea.com" },
+  { name = "Zichen Liu", email = "lkevinzc@gmail.com" },
+  { name = "Anya Sims", email = "anya.sims@stats.ox.ac.uk" },
+  { name = "Keyu Duan", email = "k.duan@u.nus.edu" },
+  { name = "Changyu Chen", email = "cychen.2020@phdcs.smu.edu.sg" },
 ]
 classifiers = [
   "Development Status :: 4 - Beta",
@@ -46,9 +49,9 @@ search = [
 ]
 
 [project.urls]
-Documentation = "https://github.com/Zichen/gem#readme"
-Issues = "https://github.com/Zichen/gem/issues"
-Source = "https://github.com/Zichen/gem"
+Documentation = "https://axon-rl.github.io/gem/"
+Issues = "https://github.com/axon-rl/gem/issues"
+Source = "https://github.com/axon-rl/gem"
 
 [tool.hatch.version]
 path = "gem/__about__.py"
