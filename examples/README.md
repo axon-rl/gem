@@ -52,7 +52,7 @@ python examples/train_oat.py \
     --zero_stage 2 \
     --gradient-checkpointing \
     --rollout_batch_size 128 \
-    --num_env 16 \
+    --num_env 4 \
     --async_env \
     --rollout_batch_size_per_device 16 \
     --pi_buffer_maxlen_per_device 16 \
@@ -103,7 +103,7 @@ python examples/train_oat.py \
     --zero_stage 2 \
     --gradient-checkpointing \
     --rollout_batch_size 128 \
-    --num_env 16 \
+    --num_env 4 \
     --async_env \
     --rollout_batch_size_per_device 16 \
     --pi_buffer_maxlen_per_device 16 \
@@ -158,7 +158,7 @@ python examples/train_oat.py \
     --zero_stage 2 \
     --gradient-checkpointing \
     --rollout_batch_size 128 \
-    --num_env 16 \
+    --num_env 4 \
     --async_env \
     --rollout_batch_size_per_device 16 \
     --pi_buffer_maxlen_per_device 16 \
@@ -229,7 +229,7 @@ python examples/train_oat.py \
     --zero_stage 2 \
     --gradient-checkpointing \
     --rollout_batch_size 128 \
-    --num_env 16 \
+    --num_env 4 \
     --async_env \
     --rollout_batch_size_per_device 16 \
     --pi_buffer_maxlen_per_device 16 \
