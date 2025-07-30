@@ -90,7 +90,7 @@ class Args(PPOArgs):
 
     # Reward settings
     gamma: float = 1.0  # Discount factor for Monte Carlo returns
-    norm_adv: bool = False
+    norm_return: bool = False
 
     # Evaluation settings
     eval_prompt_template: Literal["qwen3_general"] = "qwen3_general"
@@ -590,7 +590,7 @@ class Learner(PPOLearner):
         del response_masks
         # Return without baseline
         advantages = rewards.sum(-1)
-        if self.args.norm_adv:
+        if self.args.norm_return:
             local_sum = advantages.sum()
             local_square_sum = (advantages**2).sum()
             local_num = torch.tensor(

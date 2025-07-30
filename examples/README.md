@@ -47,7 +47,7 @@ python examples/train_oat.py \
     --wrappers "concat_chat" \
     --prompt_template "no" \
     --gamma 1.0 \
-    --norm_adv \
+    --norm_return \
     --gpus 8 \
     --zero_stage 2 \
     --gradient-checkpointing \
@@ -98,7 +98,7 @@ python examples/train_oat.py \
 +   --wrappers "python_tool_no_int_reward,concat_chat" \
     --prompt_template "no" \
     --gamma 1.0 \
-    --norm_adv \
+    --norm_return \
     --gpus 8 \
     --zero_stage 2 \
     --gradient-checkpointing \
@@ -153,7 +153,7 @@ python examples/train_oat.py \
     --wrappers "concat_chat" \
     --prompt_template "no" \
     --gamma 1.0 \
-    --norm_adv \
+    --norm_return \
     --gpus 8 \
     --zero_stage 2 \
     --gradient-checkpointing \
@@ -224,7 +224,7 @@ python examples/train_oat.py \
 +   --wrappers "search_tool_no_int_reward,concat_chat" \
     --prompt_template "no" \
     --gamma 1.0 \
-    --norm_adv \
+    --norm_return \
     --gpus 8 \
     --zero_stage 2 \
     --gradient-checkpointing \
@@ -276,7 +276,7 @@ python train.py \
     --env_id game:GuessTheNumber-v0 \
     --wrappers concat \
     --gamma 0.9 \
-    --norm_adv \
+    --norm_return \
     --gpus 8 \
     --gradient-checkpointing \
     --num_samples 1 \

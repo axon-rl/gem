@@ -20,7 +20,7 @@ actor_rollout_ref:
   prompt_template: na
   apply_chat_template: False
   gamma: 1.0
-  norm_adv: True
+  norm_return: True
   rollout:
     response_length: 4096
     max_model_len: 12800

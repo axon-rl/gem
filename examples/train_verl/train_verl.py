@@ -450,7 +450,7 @@ class ReinforceGEMTrainer(RayPPOTrainer):
                                 }
                             )
 
-                    if self.config.actor_rollout_ref.norm_adv:
+                    if self.config.actor_rollout_ref.norm_return:
                         batch.batch["advantages"] = (
                             batch.batch["advantages"] - batch.batch["advantages"].mean()
                         ) / (batch.batch["advantages"].std() + 1e-9)
