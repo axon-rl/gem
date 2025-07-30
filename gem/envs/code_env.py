@@ -66,25 +66,6 @@ class CodeEnv(Env):
                 )
         assert isinstance(dataset, Dataset), f"Expected a Dataset, got {type(dataset)}"
 
-        # Data preprocessing
-        # logging.info(f"Dataset size before preprocessing: {len(dataset)}")
-        # dataset = dataset.filter(
-        #     lambda example: isinstance(example[self.test_key], dict)
-        # )
-        # dataset = dataset.filter(
-        #     lambda example: "inputs" in example[self.test_key]
-        #     and "outputs" in example[self.test_key]
-        # )
-        # dataset = dataset.filter(
-        #     lambda example: len(example[self.test_key]["inputs"])
-        #     == len(example[self.test_key]["outputs"])
-        #     > 0
-        # )
-        # logging.info(
-        #     f"Dataset size after removing unsupported and invalid test cases: {len(dataset)}"
-        # )
-        # logging.info(f"Random seed: {self.seed}")
-
         self.dataset_name = dataset_name
         self.dataset = dataset.shuffle(seed=self.seed)
         self.dataset_iter = iter(self.dataset)
@@ -136,16 +117,6 @@ class CodeEnv(Env):
         # format of tests: Dictionary[Lists] - CodeContests, Taco/Apps
         if isinstance(tests, list):
             raise NotImplementedError
-            total_tests = len(tests)
-            if total_tests > self.max_tests:
-                # Sort indices by test input length and take the max_tests longest ones
-                selected_indices = sorted(
-                    range(total_tests),
-                    key=lambda i: len(tests[i]["input"]),
-                    reverse=True,
-                )[: self.max_tests]
-                tests = [tests[i] for i in selected_indices]
-            num_tests = len(tests)
         else:
             total_tests = len(tests["inputs"])
             if total_tests > self.max_tests:
@@ -161,7 +132,6 @@ class CodeEnv(Env):
                     "outputs": [tests["outputs"][i] for i in selected_indices],
                 }
                 tests = selected_tests
-            num_tests = len(tests["inputs"])
 
         def _parse_test(test):
             if isinstance(test, str):
