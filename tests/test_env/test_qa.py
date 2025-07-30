@@ -1,7 +1,6 @@
 import fire
 
 import gem
-from gem.envs.qa_env import apply_prompt
 
 
 def test_llm_episode(model_name: str = "Qwen/Qwen3-4B"):
@@ -98,18 +97,18 @@ def evaluate(
     tokenizer = llm.get_tokenizer()
     env = gem.make(env_name, verbose=True, load_from_cache_file=False)
     dataset = env.dataset
-    
+
     if n_examples > 0:
         dataset = dataset.select(range(min(n_examples, len(dataset))))
 
     obss = dataset[question_key]
 
     formatted_obss = [
-            tokenizer.apply_chat_template(
-                [{"content": obs, "role": "user"}],
-                add_generation_prompt=True,
-                tokenize=False,
-            )
+        tokenizer.apply_chat_template(
+            [{"content": obs, "role": "user"}],
+            add_generation_prompt=True,
+            tokenize=False,
+        )
         for obs in obss
     ]
     print("example question", formatted_obss[0])
@@ -172,7 +171,7 @@ def benchmark(
     import pandas as pd
 
     env_names = env_names.split(",")
-    
+
     # Determine output directory
     save_results = False
     if output_dir:
@@ -204,9 +203,7 @@ def benchmark(
         print(f"\nEvaluating on {env_name}...")
 
         try:
-            acc, episodes = evaluate(
-                model_name=model_name, env_name=env_name, **kwargs
-            )
+            acc, episodes = evaluate(model_name=model_name, env_name=env_name, **kwargs)
 
             result = {
                 "env_name": env_name,
