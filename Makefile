@@ -4,7 +4,7 @@ PROJECT_NAME  = gem
 COPYRIGHT     = "AxonRL Team. All Rights Reserved."
 PROJECT_PATH  = gem
 SOURCE_FOLDERS = $(PROJECT_PATH) tests examples
-LINT_PATHS    = ${PROJECT_PATH}
+LINT_PATHS    = ${PROJECT_PATH} tests examples
 
 check_install = python3 -c "import $(1)" || pip3 install $(1) --upgrade
 check_install_extra = python3 -c "import $(1)" || pip3 install $(2) --upgrade
