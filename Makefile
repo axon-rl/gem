@@ -3,7 +3,7 @@ SHELL=/bin/bash
 PROJECT_NAME  = gem
 COPYRIGHT     = "AxonRL Team. All Rights Reserved."
 PROJECT_PATH  = gem
-SOURCE_FOLDERS = $(PROJECT_PATH)
+SOURCE_FOLDERS = $(PROJECT_PATH) tests examples
 LINT_PATHS    = ${PROJECT_PATH}
 
 check_install = python3 -c "import $(1)" || pip3 install $(1) --upgrade
@@ -52,9 +52,9 @@ publish: package
 	twine upload dist/*
 
 addlicense: addlicense-install
-	$$(command -v addlicense || echo $(HOME)/go/bin/addlicense) -c $(COPYRIGHT) -ignore tests/coverage.xml -l apache -y 2025 $(SOURCE_FOLDERS)
+	$$(command -v addlicense || echo $(HOME)/go/bin/addlicense) -c $(COPYRIGHT) -ignore tests/coverage.xml -l apache $(SOURCE_FOLDERS)
 
 check-license: addlicense-install
-	$$(command -v addlicense || echo $(HOME)/go/bin/addlicense) -c $(COPYRIGHT) -ignore tests/coverage.xml -l apache -y 2025 -check $(SOURCE_FOLDERS)
+	$$(command -v addlicense || echo $(HOME)/go/bin/addlicense) -c $(COPYRIGHT) -ignore tests/coverage.xml -l apache -check $(SOURCE_FOLDERS)
 
 .PHONY: format lint check-docstyle checks

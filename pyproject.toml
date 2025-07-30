@@ -8,13 +8,13 @@ dynamic = ["version"]
 description = ''
 readme = "README.md"
 requires-python = ">=3.8"
-license = "MIT"
+license = "Apache-2.0"
 keywords = []
 authors = [
   { name = "Zichen Liu", email = "lkevinzc@gmail.com" },
   { name = "Anya Sims", email = "anya.sims@stats.ox.ac.uk" },
   { name = "Keyu Duan", email = "k.duan@u.nus.edu" },
-  { name = "Changyu Chen", email = "cychen.2020@phdcs.smu.edu.sg" },
+  { name = "Changyu Chen", email = "abelco.cy@gmail.com" },
 ]
 classifiers = [
   "Development Status :: 4 - Beta",
