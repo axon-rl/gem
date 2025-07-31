@@ -259,14 +259,13 @@ python examples/train_oat.py \
     --max_save_num 30 \
     --use-wb \
 +   --wb-run-name oat-Qwen3-4b-base-qa:HotpotQA-search-tool \
-    --wb_project gem \
-    --debug
+    --wb_project gem
 ```
 </details>
 
 ### Game
 
-In this section we show examples of training agents to solve multi-turn language games. Note that we set the discount factor `gamma=0.9` to encourage solutions with shorter horizon lengths, which are generally preferred for strategic games (i.e., the agent accomplishes goals faster).
+In this section we show examples of training agents to solve multi-turn language games. Note that we set the discount factor `gamma=0.9` to encourage solutions with shorter horizon lengths, which are generally preferred for some strategic games (i.e., the agent accomplishes goals faster).
 
 <details>
 <summary>Click Me for the Script</summary>
@@ -274,6 +273,7 @@ In this section we show examples of training agents to solve multi-turn language
 ```bash
 python train.py \
     --env_id game:GuessTheNumber-v0 \
+    --prompt_template qwen3_game \
     --wrappers concat \
     --gamma 0.9 \
     --norm_return \
@@ -310,18 +310,116 @@ python train.py \
     --max_save_num 30 \
     --use-wb \
     --wb-run-name oat-qwen3-1.7b-base-game:GuessTheNumber-v0 \
-    --wb_project gem \
-    --debug
+    --wb_project gem
 ```
 
 </details>
 
 ### Reasoning Gym
 
+In this section we show examples of training agents to solve procedurally generated reasoning intensive tasks originally from ReasoningGym.
+
+<details>
+<summary>Click Me for the Script</summary>
+
+```bash
+python train.py \
+    --use_fused_lm_head \
+    --env_id rg:arc_1d \
+    --prompt_template qwen3_general \
+    --gamma 1 \
+    --gpus 8 \
+    --zero_stage 2 \
+    --gradient-checkpointing \
+    --num_samples 1 \
+    --rollout_batch_size 128 \
+    --num_envs 2 \
+    --rollout_batch_size_per_device 16 \
+    --pi_buffer_maxlen_per_device 16 \
+    --pretrain Qwen/Qwen3-1.7B-Base \
+    --enable_prefix_caching \
+    --collocate \
+    --vllm_sleep \
+    --vllm_gpu_ratio 0.45 \
+    --rnd-seed \
+    --learning_rate 0.000001 \
+    --lr_scheduler constant \
+    --lr_warmup_ratio 0 \
+    --num_ppo_epochs 2 \
+    --train_batch_size 128 \
+    --train_batch_size_per_device 1 \
+    --beta 0 \
+    --max_model_len 12800 \
+    --generate_max_length 4096 \
+    --temperature 1.0 \
+    --top_p 1 \
+    --eval_steps -1 \
+    --save_steps -1 \
+    --eval_temperature 0.6 \
+    --eval_top_p 0.95 \
+    --eval_generate_max_length 4096 \
+    --max_train 65000 \
+    --max_save_num 30 \
+    --use-wb \
+    --wb-run-name oat-qwen3-1.7b-base-rg:arc_1d \
+    --wb_project gem
+```
+
+</details>
+
 ### Code
 
+In this section we show examples of training agents to solve coding tasks with the programs executed in independent environment. By default we use the same environment and execute the codes using a subprocess; but `bwrap` can be used for more secure sandboxing.
+
+<details>
+<summary>Click Me for the Script</summary>
+
+```bash
+python train.py \
+    --env_id code:PrimeIntellect15k \
+    --prompt_template code \
+    --apply_chat_template \
+    --gamma 1 \
+    --gpus 8 \
+    --gradient-checkpointing \
+    --num_samples 1 \
+    --rollout_batch_size 128 \
+    --num_envs 4 \
+    --async_env \
+    --rollout_batch_size_per_device 16 \
+    --pi_buffer_maxlen_per_device 16 \
+    --pretrain Qwen/Qwen3-4B-Base \
+    --enable_prefix_caching \
+    --collocate \
+    --vllm_sleep \
+    --vllm_gpu_ratio 0.45 \
+    --rnd-seed \
+    --learning_rate 0.000001 \
+    --lr_scheduler constant \
+    --lr_warmup_ratio 0 \
+    --num_ppo_epochs 2 \
+    --train_batch_size 128 \
+    --train_batch_size_per_device 1 \
+    --beta 0 \
+    --max_model_len 12800 \
+    --generate_max_length 4096 \
+    --temperature 1.0 \
+    --top_p 1 \
+    --eval_steps -1 \
+    --save_steps -1 \
+    --eval_temperature 0.6 \
+    --eval_top_p 0.95 \
+    --eval_generate_max_length 4096 \
+    --max_train 65000 \
+    --max_save_num 30 \
+    --use-wb \
+    --wb-run-name oat-qwen3-4b-base-code:PrimeIntellect15k \
+    --wb_project gem \
+```
 ## Training with VeRL
 [VeRL](https://github.com/volcengine/verl) can be easily integrated with GEM to train LLM agents. In this section, we first provide the installation guide then give a few examples.
+
+</details>
 
 ```bash
 # recommend python==3.10
