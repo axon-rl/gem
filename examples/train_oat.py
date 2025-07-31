@@ -32,7 +32,7 @@ import vllm
 from oat.algorithms.ppo import PPOActor, PPOArgs, PPOLearner
 from oat.args import default_args_validation, get_default_args
 from oat.interface import get_program, lp
-from oat.types import TrajectoryData
+from oat.types import TransitionData
 from oat.utils.ops import masked_mean, masked_sum
 from torch.utils.data import Dataset
 
@@ -196,7 +196,7 @@ class Actor(PPOActor):
 
     def step(
         self, prompts=None, formatted_prompts=None, references=None
-    ) -> List[TrajectoryData]:
+    ) -> List[TransitionData]:
         """Each actor.step handles the interaction between agent and environment to collect experiences."""
         # The provided parameters are ignored since we generate prompts from the environment
         del prompts, formatted_prompts, references
@@ -426,7 +426,7 @@ class Actor(PPOActor):
 
     def prepare_trajectories(
         self, episode: Sequence[Transition]
-    ) -> List[TrajectoryData]:
+    ) -> List[TransitionData]:
         """
         Prepare language trajectories (transitions of episode).
 
@@ -453,7 +453,7 @@ class Actor(PPOActor):
             )
             # Add trajectory data
             trajectory_data.append(
-                TrajectoryData(
+                TransitionData(
                     prompt=step_data.prompt,
                     prompt_ids=step_data.prompt_ids,
                     response=step_data.response,
@@ -585,7 +585,7 @@ class Learner(PPOLearner):
             shuffle=False,  # No need to shuffle dummy data
         )
 
-    def process_feedback_data(self, data_list: List[TrajectoryData]):
+    def process_feedback_data(self, data_list: List[TransitionData]):
         """Process collected feedback data, adding it to buffer."""
 
         logging.info("adding data into buffer")
