@@ -82,8 +82,7 @@ python examples/train_oat.py \
     --max_save_num 30 \
     --use-wb \
     --wb-run-name oat-Qwen3-4b-base-math:Math12K \
-    --wb_project gem \
-    --debug
+    --wb_project gem
 ```
 </details>
 
@@ -95,7 +94,7 @@ python examples/train_oat.py \
 ```bash
 python examples/train_oat.py \
     --env_id math:Math12K \
-+   --wrappers "python_tool_no_int_reward,concat_chat" \
+   --wrappers "python_tool_no_int_reward,concat_chat" \
     --prompt_template "no" \
     --gamma 1.0 \
     --norm_return \
@@ -132,9 +131,8 @@ python examples/train_oat.py \
     --max_train 65000 \
     --max_save_num 30 \
     --use-wb \
-+   --wb-run-name oat-Qwen3-4b-base-math:Math12K-python-tool \
-    --wb_project gem \
-    --debug
+   --wb-run-name oat-Qwen3-4b-base-math:Math12K-python-tool \
+    --wb_project gem
 ```
 </details>
 
@@ -188,8 +186,7 @@ python examples/train_oat.py \
     --max_save_num 30 \
     --use-wb \
     --wb-run-name oat-Qwen3-4b-base-qa:HotpotQA \
-    --wb_project gem \
-    --debug
+    --wb_project gem
 ```
 </details>
 
@@ -221,7 +218,7 @@ bash examples/start_retrieval_server.sh
 
 python examples/train_oat.py \
     --env_id qa:HotpotQA \
-+   --wrappers "search_tool_no_int_reward,concat_chat" \
+    --wrappers "search_tool_no_int_reward,concat_chat" \
     --prompt_template "no" \
     --gamma 1.0 \
     --norm_return \
@@ -258,7 +255,7 @@ python examples/train_oat.py \
     --max_train 65000 \
     --max_save_num 30 \
     --use-wb \
-+   --wb-run-name oat-Qwen3-4b-base-qa:HotpotQA-search-tool \
+    --wb-run-name oat-Qwen3-4b-base-qa:HotpotQA-search-tool \
     --wb_project gem
 ```
 </details>
