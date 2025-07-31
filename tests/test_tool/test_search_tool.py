@@ -12,10 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import json
+import os
 import random
 from functools import partial
+from pathlib import Path
+from typing import Optional
 
 import fire
+import pandas as pd
 from transformers import AutoTokenizer
 
 import gem
@@ -59,7 +64,7 @@ def test_single_action(search_url: str, env_name: str = "game:GuessTheNumber-v0"
 
 def test_episode(
     search_url: str,
-    env_name: str = "game:GuessTheNumber-v0",
+    env_name: str = "qa:NaturalQuestions",
     tokenizer_name: str = "PeterJinGo/SearchR1-nq_hotpotqa_train-qwen2.5-7b-em-ppo",
 ):
     env = gem.make(env_name, max_turns=3, load_from_cache_file=False)
@@ -164,62 +169,108 @@ def test_llm_episode(
 
 
 def evaluate(
-    search_url: str,
+    search_url: Optional[str] = None,
     model_name: str = "PeterJinGo/SearchR1-nq_hotpotqa_train-qwen2.5-7b-em-ppo",
-    max_tokens: int = 1024,
-    n_examples: int = 500,
-    max_tool_uses: int = 4,
+    env_name: str = "eval:QaOpen",
+    max_tokens: int = 3000,
+    temperature: float = 0.0,
+    top_p: float = 1.0,
+    n_examples: int = -1,
+    max_tool_uses: int = 5,
     obs_wrapper: str = "concat_chat",
     verbose: bool = False,
-):
+) -> tuple[float, list[list[dict]]]:
     """Evaluate the model on the QaOpen dataset with the Search tool."""
     from tqdm import tqdm
     from vllm import LLM, SamplingParams
 
+    stop_tokens = ["</answer>"]
+
     llm = LLM(
         model=model_name,
+        dtype="bfloat16",
+        enable_prefix_caching=True,
     )
     sampling_params = SamplingParams(
         n=1,
-        temperature=0.6,
+        temperature=temperature,
         max_tokens=max_tokens,
-        top_p=0.95,
+        top_p=top_p,
+        stop=stop_tokens,
+        include_stop_str_in_output=True,
     )
     tokenizer = llm.get_tokenizer()
 
-    tool = SearchTool(search_url=search_url, topk=3)
-    base_env = gem.make("eval:QaOpen", seed=42)
+    base_env = gem.make(env_name, seed=42)
     dataset = base_env.dataset
-    dataset = dataset.select(range(n_examples))
-    base_env.dataset = dataset
+    if n_examples > 0:
+        dataset = dataset.select(range(n_examples))
+        base_env.dataset = dataset
 
-    print(
-        "First question:\n",
-        "-" * 20,
-        "\n",
-        dataset[0]["question"],
-        "\n",
-        "-" * 20,
-        "\n",
+    if verbose:
+        print(
+            "First question:\n",
+            "-" * 20,
+            "\n",
+            dataset[0]["question"],
+            "\n",
+            "-" * 20,
+            "\n",
+        )
+
+    tool = SearchTool(search_url=search_url, topk=3, timeout=5)
+    wrapped_env = ToolEnvWrapper(
+        base_env,
+        tools=[tool],
+        max_tool_uses=max_tool_uses,
+        tool_reward=0.0,
+        tool_success_reward=0.0,
     )
-
-    wrapped_env = ToolEnvWrapper(base_env, tools=[tool], max_tool_uses=max_tool_uses)
     wrapped_env = WRAPPER_FACTORY[obs_wrapper](wrapped_env, tokenizer=tokenizer)
 
+    progress_bar = tqdm(total=len(dataset))
+    num_done = 0
     all_pass = 0
-    for _ in tqdm(range(n_examples)):
+    episodes = []
+
+    while True:
         obs, info = wrapped_env.reset()
         terminated = False
         truncated = False
+        ground_truth = wrapped_env.unwrapped.answer
+        episode = []
+
+        if wrapped_env.unwrapped.epoch > 0:  # force to end if traversed full dataset
+            break
+
         while not (terminated or truncated):
             response = llm.generate(
                 [obs], sampling_params=sampling_params, use_tqdm=False
             )
             action = response[0].outputs[0].text
             next_obs, reward, terminated, truncated, info = wrapped_env.step(action)
+            done = terminated or truncated
+
+            episode.append(
+                {
+                    "obs": obs,
+                    "action": action,
+                    "reward": reward,
+                    "done": done,
+                    "ground_truth": ground_truth,
+                }
+            )
+
             obs = next_obs
+
         if reward == 1:
             all_pass += 1
+        num_done += 1
+        episodes.append(episode)
+        progress_bar.update(1)
+        progress_bar.set_description(
+            f"{env_name} | Accuracy: {all_pass / num_done:.2%}"
+        )
 
         if verbose:
             print(f"Action: {action!r}")
@@ -230,7 +281,104 @@ def evaluate(
             print(f"Truncated: {truncated}")
             print(f"Info: {info!r}")
 
-    print(f"Tested {len(dataset)} questions; Accuracy: {all_pass / len(dataset)}")
+    acc = all_pass / len(dataset)
+    print(f"Tested {len(dataset)} questions; Accuracy: {acc:.2%}")
+
+    return acc, episodes
+
+
+def benchmark(
+    env_names: str = "eval:2Wiki,eval:PopQA,eval:TriviaQA,eval:HotpotQA,eval:Bamboogle,eval:NaturalQuestions,eval:Musique",
+    model_name: str = "Qwen/Qwen3-1.7B",
+    output_dir: str = None,
+    **kwargs,
+):
+    env_names = env_names.split(",")
+
+    # Determine output directory
+    save_results = False
+    if output_dir:
+        save_results = True
+        os.makedirs(output_dir, exist_ok=True)
+    else:
+        # Check if model_name is a local directory
+        if os.path.isdir(model_name):
+            output_dir = Path(model_name)
+            output_dir = os.path.join(output_dir.parent, f"eval_{output_dir.stem}")
+            save_results = True
+            os.makedirs(output_dir, exist_ok=True)
+
+    # Store results
+    results = []
+    all_episodes = {}
+
+    print(f"Running evaluation on {len(env_names)} environments...")
+    print(f"Model: {model_name}")
+    if save_results:
+        print(f"Output directory: {output_dir}")
+    else:
+        print(
+            "Results will not be saved (output_dir not specified and model_name is not a local directory)"
+        )
+
+    # Run evaluation for each environment
+    for env_name in env_names:
+        print(f"\nEvaluating on {env_name}...")
+
+        try:
+            acc, episodes = evaluate(model_name=model_name, env_name=env_name, **kwargs)
+
+            results.append(
+                {
+                    "env_name": env_name,
+                    "model_name": model_name,
+                    "accuracy": acc,
+                    "num_episodes": len(episodes),
+                }
+            )
+
+            all_episodes[env_name] = episodes
+
+            print(f"✓ {env_name}: {acc:.2%} accuracy")
+
+        except Exception as e:
+            print(f"✗ {env_name}: Error - {str(e)}")
+            results.append(
+                {
+                    "env_name": env_name,
+                    "model_name": model_name,
+                    "accuracy": None,
+                    "num_episodes": 0,
+                    "error": str(e),
+                }
+            )
+
+        # Save results if output directory is determined
+        if save_results:
+            # Save accuracy results to CSV
+            df = pd.DataFrame(results)
+            csv_path = os.path.join(output_dir, "evaluation_results.csv")
+            df.to_csv(csv_path, index=False)
+
+            # Save episodes to JSON
+            json_path = os.path.join(output_dir, "evaluation_episodes.json")
+            with open(json_path, "w") as f:
+                json.dump(all_episodes, f, indent=2)
+
+    # Print summary
+    if save_results:
+        print(f"\nAccuracy results saved to: {csv_path}")
+        print(f"Episodes saved to: {json_path}")
+    print(f"\nSummary:")
+    print(f"Total environments: {len(env_names)}")
+    successful_results = [r for r in results if r["accuracy"] is not None]
+    if successful_results:
+        avg_acc = sum(r["accuracy"] for r in successful_results) / len(
+            successful_results
+        )
+        print(f"Average accuracy: {avg_acc:.2%}")
+
+    return
 
 
 def main():
@@ -240,6 +388,7 @@ def main():
     python -m tests.test_tool.test_search_tool episode --search_url http://localhost:8000/retrieve
     python -m tests.test_tool.test_search_tool llm_episode --search_url http://localhost:8000/retrieve
     python -m tests.test_tool.test_search_tool evaluate --search_url http://localhost:8000/retrieve --n_examples 1 --verbose
+    python -m tests.test_tool.test_search_tool benchmark --search_url http://localhost:8000/retrieve --n_examples 5 --verbose --env_names eval:2Wiki,eval:PopQA
     """
     fire.Fire(
         {
@@ -247,6 +396,7 @@ def main():
             "episode": test_episode,
             "llm_episode": test_llm_episode,
             "evaluate": evaluate,
+            "benchmark": benchmark,
         }
     )
 

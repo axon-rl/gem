@@ -416,3 +416,24 @@ register(
     question_key="question",
     answer_key="answer",
 )
+
+## The test split used in DeepResearcher, 512 questions per data_source
+#   data_source: 2wiki, popqa, tq, hotpotqa, Bamboogle, nq, musique
+data_names = [
+    ("2wiki", "2Wiki"),
+    ("popqa", "PopQA"),
+    ("tq", "TriviaQA"),
+    ("hotpotqa", "HotpotQA"),
+    ("bamboogle", "Bamboogle"),
+    ("nq", "NaturalQuestions"),
+    ("musique", "Musique"),
+]
+for name, env_name in data_names:
+    register(
+        f"eval:{env_name}",
+        "gem.envs.qa_env:QaEnv",
+        dataset_name=f"axon-rl/search-eval",
+        split=name,
+        question_key="question",
+        answer_key="answer",
+    )
