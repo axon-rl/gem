@@ -8,36 +8,28 @@ We’re entering the era of experience, where LLM training moves beyond static d
 
 Like OpenAI [Gym](https://github.com/openai/gym) for traditional RL, GEM is a dedicated environment simulator for the age of LLMs. GEM offers a diverse range of environments with clean, standardized interfaces, making it easy to integrate with existing RL training frameworks (Oat, Verl, etc.). In addition, GEM features tool integration, flexible and easy-to-modify wrappers, async vectorized environment execution to maximize throughput, multi-environment training, and more … everything you need to make LLM agent RL training simple.
 
-## Updates
-* 01/08/2025: 🎉 We release our GEM codebase, along with a [blog](https://axon-rl.notion.site/gem) elaborating its key features, a baseline algorithm of multi-turn RL training, and a set of baselines. 
 
 ## Links
 * **GEM: Gym for Generalist LLMs**
-  * 🤗 [Blog](https://axon-rl.notion.site/gem)
+  * 📄 [Blog](https://axon-rl.notion.site/gem)
   * 🚀 [Release tweet](https://x.com)
-
-* **OAT: A research-friendly framework for LLM online alignment**
-  * 💻 [Codebase](https://github.com/sail-sg/oat)
 
 ## Installation
 
-We recommand using [uv](https://docs.astral.sh/uv/getting-started/installation/) for dependency management:
+We recommend using [uv](https://docs.astral.sh/uv/getting-started/installation/) for dependency management:
 
 ```bash
 uv pip install -e .
-
-# sandbox: this is for code environments
-conda install bubblewrap
 ```
 
-To use `search` tool, do: 
+To use the `search` tool, run: 
 ```bash
-pip install -e .[search]
+uv pip install -e .[search]
 conda install -c pytorch -c nvidia faiss-gpu=1.8.0
 ```
 
 ## Interface
-GEM's interface closely follows Gym's API - here's an example using "game:GuessTheNumber-v0" environment: 
+GEM's interface closely follows Gym's API. Here's an example using the "game:GuessTheNumber-v0" environment: 
 
 ```python 
 import gem
@@ -71,13 +63,82 @@ while True:
         break
 ```
 
+### Tool Integration Examples
+
+Below are examples for enabling tools within environments.
+
+Example using the Python tool: 
+```python
+
+```
+
+Example using the search tool: 
+```python
+
+```
+
+## Integration Examples
+
+We demonstrate how to leverage existing LLM RL infrastructure to train agents with GEM. First, we show how to train game agents using [Oat](https://github.com/sail-sg/oat). 
+
+Before running the training, ensure you set up the development environment by following the [instructions](https://github.com/axon-rl/gem/tree/main/examples#training-with-oat). 
+
+Run the following command to train an agent for the game environment `game:GuessTheNumber-v0`: 
+
+```python 
+python train.py \
+    --env_id game:GuessTheNumber-v0 \
+    --wrappers concat \
+    --gamma 0.9 \
+    --norm_adv \
+    --gpus 8 \
+    --gradient-checkpointing \
+    --num_samples 1 \
+    --rollout_batch_size 128 \
+    --num_envs 2 \
+    --rollout_batch_size_per_device 16 \
+    --pi_buffer_maxlen_per_device 16 \
+    --pretrain Qwen/Qwen3-1.7B-Base \
+    --enable_prefix_caching \
+    --collocate \
+    --vllm_sleep \
+    --vllm_gpu_ratio 0.45 \
+    --rnd-seed \
+    --learning_rate 0.000001 \
+    --lr_scheduler constant \
+    --lr_warmup_ratio 0 \
+    --num_ppo_epochs 2 \
+    --train_batch_size 128 \
+    --train_batch_size_per_device 1 \
+    --beta 0 \
+    --max_model_len 12800 \
+    --generate_max_length 4096 \
+    --temperature 1.0 \
+    --top_p 1 \
+    --eval_steps -1 \
+    --save_steps -1 \
+    --eval_temperature 0.6 \
+    --eval_top_p 0.95 \
+    --eval_generate_max_length 4096 \
+    --max_train 65000 \
+    --max_save_num 30 \
+    --use-wb \
+    --wb-run-name oat-qwen3-1.7b-base-game:GuessTheNumber-v0 \
+    --wb_project gem \
+    --debug
+```
+
+
+We also provide sample code for math, code, and general QA in [examples](https://github.com/axon-rl/gem/tree/main/examples). In addition to Oat integration, you can find examples of RL training with Verl [here](https://github.com/axon-rl/gem/tree/main/examples#training-with-verl). 
+
+
 ## Acknowledgements
 * This work is supported by [Sea AI Lab](https://sail.sea.com/) for computing resources.
-* Our code learns and builds based on several awesome projects such as [gym](https://github.com/openai/gym), (math ref project), (code ref project), [TextArena](https://github.com/LeonGuertler/TextArena), [Search-R1](https://github.com/PeterGriffinJin/Search-R1), [ReasoningGym](https://github.com/open-thought/reasoning-gym).
-* The training example codes are built on [Oat](https://github.com/sail-sg/oat) and [Verl](https://github.com/volcengine/verl).
+* Our code learns from and builds on several awesome projects such as [gym](https://github.com/openai/gym), (math ref project), (code ref project), [TextArena](https://github.com/LeonGuertler/TextArena), [Search-R1](https://github.com/PeterGriffinJin/Search-R1), [ReasoningGym](https://github.com/open-thought/reasoning-gym).
+* The training example code is built on [Oat](https://github.com/sail-sg/oat) and [Verl](https://github.com/volcengine/verl).
 
 ## Citation
-If you find our works useful for your research, please consider citing:
+If you find our work useful for your research, please consider citing:
 
 - Our blog that releases GEM: 
     ```bibtex
