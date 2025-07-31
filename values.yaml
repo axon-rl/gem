@@ -1,0 +1,15 @@
+shmSize: 64Gi
+
+volumeMounts:
+  - name: dataset
+    mountPath: /dataset
+  # - name: sailor2
+  #   mountPath: /sailor2
+volumes:
+  - name: dataset
+    persistentVolumeClaim:
+      claimName: dataset
+  # - name: sailor2
+  #   nfs:
+  #     path: /pvc_a2b40ce8_12b6_426b_9dcc_6210f12b8bf5
+  #     server: nfs.tmkv-1.sail.insea.io
