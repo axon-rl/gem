@@ -2,6 +2,23 @@
 
 # GEM: Gym for Generalist LLMs
 
+
+[![Notion blog](https://img.shields.io/badge/Notion-000000?style=for-the-badge&logo=notion&logoColor=white)](https://axon-rl.notion.site/gem) 
+[![🌐 Axon-RL](https://img.shields.io/badge/-AxonRL%20project-5865F2?style=for-the-badge)](https://axon-rl.github.io/) 
+[![Hugging Face Collection](https://img.shields.io/badge/AxonRL-fcd022?style=for-the-badge&logo=huggingface&logoColor=000&labelColor)](https://huggingface.co/axon-rl) 
+[![Documentation](https://img.shields.io/badge/Documentation-blue?style=for-the-badge&logo=readthedocs&logoColor=white)](https://axon-rl.github.io/gem/)
+
+<div align="center" style="font-family: Arial, sans-serif;">
+  <p>
+    <a href="#links" style="text-decoration: none; font-weight: bold;">Links</a> •
+    <a href="#installation" style="text-decoration: none; font-weight: bold;">Installation</a> •
+    <a href="#interface" style="text-decoration: none; font-weight: bold;">Interface</a> •
+    <a href="#integration-examples" style="text-decoration: none; font-weight: bold;">Integration Examples</a> •
+    <a href="#acknowledgement" style="text-decoration: none; font-weight: bold;">Acknowledgement</a> •
+    <a href="#citation" style="text-decoration: none; font-weight: bold;">Citation</a> 
+  </p>
+</div>
+
 </div>
 
 We’re entering the era of experience, where LLM training moves beyond static datasets, towards LLM agents learning from experience gathered in complex, expressive environments. As a step towards this we introduce **GEM**, our open-source **G**eneral **E**xperience **M**aker.
@@ -11,8 +28,9 @@ Like OpenAI [Gym](https://github.com/openai/gym) for traditional RL, GEM is a de
 
 ## Links
 * **GEM: Gym for Generalist LLMs**
-  * 📄 [Blog](https://axon-rl.notion.site/gem)
+  * 📜 [Blog](https://axon-rl.notion.site/gem)
   * 🚀 [Release tweet](https://x.com)
+  * 📄 [Documentation](https://axon-rl.github.io/gem/)
 
 ## Installation
 
@@ -178,7 +196,7 @@ python train.py \
 We also provide sample code for math, code, and general QA in the [examples](https://github.com/axon-rl/gem/tree/main/examples) directory. In addition to Oat integration, you can find examples of RL training with Verl [here](https://github.com/axon-rl/gem/tree/main/examples#training-with-verl). 
 
 
-## Acknowledgements
+## Acknowledgement
 * This work is supported by [Sea AI Lab](https://sail.sea.com/) for computing resources.
 * Our code learns from and builds on several awesome projects such as [gym](https://github.com/openai/gym), (math ref project), (code ref project), [TextArena](https://github.com/LeonGuertler/TextArena), [Search-R1](https://github.com/PeterGriffinJin/Search-R1), [ReasoningGym](https://github.com/open-thought/reasoning-gym).
 * The training example code is built on [Oat](https://github.com/sail-sg/oat) and [Verl](https://github.com/volcengine/verl).
