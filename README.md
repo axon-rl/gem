@@ -219,8 +219,9 @@ We also provide sample code for math, code, and general QA in the [examples](htt
 ## Roadmap
 
 We plan to integrate (but not limited) the following environments soon:
-- [ ] Terminal-bench
+- [ ] Terminal-Bench
 - [ ] SWE-Gym
+- [ ] ...
 
 ## Contributing
 
