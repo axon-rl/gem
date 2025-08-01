@@ -224,7 +224,7 @@ We plan to integrate (but not limited) the following environments soon:
 
 ## Contributing
 
-We welcome all forms of contribution — from adding new environments to integrating additional training frameworks. We're planning to write a community-driven technical report, and major contributors will be recognized with authorship.
+We welcome all forms of contribution — from adding new environments to integrating additional training frameworks. We're planning to write a community-driven technical report, and major contributors will be recognized with authorship. Join [discord](https://discord.gg/AfXVkEphzD) to discuss more!
 
 ## Acknowledgement
 * This work is supported by [Sea AI Lab](https://sail.sea.com/) for computing resources.
