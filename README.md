@@ -43,7 +43,7 @@ uv pip install gem-llm
 
 To use the `search` tool, run: 
 ```bash
-uv pip install gem-llm[search]
+uv pip install 'gem-llm[search]'
 conda install -c pytorch -c nvidia faiss-gpu=1.8.0
 ```
 
