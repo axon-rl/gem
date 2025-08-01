@@ -103,7 +103,7 @@ wrapped_env = WRAPPER_FACTORY["concat_chat"](
 obs, info = wrapped_env.reset()
 
 # we ignore the obs and use a dummy action
-dummy_action = "<think>Let me confirm the results of 10 / 3 with python.</think><python>print(10/3)</python>"
+dummy_action = "<think>Let me compare 9.9 and 0.11 using python.</think><python>print('9.9 > 9.11?', 9.9 > 9.11)</python>"
 obs, reward, terminated, truncated, info = wrapped_env.step(dummy_action)
 print(obs)
 # continue to sample the next response given the tool results ...
