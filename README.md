@@ -67,15 +67,61 @@ while True:
 
 Below are examples for enabling tools within environments.
 
-Example using the Python tool: 
+**Example using the Python tool:**
 ```python
 
 ```
 
-Example using the search tool: 
+**Example using the search tool:**
 ```python
+# assume you have search server running
 
+env = gem.make("game:GuessTheNumber-v0", max_turns=2)
+tool = SearchTool(search_url="http://localhost:8000/retrieve", topk=2)
+wrapped_env = ToolEnvWrapper(env, tools=[tool], max_tool_uses=1)
+wrapped_env = WRAPPER_FACTORY['concat_chat'](wrapped_env, tokenizer=AutoTokenizer.from_pretrained("Qwen/Qwen3-0.6B"))
+wrapped_env.reset()
+
+dummy_action = "<think>I need to search for Python list comprehension examples</think><search>Python list comprehension examples</search>"
+obs, reward, terminated, truncated, info = wrapped_env.step(dummy_action)
+print(obs)
 ```
+
+<details>
+<summary>Click to get the complete runnable code</summary>
+
+```python
+import subprocess
+import time
+
+from transformers import AutoTokenizer
+
+import gem
+from gem.tools.search_tool import SearchTool
+from gem.tools.tool_env_wrapper import ToolEnvWrapper
+from gem.wrappers.wrapper_factory import WRAPPER_FACTORY
+
+# start the search server
+serp_api_key = "add you api key" # get api at https://serpapi.com/manage-api-key
+server_process = subprocess.Popen([
+    'python', '-m', 'gem.tools.search_engine.serp_search_server',
+    '--search_url', 'https://serpapi.com/search',
+    '--topk', '2', '--serp_api_key', serp_api_key
+])
+time.sleep(5)
+
+# interact using search tool
+env = gem.make("game:GuessTheNumber-v0", max_turns=2)
+tool = SearchTool(search_url="http://localhost:8000/retrieve", topk=2)
+wrapped_env = ToolEnvWrapper(env, tools=[tool], max_tool_uses=1)
+wrapped_env = WRAPPER_FACTORY['concat_chat'](wrapped_env, tokenizer=AutoTokenizer.from_pretrained("Qwen/Qwen3-0.6B"))
+wrapped_env.reset()
+
+dummy_action = "<think>I need to search for Python list comprehension examples</think><search>Python list comprehension examples</search>"
+obs, reward, terminated, truncated, info = wrapped_env.step(dummy_action)
+print(obs)
+```
+</details>
 
 ## Integration Examples
 
@@ -129,7 +175,7 @@ python train.py \
 ```
 
 
-We also provide sample code for math, code, and general QA in [examples](https://github.com/axon-rl/gem/tree/main/examples). In addition to Oat integration, you can find examples of RL training with Verl [here](https://github.com/axon-rl/gem/tree/main/examples#training-with-verl). 
+We also provide sample code for math, code, and general QA in the [examples](https://github.com/axon-rl/gem/tree/main/examples) directory. In addition to Oat integration, you can find examples of RL training with Verl [here](https://github.com/axon-rl/gem/tree/main/examples#training-with-verl). 
 
 
 ## Acknowledgements
@@ -140,23 +186,12 @@ We also provide sample code for math, code, and general QA in [examples](https:/
 ## Citation
 If you find our work useful for your research, please consider citing:
 
-- Our blog that releases GEM: 
-    ```bibtex
-    @misc{liu2025gem,
-    title={GEM: A Gym for Generalist LLMs},
-    author={},
-    year={2025},
-    howpublished={\url{https://axon-rl.notion.site/gem}},
-    note={Notion Blog},
-    }
-    ```
-
-- The training framework for implementing the baseline algorithm: 
-    ```bibtex
-    @misc{liu2024oat,
-    title={OAT: A research-friendly framework for LLM online alignment},
-    author={Liu, Zichen and Chen, Changyu and Wan, Xinyi and Du, Chao and Lee, Wee Sun and Lin, Min},
-    year={2024},
-    howpublished={\url{https://github.com/sail-sg/oat}},
-    }
-    ```
+```bibtex
+@misc{liu2025gem,
+title={GEM: A Gym for Generalist LLMs},
+author={Liu, Zichen and Sims, Anya and Duan, Keyu and Chen, Changyu and Yang, Diyi and Lee, Wee Sun and Lin, Min},
+year={2025},
+howpublished={\url{https://axon-rl.notion.site/gem}},
+note={Notion Blog},
+}
+```
