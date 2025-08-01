@@ -218,7 +218,7 @@ We also provide sample code for math, code, and general QA in the [examples](htt
 
 ## Roadmap
 
-We plan to integrate (but not limited) the following environments soon:
+As our next step, we plan to integrate the following environments (among others):
 - [ ] Terminal-Bench
 - [ ] SWE-Gym
 - [ ] ...
