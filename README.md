@@ -30,7 +30,7 @@ Like OpenAI [Gym](https://github.com/openai/gym) for traditional RL, GEM is a de
 ## Links
 * **GEM: Gym for Generalist LLMs**
   * 📜 [Blog](https://axon-rl.notion.site/gem)
-  * 🚀 [Release tweet](https://x.com)
+  * 🚀 [Release tweet](https://x.com/zzlccc/status/1951358948587741295)
   * 📄 [Documentation](https://axon-rl.github.io/gem/)
 
 ## Installation
