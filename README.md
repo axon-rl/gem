@@ -216,21 +216,17 @@ python train.py \
 
 We also provide sample code for math, code, and general QA in the [examples](https://github.com/axon-rl/gem/tree/main/examples) directory. In addition to Oat integration, you can find examples of RL training with Verl [here](https://github.com/axon-rl/gem/tree/main/examples#training-with-verl). 
 
+## Roadmap
+
+We plan to integrate (but not limited) the following environments soon:
+- [ ] Terminal-bench
+- [ ] SWE-Gym
+
+## Contributing
+
+We welcome all forms of contribution — from adding new environments to integrating additional training frameworks. We're planning to write a community-driven technical report, and major contributors will be recognized with authorship.
 
 ## Acknowledgement
 * This work is supported by [Sea AI Lab](https://sail.sea.com/) for computing resources.
-* Our code learns from and builds on several awesome projects such as [gym](https://github.com/openai/gym), (math ref project), (code ref project), [TextArena](https://github.com/LeonGuertler/TextArena), [Search-R1](https://github.com/PeterGriffinJin/Search-R1), [ReasoningGym](https://github.com/open-thought/reasoning-gym).
+* Our code learns from and builds on several awesome projects such as [gym](https://github.com/openai/gym), [rllm](https://github.com/rllm-org/rllm), [TextArena](https://github.com/LeonGuertler/TextArena), [Search-R1](https://github.com/PeterGriffinJin/Search-R1), [ReasoningGym](https://github.com/open-thought/reasoning-gym).
 * The training example code is built on [Oat](https://github.com/sail-sg/oat) and [Verl](https://github.com/volcengine/verl).
-
-## Citation
-If you find our work useful for your research, please consider citing:
-
-```bibtex
-@misc{liu2025gem,
-title={GEM: A Gym for Generalist LLMs},
-author={Liu, Zichen and Sims, Anya and Duan, Keyu and Chen, Changyu and Yang, Diyi and Lee, Wee Sun and Lin, Min},
-year={2025},
-howpublished={\url{https://axon-rl.notion.site/gem}},
-note={Notion Blog},
-}
-```
