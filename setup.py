@@ -37,7 +37,7 @@ setup(
     license="Apache-2.0",
     packages=find_packages(exclude=["examples*", "test*"]),
     include_package_data=True,
-    python_requires=">=3.8, <3.11",
+    python_requires=">=3.10, <=3.12",
     setup_requires=["setuptools_scm>=7.0"],
     zip_safe=False,
 )
