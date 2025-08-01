@@ -16,6 +16,7 @@
 
 import argparse
 import asyncio
+import json
 import os
 import random
 import re
@@ -29,53 +30,6 @@ from googleapiclient.discovery import build
 from mosec import Runtime, Server, Worker
 from mosec.mixin import TypedMsgPackMixin
 from msgspec import Struct
-
-# --- CLI Args ---
-parser = argparse.ArgumentParser(description="Launch online search server.")
-parser.add_argument(
-    "--api_key", type=str, required=True, help="API key for Google search"
-)
-parser.add_argument(
-    "--cse_id", type=str, required=True, help="CSE ID for Google search"
-)
-parser.add_argument(
-    "--topk", type=int, default=3, help="Number of results to return per query"
-)
-parser.add_argument(
-    "--snippet_only",
-    action="store_true",
-    help="If set, only return snippets; otherwise, return full context.",
-)
-parser.add_argument(
-    "--max_wait_time",
-    type=int,
-    default=10,
-    help="Maximum wait time for batching requests",
-)
-args = parser.parse_args()
-
-
-class SearchRequest(Struct, kw_only=True):
-    queries: List[str]
-
-
-class SearchResponse(Struct, kw_only=True):
-    result: List[List[Dict]]
-
-
-# --- Config ---
-class OnlineSearchConfig:
-    def __init__(
-        self,
-        topk: int = 3,
-        api_key: Optional[str] = None,
-        cse_id: Optional[str] = None,
-        snippet_only: bool = False,
-    ):
-        self.topk = topk
-        self.api_key = api_key
-        self.cse_id = cse_id
-        self.snippet_only = snippet_only
 
 
 # --- Utilities ---
@@ -143,9 +97,9 @@ async def fetch_all(urls: List[str], limit: int = 8) -> List[str]:
         return await asyncio.gather(*tasks)
 
 
-# --- Search Engine ---
+# --- Online Search Engine ---
 class OnlineSearchEngine:
-    def __init__(self, config: OnlineSearchConfig):
+    def __init__(self, config):
         self.config = config
 
     def collect_context(self, snippet: str, doc: str) -> str:
@@ -247,30 +201,98 @@ class OnlineSearchEngine:
         return contexts[: self.config.topk]
 
 
+#####################################
+# Mosec server
+#####################################
+
+class SearchRequest(Struct):
+    query: str
+
+
+class SearchResponse(Struct):
+    result: List[Dict]
+
+
+class Config:
+    def __init__(
+        self,
+        topk: int = 3,
+        api_key: Optional[str] = None,
+        cse_id: Optional[str] = None,
+        snippet_only: bool = False,
+    ):
+        self.topk = topk
+        self.api_key = api_key
+        self.cse_id = cse_id
+        self.snippet_only = snippet_only
+
+
 class SearchWorker(TypedMsgPackMixin, Worker):
     def __init__(self):
         super().__init__()
-        self.config = OnlineSearchConfig(
-            api_key=args.api_key,
-            cse_id=args.cse_id,
-            topk=args.topk,
-            snippet_only=args.snippet_only,
-        )
+        self.config = Config(**json.loads(os.environ.get("CONFIG")))
         self.engine = OnlineSearchEngine(self.config)
 
-    def forward(self, request: SearchRequest) -> SearchResponse:
-        results = self.engine.batch_search(request.queries)
-        return SearchResponse(result=results)
+    def forward(self, requests: List[SearchRequest]) -> List[SearchResponse]:
+        query_list = [request.query for request in requests]
+        results = self.engine.batch_search(query_list)
+        
+        return [SearchResponse(result=result) for result in results]
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Launch online search server.")
+    parser.add_argument(
+        "--api_key", type=str, required=True, help="API key for Google search"
+    )
+    parser.add_argument(
+        "--cse_id", type=str, required=True, help="CSE ID for Google search"
+    )
+    parser.add_argument(
+        "--topk", type=int, default=3, help="Number of results to return per query"
+    )
+    parser.add_argument(
+        "--snippet_only",
+        action="store_true",
+        help="If set, only return snippets; otherwise, return full context.",
+    )
+    parser.add_argument(
+        "--max_wait_time",
+        type=int,
+        default=10,
+        help="Maximum wait time for batching requests",
+    )
+    parser.add_argument(
+        "--max_batch_size",
+        type=int,
+        default=10,
+        help="Maximum batch size for the search server.",
+    )
+    parser.add_argument(
+        "--num_workers",
+        type=int,
+        default=1,
+        help="Number of worker processes for the search server.",
+    )
+
+    args = parser.parse_args()
+
+    # Build config to pass to workers via environment variable
+    config = {
+        "api_key": args.api_key,
+        "cse_id": args.cse_id,
+        "topk": args.topk,
+        "snippet_only": args.snippet_only,
+    }
+
     server = Server()
     runtime = Runtime(
         worker=SearchWorker,
-        num=1,
-        max_batch_size=1,
+        num=args.num_workers,
+        max_batch_size=args.max_batch_size,
         max_wait_time=args.max_wait_time,
         timeout=30,
+        env=[{"CONFIG": json.dumps(config)} for _ in range(args.num_workers)],
     )
 
     server.register_runtime(

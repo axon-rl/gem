@@ -327,9 +327,8 @@ def get_retriever(config):
 
 
 #####################################
-# FastAPI server below
+# Mosec server
 #####################################
-
 
 class Config:
     """

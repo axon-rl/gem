@@ -15,6 +15,8 @@
 # Adapted from https://github.com/PeterGriffinJin/Search-R1.
 
 import argparse
+import json
+import os
 from concurrent.futures import ThreadPoolExecutor
 from typing import Dict, List, Optional
 
@@ -23,57 +25,10 @@ from mosec import Runtime, Server, Worker
 from mosec.mixin import TypedMsgPackMixin
 from msgspec import Struct
 
-parser = argparse.ArgumentParser(description="Launch online search server.")
-parser.add_argument(
-    "--search_url",
-    type=str,
-    required=True,
-    help="URL for search engine (e.g. https://serpapi.com/search)",
-)
-parser.add_argument(
-    "--topk", type=int, default=3, help="Number of results to return per query"
-)
-parser.add_argument(
-    "--serp_api_key", type=str, default=None, help="SerpAPI key for online search"
-)
-parser.add_argument(
-    "--serp_engine", type=str, default="google", help="SerpAPI engine for online search"
-)
-parser.add_argument(
-    "--max_wait_time",
-    type=int,
-    default=10,
-    help="Maximum wait time for batching requests",
-)
-args = parser.parse_args()
-
-
-class SearchRequest(Struct, kw_only=True):
-    queries: List[str]
-
-
-class SearchResponse(Struct, kw_only=True):
-    result: List[List[Dict]]
-
-
-# --- Config ---
-class OnlineSearchConfig:
-    def __init__(
-        self,
-        search_url: str = "https://serpapi.com/search",
-        topk: int = 3,
-        serp_api_key: Optional[str] = None,
-        serp_engine: Optional[str] = None,
-    ):
-        self.search_url = search_url
-        self.topk = topk
-        self.serp_api_key = serp_api_key
-        self.serp_engine = serp_engine
-
 
 # --- Online Search Wrapper ---
 class OnlineSearchEngine:
-    def __init__(self, config: OnlineSearchConfig):
+    def __init__(self, config):
         self.config = config
 
     def _search_query(self, query: str):
@@ -129,30 +84,99 @@ class OnlineSearchEngine:
         return results
 
 
+#####################################
+# Mosec server
+#####################################
+
+class SearchRequest(Struct):
+    query: str
+
+
+class SearchResponse(Struct):
+    result: List[Dict]
+
+
+class Config:
+    def __init__(
+        self,
+        search_url: str = "https://serpapi.com/search",
+        topk: int = 3,
+        serp_api_key: Optional[str] = None,
+        serp_engine: Optional[str] = None,
+    ):
+        self.search_url = search_url
+        self.topk = topk
+        self.serp_api_key = serp_api_key
+        self.serp_engine = serp_engine
+
+
 class SearchWorker(TypedMsgPackMixin, Worker):
     def __init__(self):
         super().__init__()
-        self.config = OnlineSearchConfig(
-            search_url=args.search_url,
-            topk=args.topk,
-            serp_api_key=args.serp_api_key,
-            serp_engine=args.serp_engine,
-        )
+        self.config = Config(**json.loads(os.environ.get("CONFIG")))
         self.engine = OnlineSearchEngine(self.config)
 
-    def forward(self, request: SearchRequest) -> SearchResponse:
-        results = self.engine.batch_search(request.queries)
-        return SearchResponse(result=results)
+    def forward(self, requests: List[SearchRequest]) -> List[SearchResponse]:
+        query_list = [request.query for request in requests]
+        results = self.engine.batch_search(query_list)
+        
+        return [SearchResponse(result=result) for result in results]
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Launch online search server.")
+    parser.add_argument(
+        "--search_url",
+        type=str,
+        default="https://serpapi.com/search",
+        help="URL for search engine (e.g. https://serpapi.com/search)",
+    )
+    parser.add_argument(
+        "--topk", type=int, default=3, help="Number of results to return per query"
+    )
+    parser.add_argument(
+        "--serp_api_key", type=str, default=None, help="SerpAPI key for online search"
+    )
+    parser.add_argument(
+        "--serp_engine", type=str, default="google", help="SerpAPI engine for online search"
+    )
+    parser.add_argument(
+        "--max_wait_time",
+        type=int,
+        default=10,
+        help="Maximum wait time for batching requests",
+    )
+    parser.add_argument(
+        "--max_batch_size",
+        type=int,
+        default=10,
+        help="Maximum batch size for the search server.",
+    )
+    parser.add_argument(
+        "--num_workers",
+        type=int,
+        default=1,
+        help="Number of worker processes for the search server.",
+    )
+
+    args = parser.parse_args()
+
+    # Build config to pass to workers via environment variable
+    config = {
+        "search_url": args.search_url,
+        "topk": args.topk,
+        "serp_api_key": args.serp_api_key,
+        "serp_engine": args.serp_engine,
+    }
+
     server = Server()
     runtime = Runtime(
         worker=SearchWorker,
-        num=1,
-        max_batch_size=1,
+        num=args.num_workers,
+        max_batch_size=args.max_batch_size,
         max_wait_time=args.max_wait_time,
         timeout=30,
+        env=[{"CONFIG": json.dumps(config)} for _ in range(args.num_workers)],
     )
 
     server.register_runtime(
