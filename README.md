@@ -1,6 +1,6 @@
 <div align="center">
 
-# GEM: Gym for Generalist LLMs
+# GEM: A Gym for Generalist LLMs
 
 
 [![Notion blog](https://img.shields.io/badge/Notion-000000?style=for-the-badge&logo=notion&logoColor=white)](https://axon-rl.notion.site/gem) 
@@ -87,7 +87,28 @@ Below are examples for enabling tools within environments.
 
 **Example using the Python tool:**
 ```python
+from transformers import AutoTokenizer
 
+import gem
+from gem.tools.python_code_tool import PythonCodeTool
+from gem.tools.tool_env_wrapper import ToolEnvWrapper
+from gem.wrappers.wrapper_factory import WRAPPER_FACTORY
+
+env = gem.make("math:GSM8K")
+tool = PythonCodeTool()
+wrapped_env = ToolEnvWrapper(env, tools=[tool])
+wrapped_env = WRAPPER_FACTORY["concat_chat"](
+    wrapped_env, tokenizer=AutoTokenizer.from_pretrained("Qwen/Qwen3-0.6B")
+)
+obs, info = wrapped_env.reset()
+
+# we ignore the obs and use a dummy action
+dummy_action = "<think>Let me confirm the results of 10 / 3 with python.</think><python>print(10/3)</python>"
+obs, reward, terminated, truncated, info = wrapped_env.step(dummy_action)
+print(obs)
+# continue to sample the next response given the tool results ...
+
+wrapped_env.close()
 ```
 
 **Example using the search tool:**

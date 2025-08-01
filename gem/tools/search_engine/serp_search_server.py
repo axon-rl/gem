@@ -88,6 +88,7 @@ class OnlineSearchEngine:
 # Mosec server
 #####################################
 
+
 class SearchRequest(Struct):
     query: str
 
@@ -119,7 +120,7 @@ class SearchWorker(TypedMsgPackMixin, Worker):
     def forward(self, requests: List[SearchRequest]) -> List[SearchResponse]:
         query_list = [request.query for request in requests]
         results = self.engine.batch_search(query_list)
-        
+
         return [SearchResponse(result=result) for result in results]
 
 
@@ -138,7 +139,10 @@ if __name__ == "__main__":
         "--serp_api_key", type=str, default=None, help="SerpAPI key for online search"
     )
     parser.add_argument(
-        "--serp_engine", type=str, default="google", help="SerpAPI engine for online search"
+        "--serp_engine",
+        type=str,
+        default="google",
+        help="SerpAPI engine for online search",
     )
     parser.add_argument(
         "--max_wait_time",

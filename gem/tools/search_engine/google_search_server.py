@@ -205,6 +205,7 @@ class OnlineSearchEngine:
 # Mosec server
 #####################################
 
+
 class SearchRequest(Struct):
     query: str
 
@@ -236,7 +237,7 @@ class SearchWorker(TypedMsgPackMixin, Worker):
     def forward(self, requests: List[SearchRequest]) -> List[SearchResponse]:
         query_list = [request.query for request in requests]
         results = self.engine.batch_search(query_list)
-        
+
         return [SearchResponse(result=result) for result in results]
 
 

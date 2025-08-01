@@ -125,6 +125,9 @@ class MathEnv(Env):
         """Sample a random action."""
         return "\\boxed{42}"
 
+    def close(self):
+        self.mp_pool.close()
+
 
 if __name__ == "__main__":
     ans1 = parse("${1,2,3,4}$")

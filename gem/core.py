@@ -63,6 +63,10 @@ class Env(abc.ABC):
         """Samples a random action given the current state."""
         raise NotImplementedError
 
+    def close(self) -> None:
+        """Close the environment and recycle resources."""
+        raise NotImplementedError
+
     @property
     def unwrapped(self) -> "Env":
         """Returns the base non-wrapped environment.

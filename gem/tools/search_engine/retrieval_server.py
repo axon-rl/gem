@@ -330,6 +330,7 @@ def get_retriever(config):
 # Mosec server
 #####################################
 
+
 class Config:
     """
     Minimal config class (simulating your argparse)

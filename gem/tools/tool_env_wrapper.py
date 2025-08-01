@@ -23,8 +23,8 @@ class ToolEnvWrapper(EnvWrapper):
         self,
         env: Env,
         tools: List[BaseTool],
-        tool_reward: float = 0.05,
-        tool_success_reward: float = 0.25,
+        tool_reward: float = 0.0,
+        tool_success_reward: float = 0.0,
         max_tool_uses: Optional[int] = 10,
     ):
         super().__init__(env)
