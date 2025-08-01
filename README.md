@@ -14,8 +14,9 @@
     <a href="#installation" style="text-decoration: none; font-weight: bold;">Installation</a> •
     <a href="#interface" style="text-decoration: none; font-weight: bold;">Interface</a> •
     <a href="#integration-examples" style="text-decoration: none; font-weight: bold;">Integration Examples</a> •
-    <a href="#acknowledgement" style="text-decoration: none; font-weight: bold;">Acknowledgement</a> •
-    <a href="#citation" style="text-decoration: none; font-weight: bold;">Citation</a> 
+    <a href="#roadmap" style="text-decoration: none; font-weight: bold;">Roadmap</a> •
+    <a href="#contributing" style="text-decoration: none; font-weight: bold;">Contributing</a> •
+    <a href="#acknowledgement" style="text-decoration: none; font-weight: bold;">Acknowledgement</a>
   </p>
 </div>
 
@@ -37,12 +38,12 @@ Like OpenAI [Gym](https://github.com/openai/gym) for traditional RL, GEM is a de
 We recommend using [uv](https://docs.astral.sh/uv/getting-started/installation/) for dependency management:
 
 ```bash
-uv pip install -e .
+uv pip install gem-llm
 ```
 
 To use the `search` tool, run: 
 ```bash
-uv pip install -e .[search]
+uv pip install gem-llm[search]
 conda install -c pytorch -c nvidia faiss-gpu=1.8.0
 ```
 
