@@ -104,7 +104,7 @@ wrapped_env = WRAPPER_FACTORY["concat_chat"](
 obs, info = wrapped_env.reset()
 
 # we ignore the obs and use a dummy action
-dummy_action = "<think>Let me compare 9.9 and 0.11 using python.</think><python>print('9.9 > 9.11?', 9.9 > 9.11)</python>"
+dummy_action = "<think>Let me compare 9.9 and 9.11 using python.</think><python>print('9.9 > 9.11?', 9.9 > 9.11)</python>"
 obs, reward, terminated, truncated, info = wrapped_env.step(dummy_action)
 print(obs)
 # continue to sample the next response given the tool results ...
@@ -222,6 +222,7 @@ We also provide sample code for math, code, and general QA in the [examples](htt
 As our next step, we plan to integrate the following environments (among others):
 - [ ] Terminal-Bench
 - [ ] SWE-Gym
+- [ ] Multi-Agent Systems
 - [ ] ...
 
 ## Contributing
