@@ -35,15 +35,15 @@ Like OpenAI [Gym](https://github.com/openai/gym) for traditional RL, GEM is a de
 
 ## Installation
 
-We recommend using [uv](https://docs.astral.sh/uv/getting-started/installation/) for dependency management:
+Install `GEM` from PyPI:
 
 ```bash
-uv pip install gem-llm
+pip install -U gem-llm
 ```
 
-To use the `search` tool, run: 
+To use the `search` tool, run the following to install extra dependencies: 
 ```bash
-uv pip install 'gem-llm[search]'
+pip install -U 'gem-llm[search]'
 conda install -c pytorch -c nvidia faiss-gpu=1.8.0
 ```
 
