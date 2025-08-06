@@ -143,9 +143,9 @@ def test_llm_episode(
     tokenizer = AutoTokenizer.from_pretrained(model_name)
 
     def policy(obs):
-        assert isinstance(obs, str), (
-            f"Observation should be a string but is {type(obs)}."
-        )
+        assert isinstance(
+            obs, str
+        ), f"Observation should be a string but is {type(obs)}."
         response = llm.generate(
             [obs],
             sampling_params=sampling_params,
@@ -158,9 +158,9 @@ def test_llm_episode(
         return action
 
     def batch_policy(obss):
-        assert isinstance(obss, List), (
-            f"Observation should be a string but is {type(obss)}."
-        )
+        assert isinstance(
+            obss, List
+        ), f"Observation should be a string but is {type(obss)}."
         response = llm.generate(
             obss,
             sampling_params=sampling_params,

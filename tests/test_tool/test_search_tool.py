@@ -141,9 +141,9 @@ def test_llm_episode(
     tokenizer = llm.get_tokenizer()
 
     def policy(obs):
-        assert isinstance(obs, str), (
-            f"Observation should be a string but is {type(obs)}."
-        )
+        assert isinstance(
+            obs, str
+        ), f"Observation should be a string but is {type(obs)}."
         response = llm.generate(
             [obs],
             sampling_params=sampling_params,
