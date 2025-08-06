@@ -105,9 +105,10 @@ class GuessTheNumberEnv(Env):
                 )
         if self.turn_count >= self.max_turns:  # reach max_turns
             terminate_obs = "You have reached the maximum number of turns."
-            distance = abs(player_guess - self.game_number)
-            # reward = soft_reward + final_step_reward
-            if reward >= 0:
+            if player_guess < self.min_number or player_guess > self.max_number:
+                reward = LanguageGameReward.invalid_action_reward
+            else:
+                distance = abs(player_guess - self.game_number)
                 reward = 1 - (distance / (self.max_number - self.min_number))
             return terminate_obs, reward, True, True, {"suffix": self.get_task_suffix()}
         return next_obs, reward, False, False, {"suffix": self.get_task_suffix()}
