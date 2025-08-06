@@ -41,8 +41,7 @@ def test(env_name: str = "rg:leg_counting"):
     num_envs = 8
     base_seed = 42
     rg_vec_env = gem.make_vec(
-        env_name,
-        num_envs=num_envs,
+        [env_name] * num_envs,
         vec_kwargs=[{"seed": base_seed + i} for i in range(num_envs)],
         size=int(1e9),
     )

@@ -34,10 +34,12 @@ class VectorEnv(Env):
 
     def __init__(
         self,
+        env_ids: Sequence[str],
         env_fns: Sequence[Callable[[], Env]],
         autoreset_mode: Union[str, AutoresetMode] = AutoresetMode.SAME_STEP,
     ) -> None:
         super().__init__()
+        self.env_ids = env_ids
         self.env_fns = env_fns
         self.envs = [env_fn() for env_fn in env_fns]
         self.num_envs = len(env_fns)

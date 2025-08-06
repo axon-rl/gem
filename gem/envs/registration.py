@@ -83,15 +83,14 @@ def make(env_id: str, **kwargs) -> Env:
 
 
 def make_vec(
-    env_id,
-    num_envs: int = 1,
+    env_ids: Union[str, Sequence[str]],
     wrappers: Optional[Sequence[EnvWrapper]] = None,
     vec_kwargs: Optional[Sequence[dict]] = None,
     async_mode: bool = False,
     seed: int = 0,
     **kwargs,
 ) -> VectorEnv:
-    def create_single_env(idx: int) -> Env:
+    def create_single_env(env_id, idx: int) -> Env:
         # set vec specific kwargs
         if vec_kwargs is not None:
             _kwargs = vec_kwargs[idx]
@@ -111,14 +110,25 @@ def make_vec(
             single_env = wrapper(single_env)
         return single_env
 
+    if isinstance(env_ids, str):
+        env_ids = [env_ids]
+
+    num_envs = len(env_ids)
+
     if async_mode:
         print(f"AsyncVectorEnv with {num_envs} environments.")
         env = AsyncVectorEnv(
-            env_fns=[partial(create_single_env, i) for i in range(num_envs)],
+            env_ids=env_ids,
+            env_fns=[
+                partial(create_single_env, env_ids[i], i) for i in range(num_envs)
+            ],
         )
     else:
         print(f"SyncVectorEnv with {num_envs} environments.")
         env = SyncVectorEnv(
-            env_fns=[partial(create_single_env, i) for i in range(num_envs)],
+            env_ids=env_ids,
+            env_fns=[
+                partial(create_single_env, env_ids[i], i) for i in range(num_envs)
+            ],
         )
     return env

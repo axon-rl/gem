@@ -98,18 +98,18 @@ def test_episode(
     run_episode_test("EPISODE 3: CHAT TEMPLATE OBSERVATION ON RESET", wrapped_env)
 
     # Batch episode: Sync vectorized env
-    print("\nBATCH EPISODE: SYNC VECTORIZED ENV")
     num_envs = 3
     tool_env_wrapper = partial(ToolEnvWrapper, tools=[tool], max_tool_uses=3)
     chat_wrapper = partial(WRAPPER_FACTORY["concat_chat"], tokenizer=tokenizer)
     ta_vec_env = gem.make_vec(
-        env_name,
-        num_envs=num_envs,
+        [env_name] * num_envs,
         wrappers=[tool_env_wrapper, chat_wrapper],
         max_turns=3,
     )
     batch_policy = lambda _: [random.choice(TEST_ACTIONS) for _ in range(num_envs)]
-    run_episode_test("", ta_vec_env, batch_policy)
+    run_episode_test(
+        "EPISODE 4: BATCH EPISODE SYNC VECTORIZED ENV", ta_vec_env, batch_policy
+    )
 
 
 def test_llm_episode(
@@ -141,9 +141,9 @@ def test_llm_episode(
     tokenizer = llm.get_tokenizer()
 
     def policy(obs):
-        assert isinstance(
-            obs, str
-        ), f"Observation should be a string but is {type(obs)}."
+        assert isinstance(obs, str), (
+            f"Observation should be a string but is {type(obs)}."
+        )
         response = llm.generate(
             [obs],
             sampling_params=sampling_params,

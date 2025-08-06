@@ -187,8 +187,7 @@ class Actor(PPOActor):
 
         # Instantiate vectorized environment.
         self.env = gem.make_vec(
-            self.args.env_id,
-            num_envs=self.args.num_env,
+            [self.args.env_id] * self.args.num_env,
             vec_kwargs=[{"seed": self.args.seed + j} for j in range(self.args.num_env)],
             wrappers=wrappers,
             async_mode=self.args.async_env,
@@ -653,9 +652,9 @@ if __name__ == "__main__":
     args.prompt_data = ""  # Don't load any dataset
     args.rollout_batch_size = args.rollout_batch_size_per_device * args.gpus
     if "concat_chat" in args.wrappers:
-        assert (
-            args.prompt_template == "no"
-        ), "chat template is applied on env side already"
+        assert args.prompt_template == "no", (
+            "chat template is applied on env side already"
+        )
     args = default_args_validation(args)
 
     # Let's go

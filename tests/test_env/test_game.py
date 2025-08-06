@@ -29,27 +29,25 @@ class HumanAgent:
 
 def test(env_name: str = "game:GuessTheNumber-v0"):
     env = gem.make(env_name, max_turns=3)
-    # policy = lambda _: env.sample_random_action()
-    policy = HumanAgent()
+    policy = lambda _: env.sample_random_action()
 
     # print("\n" * 5, "EPISODE 1: DEFAULT OBSERVATION")
     # run_and_print_episode(env, policy)
 
-    print("\n" * 5, "EPISODE 2: CONCATENATED OBSERVATION")
-    wrapped_env = WRAPPER_FACTORY["concat"](env)
-    run_and_print_episode(wrapped_env, policy)
+    # print("\n" * 5, "EPISODE 2: CONCATENATED OBSERVATION")
+    # wrapped_env = WRAPPER_FACTORY["concat"](env)
+    # run_and_print_episode(wrapped_env, policy)
 
-    print("\n" * 5, "EPISODE 4: CHAT TEMPLATE OBSERVATION")
+    # print("\n" * 5, "EPISODE 4: CHAT TEMPLATE OBSERVATION")
     tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen3-0.6B-Base")
-    wrapped_env = WRAPPER_FACTORY["concat_chat"](env, tokenizer=tokenizer)
-    run_and_print_episode(wrapped_env, policy)
+    # wrapped_env = WRAPPER_FACTORY["concat_chat"](env, tokenizer=tokenizer)
+    # run_and_print_episode(wrapped_env, policy)
 
     print("\n" * 5, "BATCH EPISODE: VECTORIZED ENV")
     num_envs = 3
     wrapper_fn = partial(WRAPPER_FACTORY["concat_chat"], tokenizer=tokenizer)
     ta_vec_env = gem.make_vec(
-        env_name,
-        num_envs=num_envs,
+        [env_name] * num_envs,
         wrappers=[wrapper_fn],
         max_turns=3,
     )
@@ -66,11 +64,10 @@ if __name__ == "__main__":
     print(f"\n\nAll tests run.\n\n")
 
     """Run with:
-        python -m tests.test_env.test_game --env_name game:GuessTheNumber-v0-sanitycheck
-        python -m tests.test_env.test_game --env_name game:GuessTheNumber-v0
-        python -m tests.test_env.test_game --env_name game:Mastermind-v0
-        python -m tests.test_env.test_game --env_name game:Minesweeper-v0
-        python -m tests.test_env.test_game --env_name game:Wordle-v0
+        python -m tests.test_env.test_game --env_name game:GuessTheNumber-v0-hard
+        python -m tests.test_env.test_game --env_name game:Mastermind-v0-easy
+        python -m tests.test_env.test_game --env_name game:Minesweeper-v0-easy
+        python -m tests.test_env.test_game --env_name game:Wordle-v0-easy
         python -m tests.test_env.test_game --env_name eval:MATH500
         python -m tests.test_env.test_game --env_name game:FifteenPuzzle-v0-easy
         python -m tests.test_env.test_game --env_name game:Hangman-v0-easy
