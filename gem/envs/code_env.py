@@ -16,6 +16,7 @@
 
 import json
 import logging
+import random
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Optional, SupportsFloat, Tuple
 
@@ -69,6 +70,7 @@ class CodeEnv(Env):
         self.dataset_name = dataset_name
         self.dataset = dataset.shuffle(seed=self.seed)
         self.dataset_iter = iter(self.dataset)
+        self.epoch = 0
 
         self.thread_pool_executer = ThreadPoolExecutor(max_workers=max_workers)
         self.max_tests = max_tests
@@ -89,14 +91,16 @@ class CodeEnv(Env):
 
     def reset(self, seed: Optional[None] = None) -> Tuple[str, dict[str, Any]]:
         """Sample a question from the dataset."""
-        del seed
-
-        try:
-            data = next(self.dataset_iter)
-        except StopIteration:
-            self.dataset = self.dataset.shuffle(seed=self.seed)
-            self.dataset_iter = iter(self.dataset)
-            data = next(self.dataset_iter)
+        if seed is not None:
+            data = random.choice(self.dataset)
+        else:
+            try:
+                data = next(self.dataset_iter)
+            except StopIteration:
+                self.epoch += 1
+                self.dataset = self.dataset.shuffle(seed=self.seed + self.epoch)
+                self.dataset_iter = iter(self.dataset)
+                data = next(self.dataset_iter)
 
         self.first_obs = data[self.question_key]
         self.tests = data[self.test_key]

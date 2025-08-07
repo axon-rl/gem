@@ -14,6 +14,7 @@
 
 """Reasoning Gym environments (https://github.com/open-thought/reasoning-gym)."""
 
+import random
 from typing import Any, Optional, SupportsFloat, Tuple
 
 import reasoning_gym as rg
@@ -45,17 +46,22 @@ class ReasoningGymEnv(Env):
 
     def reset(self, seed: Optional[None] = None) -> Tuple[str, dict[str, Any]]:
         """Sample a question from the dataset."""
-        del seed
-
-        try:
-            data = next(self.dataset_iter)
-        except StopIteration:
-            # reset dataset with a new but deterministic seed
-            self.dataset = rg.create_dataset(
-                self.name, size=self.size, seed=self.seed + self.idx
-            )
-            self.dataset_iter = iter(self.dataset)
-            data = next(self.dataset_iter)
+        if seed is not None:
+            data = random.choice(self.dataset)
+            if (self.idx + 1) % self.size == 0:
+                self.dataset = rg.create_dataset(
+                    self.name, size=self.size, seed=self.seed + self.idx
+                )
+        else:
+            try:
+                data = next(self.dataset_iter)
+            except StopIteration:
+                # reset dataset with a new but deterministic seed
+                self.dataset = rg.create_dataset(
+                    self.name, size=self.size, seed=self.seed + self.idx
+                )
+                self.dataset_iter = iter(self.dataset)
+                data = next(self.dataset_iter)
 
         question = data["question"]
         self.idx += 1

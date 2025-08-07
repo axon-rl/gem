@@ -16,6 +16,7 @@
 
 import logging
 import multiprocessing
+import random
 from typing import Any, Optional, SupportsFloat, Tuple
 
 from datasets import Dataset, DatasetDict, load_dataset
@@ -84,12 +85,13 @@ class MathEnv(Env):
 
     def reset(self, seed: Optional[None] = None) -> Tuple[str, dict[str, Any]]:
         """Sample a question from the dataset."""
-        del seed
-
-        if self.idx == len(self.dataset):
-            self.epoch += 1
-            self.dataset = self.dataset.shuffle(seed=self.seed + self.epoch)
-            self.idx = 0
+        if seed is not None:
+            self.idx = random.randint(0, len(self.dataset))
+        else:
+            if self.idx == len(self.dataset):
+                self.epoch += 1
+                self.dataset = self.dataset.shuffle(seed=self.seed + self.epoch)
+                self.idx = 0
 
         data = self.dataset[self.idx]
         self.first_obs = data[self.question_key]
