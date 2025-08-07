@@ -57,6 +57,9 @@ text = "Apache-2.0"
 [tool.hatch.version]
 path = "gem/__about__.py"
 
+[tool.hatch.build.targets.wheel]
+packages = ["gem"]
+
 [tool.hatch.envs.types]
 extra-dependencies = [
   "mypy>=1.0.0",
@@ -83,5 +86,62 @@ exclude_lines = [
   "if TYPE_CHECKING:",
 ]
 
-[tool.uv.sources]
-reasoning-gym = { git = "https://github.com/open-thought/reasoning-gym", rev = "1c98584" }
+[tool.pylint.master]
+load-plugins = "pylint.extensions.docparams,pylint.extensions.docstyle,pylint.extensions.no_self_use"
+default-docstring-type = "google"
+ignore-paths = ["gem/__about__.py"]
+
+[tool.pylint.format]
+max-line-length = 88
+indent-after-paren = 4
+indent-string = "    "
+
+[tool.pylint.imports]
+known-third-party = "wandb"
+
+[tool.pylint.reports]
+output-format = "colorized"
+reports = "no"
+score = "yes"
+max-args = 7
+
+[tool.pylint.messages_control]
+disable = ["W0201", "W0108", "W0212", "W1514", "R0902", "R0903", "R0913", "R0914", "R0915", "R1719",
+"R1732", "R0801", "C0103", "C3001", "C0116", "W0106", "R0912", "R1702", "W0640", "W1203",
+"R0402", "C0199", "R6301", "C0301", "W0105", "C0115", "W0621", "C0415", "W0621", "E0401"]
+
+[tool.yapf]
+based_on_style = "yapf"
+spaces_before_comment = 4
+dedent_closing_brackets = true
+column_limit = 88
+continuation_indent_width = 4
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+indent = 4
+line_length = 88
+known_third_party = "wandb"
+
+[tool.mypy]
+files = "gem/**/*.py"
+allow_redefinition = true
+check_untyped_defs = true
+disallow_incomplete_defs = true
+disallow_untyped_defs = true
+ignore_missing_imports = true
+no_implicit_optional = true
+pretty = true
+show_error_codes = true
+show_error_context = true
+show_traceback = true
+strict_equality = true
+strict_optional = true
+warn_no_return = true
+warn_redundant_casts = true
+warn_unreachable = true
+warn_unused_configs = true
+
+[tool.pydocstyle]
+ignore = ["D100", "D102", "D104", "D105", "D107", "D203", "D213", "D401", "D402"]

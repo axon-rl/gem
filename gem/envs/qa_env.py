@@ -23,8 +23,7 @@ from datasets import Dataset, DatasetDict, load_dataset
 
 from gem.core import Env
 from gem.utils.constants import TERMINAL_STATE
-from gem.utils.parsing import (extract_last_boxed_answer,
-                               extract_last_tagged_answer)
+from gem.utils.parsing import extract_last_boxed_answer, extract_last_tagged_answer
 from gem.utils.qa_em import em_check
 
 logger = logging.getLogger(__name__)

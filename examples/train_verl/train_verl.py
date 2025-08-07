@@ -48,12 +48,18 @@ from verl.single_controller.ray import RayWorkerGroup
 from verl.trainer.constants_ppo import PPO_RAY_RUNTIME_ENV
 from verl.trainer.ppo import core_algos
 from verl.trainer.ppo.core_algos import agg_loss
-from verl.trainer.ppo.metric_utils import (compute_data_metrics,
-                                           compute_throughout_metrics,
-                                           compute_timing_metrics)
-from verl.trainer.ppo.ray_trainer import (Dataset, RayPPOTrainer,
-                                          ResourcePoolManager, Role,
-                                          compute_response_mask)
+from verl.trainer.ppo.metric_utils import (
+    compute_data_metrics,
+    compute_throughout_metrics,
+    compute_timing_metrics,
+)
+from verl.trainer.ppo.ray_trainer import (
+    Dataset,
+    RayPPOTrainer,
+    ResourcePoolManager,
+    Role,
+    compute_response_mask,
+)
 from verl.utils.checkpoint.checkpoint_manager import should_save_ckpt_esi
 from verl.utils.debug import marked_timer
 from verl.utils.device import is_cuda_available
@@ -1081,8 +1087,6 @@ class TaskRunner:
         # [GEM Notes] We only support FSDP for now.
         actor_rollout_cls = GEMActorRolloutRefWorker
         ray_worker_group_cls = RayWorkerGroup
-
-        from verl.trainer.ppo.ray_trainer import ResourcePoolManager, Role
 
         # Map roles to their corresponding remote worker classes.
         role_worker_mapping = {
