@@ -57,7 +57,7 @@ class Env(abc.ABC):
             info (dict): Contains auxiliary diagnostic information (helpful for debugging, learning, and logging).
         """
         if seed is not None:
-            self._np_random, self._np_random_seed = seeding.np_random(seed)
+            seeding.set_seed(seed)
 
     def sample_random_action(self) -> str:
         """Samples a random action given the current state."""

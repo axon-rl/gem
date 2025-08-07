@@ -14,10 +14,13 @@
 
 """Seeding the random number generator."""
 
+import random
+from typing import Optional
+
 import numpy as np
 
 
-def np_random(seed: int | None = None) -> tuple[np.random.Generator, int]:
+def np_random(seed: Optional[int] = None) -> tuple[np.random.Generator, int]:
     if seed is not None and not (isinstance(seed, int) and 0 <= seed):
         if isinstance(seed, int) is False:
             raise Exception(f"Seed must be a python integer, actual type: {type(seed)}")
@@ -30,6 +33,12 @@ def np_random(seed: int | None = None) -> tuple[np.random.Generator, int]:
     np_seed = seed_seq.entropy
     rng = RandomNumberGenerator(np.random.PCG64(seed_seq))
     return rng, np_seed
+
+
+def set_seed(seed: Optional[int] = None):
+    np_random(seed)
+    random.seed(seed)
+    np.random.seed(seed)
 
 
 RNG = RandomNumberGenerator = np.random.Generator

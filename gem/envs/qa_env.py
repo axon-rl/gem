@@ -102,6 +102,7 @@ class QaEnv(Env):
 
     def reset(self, seed: Optional[None] = None) -> Tuple[str, dict[str, Any]]:
         """Sample a question from the dataset."""
+        super().reset(seed)
         if seed is not None:
             self.idx = random.randint(0, len(self.dataset))
         else:

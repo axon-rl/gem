@@ -278,7 +278,7 @@ class ReinforceGEMTrainer(RayPPOTrainer):
         if self.config.trainer.total_training_steps is not None:
             self.total_training_steps = self.config.trainer.total_training_steps
 
-        seed = 233
+        seed = int(time.time_ns())
         # [GEM Notes] Init environment.
         # [GEM Notes] Get environment wrappers.
         wrappers = get_wrapper_fns(
