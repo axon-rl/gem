@@ -36,7 +36,6 @@ def np_random(seed: Optional[int] = None) -> tuple[np.random.Generator, int]:
 
 
 def set_seed(seed: Optional[int] = None):
-    np_random(seed)
     random.seed(seed)
     np.random.seed(seed)
 
