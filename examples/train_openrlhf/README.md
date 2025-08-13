@@ -19,7 +19,7 @@ You can use the scripts:
 for reasoning-gym and game environments respectively.
 
 The corresponding agent function files are:
-- `agent_func_single_turn.py`
-- `agent_func_multi_turn.py`
+- `agent_func_multi_turn_template.py` using qwen3 template
+- `agent_func_multi_turn_notemplate.py` without template
 
 Since [OpenRLHF](https://github.com/OpenRLHF/OpenRLHF) requires training data files, we also use GEM to generate prompt datasets specifically for integration with OpenRLHF. All prompts used for training are entirely sourced from GEM.
