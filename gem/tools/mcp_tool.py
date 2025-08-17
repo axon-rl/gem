@@ -19,6 +19,7 @@ import json
 import logging
 import os
 import re
+import threading
 from datetime import timedelta
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -28,15 +29,45 @@ from mcp.client.stdio import stdio_client
 from gem.tools.base_tool import BaseTool
 
 logger = logging.getLogger(__name__)
-logger.setLevel(os.getenv("GEM_LOGGING_LEVEL", "WARN"))
+
+
+def _run_async(coro):
+    """Run an async coroutine from both sync and already-async contexts safely.
+
+    - If there is no running loop, uses asyncio.run
+    - If called inside a running loop, spins up a dedicated thread with its own loop
+    """
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        # No running loop
+        return asyncio.run(coro)
+
+    result: Dict[str, Any] = {}
+
+    def _runner():
+        try:
+            result["value"] = asyncio.run(coro)
+        except Exception as exc:  # noqa: BLE001
+            result["error"] = exc
+
+    thread = threading.Thread(target=_runner, daemon=True)
+    thread.start()
+    thread.join()
+
+    if "error" in result:
+        raise result["error"]
+    return result.get("value")
 
 
 def is_timeout_error(error: Exception) -> bool:
     """Check if an error is a timeout-related error."""
-    error_str = str(error)
+    if isinstance(error, (asyncio.TimeoutError, TimeoutError)):
+        return True
+    error_str = str(error).lower()
     return any(
         keyword in error_str
-        for keyword in ["ETIMEDOUT", "ECONNRESET", "Timeout", "Timed out"]
+        for keyword in ["etimedout", "econnreset", "timeout", "timed out"]
     )
 
 
@@ -92,54 +123,51 @@ class MCPTool(BaseTool):
         self._available_tools: Optional[List[Dict[str, Any]]] = None
         self._tools_discovered = False
 
-    async def _discover_tools(self) -> List[Dict[str, Any]]:
-        """Discover available tools from the MCP server."""
+    def _discover_tools(self) -> List[Dict[str, Any]]:
+        """Discover available tools from the MCP server (synchronous wrapper)."""
         if self._tools_discovered:
             return self._available_tools or []
 
-        tools = []
-        async with stdio_client(self.params) as (read, write):
-            async with ClientSession(
-                read,
-                write,
-                read_timeout_seconds=timedelta(seconds=self.connection_timeout),
-            ) as session:
-                for attempt in range(self.max_retries):
-                    try:
-                        await session.initialize()
-                        response = await session.list_tools()
-                        for tool in response.tools:
-                            tool_info = {
-                                "name": tool.name,
-                                "description": tool.description,
-                                "parameters": tool.inputSchema,
-                            }
-                            tools.append(tool_info)
-                        break
-                    except Exception as e:
-                        logger.warning(
-                            f"Tool discovery attempt {attempt + 1} failed: {e}"
-                        )
-                        if attempt < self.max_retries - 1:
-                            await asyncio.sleep(self.delay_between_retries)
-                        else:
-                            logger.error(
-                                f"Failed to discover tools after {self.max_retries} attempts"
+        async def _async_discover() -> List[Dict[str, Any]]:
+            tools: List[Dict[str, Any]] = []
+            async with stdio_client(self.params) as (read, write):
+                async with ClientSession(
+                    read,
+                    write,
+                    read_timeout_seconds=timedelta(seconds=self.connection_timeout),
+                ) as session:
+                    for attempt in range(self.max_retries):
+                        try:
+                            await session.initialize()
+                            response = await session.list_tools()
+                            for tool in response.tools:
+                                tool_info = {
+                                    "name": tool.name,
+                                    "description": tool.description,
+                                    "parameters": getattr(tool, "inputSchema", None),
+                                }
+                                tools.append(tool_info)
+                            break
+                        except Exception as e:  # noqa: BLE001
+                            logger.warning(
+                                f"Tool discovery attempt {attempt + 1} failed: {e}"
                             )
+                            if attempt < self.max_retries - 1:
+                                await asyncio.sleep(self.delay_between_retries)
+                            else:
+                                logger.error(
+                                    f"Failed to discover tools after {self.max_retries} attempts"
+                                )
+            return tools
 
+        tools = _run_async(_async_discover())
         self._available_tools = tools
         self._tools_discovered = True
         return tools
 
     def get_available_tools(self) -> List[Dict[str, Any]]:
-        """Get list of available tools from the MCP server (sync wrapper)."""
-        try:
-            loop = asyncio.get_event_loop()
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-
-        return loop.run_until_complete(self._discover_tools())
+        """Get list of available tools from the MCP server."""
+        return self._discover_tools()
 
     def _parse_action(self, action: str) -> Tuple[str, str, Dict[str, Any], bool]:
         """Parse action to extract tool name and parameters.
@@ -172,46 +200,52 @@ class MCPTool(BaseTool):
             logger.error(f"Failed to parse parameters JSON: {e}")
             return tool_name, parsed_action, {}, False
 
-    async def _execute_mcp_tool(
-        self, tool_name: str, parameters: Dict[str, Any]
-    ) -> str:
-        """Execute a specific MCP tool with given parameters."""
-        response = ""
+    def _execute_mcp_tool(self, tool_name: str, parameters: Dict[str, Any]) -> str:
+        """Execute a specific MCP tool with given parameters (synchronous wrapper)."""
 
-        async with stdio_client(self.params) as (read, write):
-            async with ClientSession(
-                read,
-                write,
-                read_timeout_seconds=timedelta(seconds=self.connection_timeout),
-            ) as session:
-                for attempt in range(self.max_retries):
-                    try:
-                        await session.initialize()
-                        result = await session.call_tool(
-                            tool_name,
-                            arguments=parameters,
-                            read_timeout_seconds=timedelta(
-                                seconds=self.execution_timeout
-                            ),
-                        )
-                        response = result.content[0].text if result.content else ""
-                        if attempt > 0:
-                            logger.info(
-                                f"MCP tool execution succeeded on attempt {attempt + 1}"
+        async def _async_execute() -> str:
+            response_text = ""
+            async with stdio_client(self.params) as (read, write):
+                async with ClientSession(
+                    read,
+                    write,
+                    read_timeout_seconds=timedelta(seconds=self.connection_timeout),
+                ) as session:
+                    for attempt in range(self.max_retries):
+                        try:
+                            await session.initialize()
+                            result = await session.call_tool(
+                                tool_name,
+                                arguments=parameters,
+                                read_timeout_seconds=timedelta(
+                                    seconds=self.execution_timeout
+                                ),
                             )
-                        break
-                    except Exception as e:
-                        if is_timeout_error(e) and attempt < self.max_retries - 1:
-                            logger.warning(
-                                f"MCP tool execution attempt {attempt + 1} failed: {e}"
-                            )
-                            await asyncio.sleep(self.delay_between_retries)
-                        else:
-                            response = f"MCP tool execution failed: {e}"
-                            logger.error(response)
+                            if getattr(result, "content", None):
+                                parts: List[str] = []
+                                for item in result.content:
+                                    text = getattr(item, "text", None)
+                                    if text is not None:
+                                        parts.append(text)
+                                response_text = "\n".join(parts)
+                            if attempt > 0:
+                                logger.info(
+                                    f"MCP tool execution succeeded on attempt {attempt + 1}"
+                                )
                             break
+                        except Exception as e:  # noqa: BLE001
+                            if is_timeout_error(e) and attempt < self.max_retries - 1:
+                                logger.warning(
+                                    f"MCP tool execution attempt {attempt + 1} failed: {e}"
+                                )
+                                await asyncio.sleep(self.delay_between_retries)
+                            else:
+                                response_text = f"MCP tool execution failed: {e}"
+                                logger.error(response_text)
+                                break
+            return response_text
 
-        return response
+        return _run_async(_async_execute())
 
     def instruction_string(self) -> str:
         """Return instruction string for using the MCP tool."""
@@ -223,7 +257,7 @@ class MCPTool(BaseTool):
             )
 
         tool_descriptions = []
-        for tool in tools:
+        for tool in sorted(tools, key=lambda t: t.get("name", "")):
             desc = f"- {tool['name']}: {tool['description']}"
             if tool.get("parameters", {}).get("properties"):
                 params = list(tool["parameters"]["properties"].keys())
@@ -262,16 +296,8 @@ class MCPTool(BaseTool):
             return False, True, error_msg, parsed_action
 
         try:
-            # Execute the MCP tool
-            loop = asyncio.get_event_loop()
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-
-        try:
-            response = loop.run_until_complete(
-                self._execute_mcp_tool(tool_name, parameters)
-            )
+            # Execute the MCP tool (synchronously)
+            response = self._execute_mcp_tool(tool_name, parameters)
             has_error = "failed" in response.lower()
             observation = f"\n<mcp_result>\n{response}\n</mcp_result>\n"
             return True, has_error, observation, parsed_action
