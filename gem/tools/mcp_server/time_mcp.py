@@ -1,8 +1,9 @@
 # Adapted from https://github.com/yokingma/time-mcp 
 
 import calendar
+import logging
 from datetime import datetime, timedelta, timezone
-from typing import Optional, Tuple
+from typing import Optional
 
 try:
     from zoneinfo import ZoneInfo  # Python 3.9+
@@ -10,6 +11,9 @@ except Exception:  # pragma: no cover
     ZoneInfo = None  # type: ignore
 
 from fastmcp import FastMCP  # FastMCP 2.0 import
+
+# Set up logger
+logger = logging.getLogger(__name__)
 
 app = FastMCP("mcp-time-server")
 
@@ -253,5 +257,61 @@ def get_week_year(date: Optional[str] = None) -> str:
 
 
 if __name__ == "__main__":
-    # Run as an MCP server over stdio
-    app.run()
+    import argparse
+
+    # Parse command line arguments for transport selection
+    parser = argparse.ArgumentParser(description="Time MCP Server")
+    parser.add_argument(
+        "--transport", 
+        choices=["stdio", "http", "streamable-http"], 
+        default="streamable-http",
+        help="Transport protocol to use (default: streamable-http)"
+    )
+    parser.add_argument(
+        "--host", 
+        default="127.0.0.1", 
+        help="Host to bind to for HTTP transport (default: 127.0.0.1)"
+    )
+    parser.add_argument(
+        "--port", 
+        type=int, 
+        default=8081, 
+        help="Port to bind to for HTTP transport (default: 8081)"
+    )
+    parser.add_argument(
+        "--path", 
+        default="/time-mcp", 
+        help="Path for HTTP endpoint (default: /time-mcp)"
+    )
+    parser.add_argument(
+        "--log-level", 
+        choices=["DEBUG", "INFO", "WARNING", "ERROR"], 
+        default="INFO",
+        help="Log level (default: INFO)"
+    )
+    
+    args = parser.parse_args()
+    
+    # Configure logging based on the specified log level
+    logging.basicConfig(
+        level=getattr(logging, args.log_level.upper()),
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
+    
+    # Run the server with the specified transport
+    if args.transport in ["http", "streamable-http"]:
+        logger.info("Starting Time MCP Server with Streamable HTTP transport")
+        logger.info(f"Server will be available at: http://{args.host}:{args.port}{args.path}")
+        logger.info(f"Log level: {args.log_level}")
+        logger.info("Press Ctrl+C to stop the server")
+        app.run(
+            transport="streamable-http",
+            host=args.host,
+            port=args.port,
+            path=args.path,
+            log_level=args.log_level.lower()
+        )
+    else:
+        # Default stdio transport
+        logger.info("Starting Time MCP Server with stdio transport")
+        app.run(transport="stdio")
