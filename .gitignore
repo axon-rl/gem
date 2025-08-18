@@ -1,5 +1,6 @@
 oat-output
 wandb
+tasks
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
