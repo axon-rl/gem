@@ -76,7 +76,7 @@ def is_timeout_error(error: Exception) -> bool:
 
 
 class MCPTool(BaseTool):
-    """A tool for connecting to MCP (Model Context Protocol) servers.
+    """A tool for connecting to MCP servers.
 
     This tool provides a unified configuration-based interface to connect to and 
     interact with MCP servers following the GEM framework's BaseTool interface.
@@ -356,7 +356,11 @@ class MCPTool(BaseTool):
                                 error_content.append(content.text)
                             else:
                                 error_content.append(str(content))
-                        return f"Tool execution error: {' '.join(error_content)}"
+                        return f"[Tool execution error: {' '.join(error_content)}]"
+                    
+                    # Log success if this was a retry attempt
+                    if attempt > 0:
+                        logger.info(f"Tool execution succeeded on attempt {attempt + 1}")
                     
                     # Use FastMCP's structured data handling
                     if result.data is not None:
@@ -376,13 +380,9 @@ class MCPTool(BaseTool):
                     else:
                         # No content available
                         return "Tool execution completed with no output"
-                        
-                if attempt > 0:
-                    logger.info(f"Tool execution succeeded on attempt {attempt + 1}")
-                break
                 
             except ClientError as e:
-                error_msg = f"Tool execution error: {e}"
+                error_msg = f"[Tool execution error: {e}]"
                 logger.error(error_msg)
                 return error_msg
                 
@@ -391,11 +391,11 @@ class MCPTool(BaseTool):
                     logger.warning(f"Tool execution attempt {attempt + 1} failed: {e}")
                     await asyncio.sleep(self.delay_between_retries)
                 else:
-                    error_msg = f"Tool execution failed: {e}"
+                    error_msg = f"[Tool execution failed: {e}]"
                     logger.error(error_msg)
                     return error_msg
         
-        return "Tool execution failed after all retry attempts"
+        return "[Tool execution failed after all retry attempts]"
 
     @classmethod
     def from_url(
@@ -541,13 +541,8 @@ class MCPTool(BaseTool):
         try:
             # Execute the MCP tool (synchronously)
             response = self._execute_mcp_tool(tool_name, parameters)
-            # More sophisticated error detection - check for explicit error indicators
-            has_error = (
-                "error" in response.lower() or 
-                "failed" in response.lower() or
-                "exception" in response.lower()
-            ) # TODO: @changyu -  add more robust error detection. If any error keyword 
-              #     in response, this will return True, which is not ideal.
+            ERROR_PREFIXES = ("[Tool execution error", "[Tool execution failed")
+            has_error = response.startswith(ERROR_PREFIXES)
             observation = f"\n<mcp_result>\n{response}\n</mcp_result>\n"
             return True, has_error, observation, parsed_action
 
