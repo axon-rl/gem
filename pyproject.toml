@@ -46,6 +46,10 @@ search = [
   "pyserini",
 ]
 
+mcp = [
+  "fastmcp",
+]
+
 [project.urls]
 Documentation = "https://axon-rl.github.io/gem/"
 Issues = "https://github.com/axon-rl/gem/issues"
