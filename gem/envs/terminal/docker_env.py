@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, SupportsFloat, Tuple
 
+import yaml
 from terminal_bench.handlers.trial_handler import TrialHandler
 from terminal_bench.terminal.terminal import Terminal
 
@@ -26,6 +27,7 @@ class TaskConfig:
     instruction: str
     test_weights: Dict[str, float]
     max_test_timeout_sec: float = 300.0
+    max_retry: int = 5
 
 
 @dataclass
@@ -39,7 +41,7 @@ class ContainerConfig:
 class DockerEnv(Env):
     """Docker environment that runs inside containers for terminal interaction tasks."""
 
-    action_space = ["bash", "summary"]
+    action_space = ["bash", "finish"]
 
     def __init__(
         self,
@@ -93,6 +95,7 @@ class DockerEnv(Env):
         self._capture_pre_agent_pane()
 
         self.done = False
+        self.bash_error_count = 0
 
         return self.current_task_config.instruction, {}
 
@@ -111,6 +114,7 @@ class DockerEnv(Env):
             # Invalid action, end the episode without command execution.
             reward = 0.0
             self.done = True
+            observation = TERMINAL_STATE
         else:
             tag_name, content = matches[0]
             if tag_name not in self.action_space:
@@ -122,16 +126,32 @@ class DockerEnv(Env):
                     f"<{tag_name}>(.*?)</{tag_name}>", action, re.DOTALL
                 )
                 parsed_action = action[: first_match.end()]
-                if tag_name == "summary":
-                    self.done = True
-                    observation = TERMINAL_STATE
-                    info["parsed_action"] = parsed_action
-                    info["tool_type"] = "terminal-summary"
-                elif tag_name == "bash":
-                    info["parsed_action"] = parsed_action
-                    info["tool_type"] = "terminal-bash"
-                    output, exit_code = asyncio.run(self.executor.execute(content))
-                    observation = f"<bash_output>{output}</bash_output>"
+                try:
+                    yaml_data = yaml.safe_load(content.strip())
+                    if tag_name == "finish":
+                        self.done = True
+                        observation = TERMINAL_STATE
+                        info["parsed_action"] = parsed_action
+                        info["tool_type"] = "terminal-finish"
+                    elif tag_name == "bash":
+                        info["parsed_action"] = parsed_action
+                        info["tool_type"] = "terminal-bash"
+                        cmd = yaml_data.get("cmd", "")
+                        output, exit_code = asyncio.run(self.executor.execute(cmd))
+                        observation = f"<bash_output>{output}</bash_output>"
+                        if exit_code != 0:
+                            self.bash_error_count += 1
+                            if (
+                                self.bash_error_count
+                                < self.current_task_config.max_retry
+                            ):
+                                observation += "\nBash execution failed with above error. Please fix any potential bug and retry.\n"
+                            else:
+                                self.done = True
+                                observation += "\nBash execution failure reaches maximum allowed times.\n"
+                        reward = 0.0
+                except yaml.YAMLError as e:
+                    observation = f"Action parsing error. {str(e)}"
                     reward = 0.0
 
         # 2) Verify via test cases when it's done.
