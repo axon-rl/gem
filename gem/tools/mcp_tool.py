@@ -30,6 +30,9 @@ from fastmcp.exceptions import ClientError, ToolError
 from gem.tools.base_tool import BaseTool
 
 logger = logging.getLogger(__name__)
+# silence the underlying HTTP and MCP client loggers
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("mcp.client.streamable_http").setLevel(logging.WARNING)
 
 
 def _run_async(coro):
@@ -169,7 +172,7 @@ class MCPTool(BaseTool):
         
         # Create FastMCP client with normalized configuration
         self.client = self._create_client(
-            log_handler or self._default_log_handler,
+            log_handler,
             progress_handler,
             sampling_handler,
             execution_timeout
@@ -235,12 +238,16 @@ class MCPTool(BaseTool):
             
     def _create_client(
         self,
-        log_handler: Callable[[LogMessage], None],
+        log_handler: Optional[Callable[[LogMessage], None]],
         progress_handler: Optional[Callable[[float, Optional[float], Optional[str]], None]],
         sampling_handler: Optional[Callable[[List[SamplingMessage], SamplingParams, RequestContext], str]],
         timeout: float
     ) -> Client:
         """Create FastMCP client with normalized configuration."""
+        # If no log_handler provided, use a silent handler by default
+        if log_handler is None:
+            log_handler = lambda msg: None  # Silent handler - does nothing with log messages
+            
         client_kwargs = {
             'timeout': timeout,
             'log_handler': log_handler,
@@ -253,25 +260,6 @@ class MCPTool(BaseTool):
             client_kwargs['sampling_handler'] = sampling_handler
             
         return Client(self.normalized_config, **client_kwargs)
-        
-    def _default_log_handler(self, message: LogMessage) -> None:
-        """Default log handler that forwards server logs to Python logging."""
-        level_map = {
-            'debug': logging.DEBUG,
-            'info': logging.INFO,
-            'notice': logging.INFO,
-            'warning': logging.WARNING,
-            'error': logging.ERROR,
-            'critical': logging.CRITICAL,
-            'alert': logging.CRITICAL,
-            'emergency': logging.CRITICAL,
-        }
-        
-        level = level_map.get(message.level.lower(), logging.INFO)
-        msg = message.data.get('msg', '')
-        extra = message.data.get('extra', {})
-        
-        logger.log(level, f"MCP Server: {msg}", extra=extra)
 
     def _discover_tools(self) -> List[Dict[str, Any]]:
         """Discover available tools from the MCP server (synchronous wrapper)."""
