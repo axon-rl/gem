@@ -17,14 +17,15 @@
 import asyncio
 import json
 import logging
-import os
 import re
 import threading
-from datetime import timedelta
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
-from mcp import ClientSession, StdioServerParameters
-from mcp.client.stdio import stdio_client
+from fastmcp import Client
+from fastmcp.client.auth import BearerAuth
+from fastmcp.client.logging import LogMessage
+from fastmcp.client.sampling import RequestContext, SamplingMessage, SamplingParams
+from fastmcp.exceptions import ClientError, ToolError
 
 from gem.tools.base_tool import BaseTool
 
@@ -72,97 +73,240 @@ def is_timeout_error(error: Exception) -> bool:
 
 
 class MCPTool(BaseTool):
-    """A tool for connecting to any MCP (Model Context Protocol) server.
+    """A tool for connecting to MCP (Model Context Protocol) servers.
 
-    This tool provides a generic interface to connect to and interact with
-    MCP servers following the GEM framework's BaseTool interface.
+    This tool provides a unified configuration-based interface to connect to and 
+    interact with MCP servers following the GEM framework's BaseTool interface.
+    
+    Uses FastMCP client with configuration-based setup for reliable MCP 
+    communication. Supports both simple HTTP servers and complex multi-server 
+    configurations.
+    
+    Examples:
+        # Simple HTTP server (most common case)
+        tool = MCPTool("https://api.example.com/mcp")
+        
+        # HTTP server with authentication
+        tool = MCPTool({
+            "mcpServers": {
+                "main": {
+                    "transport": "http",
+                    "url": "https://api.example.com/mcp",
+                    "headers": {"Authorization": "Bearer your-token"}
+                }
+            }
+        })
+        
+        # Multi-server configuration with tool transformations
+        tool = MCPTool({
+            "mcpServers": {
+                "weather": {
+                    "transport": "http",
+                    "url": "https://weather-api.example.com/mcp"
+                },
+                "assistant": {
+                    "transport": "http", 
+                    "url": "https://assistant-api.example.com/mcp",
+                    "tools": {
+                        "ask": {"name": "assistant_ask"}  # Rename tool
+                    }
+                }
+            }
+        })
+        
+        # From configuration file
+        tool = MCPTool.from_config_file("mcp_servers.json")
+        
+        # HTTP with custom authentication and callbacks
+        tool = MCPTool(
+            "https://api.example.com/mcp",
+            auth="bearer-token",
+            headers={"X-Custom": "value"},
+            log_handler=my_log_handler
+        )
     """
 
     tool_type = "mcp"
 
     def __init__(
         self,
-        command: str,
-        args: Optional[List[str]] = None,
-        env_vars: Optional[List[str]] = None,
+        config: Union[str, Dict[str, Any]],
+        # Optional authentication and headers for simple HTTP case
+        auth: Optional[Union[str, BearerAuth]] = None,
+        headers: Optional[Dict[str, str]] = None,
+        # Optional callback handlers
+        log_handler: Optional[Callable[[LogMessage], None]] = None,
+        progress_handler: Optional[Callable[[float, Optional[float], Optional[str]], None]] = None,
+        sampling_handler: Optional[Callable[[List[SamplingMessage], SamplingParams, RequestContext], str]] = None,
+        # Retry and timeout configuration
         max_retries: int = 3,
         delay_between_retries: float = 1.0,
-        connection_timeout: float = 10.0,
         execution_timeout: float = 30.0,
         num_workers: int = 1,
         **kwargs,
     ):
-        """Initialize the MCP tool.
+        """Initialize the MCP tool using configuration.
 
         Args:
-            command: The command to run the MCP server
-            args: Optional list of arguments for the command
-            env_vars: Optional list of environment variable names to pass
+            config: MCP server configuration. Can be:
+                - URL string: "https://api.example.com/mcp" (auto-converted to config)
+                - MCP config dict: Full configuration with multiple servers
+            auth: Bearer token for authentication (only used with URL string input)
+            headers: Custom headers for HTTP requests (only used with URL string input)
+            log_handler: Handler for server log messages
+            progress_handler: Handler for progress updates during long operations
+            sampling_handler: Handler for server LLM sampling requests
             max_retries: Maximum number of retry attempts on failure
             delay_between_retries: Delay in seconds between retry attempts
-            connection_timeout: Timeout in seconds for connection establishment
             execution_timeout: Timeout in seconds for tool execution
             num_workers: Number of worker processes
         """
         super().__init__(num_workers)
 
-        # MCP server configuration
-        self.params = StdioServerParameters(
-            command=command,
-            args=args or [],
-            env={var: os.environ.get(var, "") for var in env_vars or []},
+        # Store original config and normalize it
+        self.raw_config = config
+        self.normalized_config = self._normalize_config(config, auth, headers)
+        
+        # Create FastMCP client with normalized configuration
+        self.client = self._create_client(
+            log_handler or self._default_log_handler,
+            progress_handler,
+            sampling_handler,
+            execution_timeout
         )
 
         # Retry and timeout configuration
         self.max_retries = max_retries
         self.delay_between_retries = delay_between_retries
-        self.connection_timeout = connection_timeout
         self.execution_timeout = execution_timeout
 
         # Tool discovery and caching
         self._available_tools: Optional[List[Dict[str, Any]]] = None
         self._tools_discovered = False
+        
+    def _normalize_config(
+        self, 
+        config: Union[str, Dict[str, Any]], 
+        auth: Optional[Union[str, BearerAuth]] = None,
+        headers: Optional[Dict[str, str]] = None
+    ) -> Dict[str, Any]:
+        """Convert any config input to standard MCP configuration format.
+        
+        Args:
+            config: URL string or MCP configuration dictionary
+            auth: Optional authentication for URL string input
+            headers: Optional headers for URL string input
+            
+        Returns:
+            Standard MCP configuration dictionary
+        """
+        if isinstance(config, str):
+            # Auto-convert URL string to simple HTTP config
+            server_config = {
+                "transport": "http",
+                "url": config
+            }
+            
+            # Add authentication if provided
+            if auth or headers:
+                server_headers = headers or {}
+                if auth:
+                    if isinstance(auth, str):
+                        server_headers["Authorization"] = f"Bearer {auth}"
+                    # BearerAuth will be handled in client creation
+                if server_headers:
+                    server_config["headers"] = server_headers
+                    
+            return {
+                "mcpServers": {
+                    "default": server_config
+                }
+            }
+        elif isinstance(config, dict):
+            # Ensure all servers default to HTTP transport if not specified
+            normalized = config.copy()
+            if "mcpServers" in normalized:
+                for server_name, server_config in normalized["mcpServers"].items():
+                    if "transport" not in server_config:
+                        server_config["transport"] = "http"
+            return normalized
+        else:
+            raise ValueError(f"Unsupported config type: {type(config)}")
+            
+    def _create_client(
+        self,
+        log_handler: Callable[[LogMessage], None],
+        progress_handler: Optional[Callable[[float, Optional[float], Optional[str]], None]],
+        sampling_handler: Optional[Callable[[List[SamplingMessage], SamplingParams, RequestContext], str]],
+        timeout: float
+    ) -> Client:
+        """Create FastMCP client with normalized configuration."""
+        client_kwargs = {
+            'timeout': timeout,
+            'log_handler': log_handler,
+        }
+        
+        # Add optional handlers if provided
+        if progress_handler:
+            client_kwargs['progress_handler'] = progress_handler
+        if sampling_handler:
+            client_kwargs['sampling_handler'] = sampling_handler
+            
+        return Client(self.normalized_config, **client_kwargs)
+        
+    def _default_log_handler(self, message: LogMessage) -> None:
+        """Default log handler that forwards server logs to Python logging."""
+        level_map = {
+            'debug': logging.DEBUG,
+            'info': logging.INFO,
+            'notice': logging.INFO,
+            'warning': logging.WARNING,
+            'error': logging.ERROR,
+            'critical': logging.CRITICAL,
+            'alert': logging.CRITICAL,
+            'emergency': logging.CRITICAL,
+        }
+        
+        level = level_map.get(message.level.lower(), logging.INFO)
+        msg = message.data.get('msg', '')
+        extra = message.data.get('extra', {})
+        
+        logger.log(level, f"MCP Server: {msg}", extra=extra)
 
     def _discover_tools(self) -> List[Dict[str, Any]]:
         """Discover available tools from the MCP server (synchronous wrapper)."""
         if self._tools_discovered:
             return self._available_tools or []
 
-        async def _async_discover() -> List[Dict[str, Any]]:
-            tools: List[Dict[str, Any]] = []
-            async with stdio_client(self.params) as (read, write):
-                async with ClientSession(
-                    read,
-                    write,
-                    read_timeout_seconds=timedelta(seconds=self.connection_timeout),
-                ) as session:
-                    for attempt in range(self.max_retries):
-                        try:
-                            await session.initialize()
-                            response = await session.list_tools()
-                            for tool in response.tools:
-                                tool_info = {
-                                    "name": tool.name,
-                                    "description": tool.description,
-                                    "parameters": getattr(tool, "inputSchema", None),
-                                }
-                                tools.append(tool_info)
-                            break
-                        except Exception as e:  # noqa: BLE001
-                            logger.warning(
-                                f"Tool discovery attempt {attempt + 1} failed: {e}"
-                            )
-                            if attempt < self.max_retries - 1:
-                                await asyncio.sleep(self.delay_between_retries)
-                            else:
-                                logger.error(
-                                    f"Failed to discover tools after {self.max_retries} attempts"
-                                )
-            return tools
-
-        tools = _run_async(_async_discover())
+        tools = _run_async(self._async_discover_tools())
         self._available_tools = tools
         self._tools_discovered = True
+        return tools
+
+    async def _async_discover_tools(self) -> List[Dict[str, Any]]:
+        """Discover tools using fastMCP client."""
+        tools: List[Dict[str, Any]] = []
+        
+        for attempt in range(self.max_retries):
+            try:
+                async with self.client:
+                    mcp_tools = await self.client.list_tools()
+                    for tool in mcp_tools:
+                        tool_info = {
+                            "name": tool.name,
+                            "description": tool.description or "",
+                            "parameters": tool.inputSchema,
+                        }
+                        tools.append(tool_info)
+                break
+                
+            except Exception as e:  # noqa: BLE001
+                logger.warning(f"Tool discovery attempt {attempt + 1} failed: {e}")
+                if attempt < self.max_retries - 1:
+                    await asyncio.sleep(self.delay_between_retries)
+                else:
+                    logger.error(f"Failed to discover tools after {self.max_retries} attempts")
+        
         return tools
 
     def get_available_tools(self) -> List[Dict[str, Any]]:
@@ -202,58 +346,153 @@ class MCPTool(BaseTool):
 
     def _execute_mcp_tool(self, tool_name: str, parameters: Dict[str, Any]) -> str:
         """Execute a specific MCP tool with given parameters (synchronous wrapper)."""
+        return _run_async(self._async_execute_tool(tool_name, parameters))
 
-        async def _async_execute() -> str:
-            response_text = ""
-            async with stdio_client(self.params) as (read, write):
-                async with ClientSession(
-                    read,
-                    write,
-                    read_timeout_seconds=timedelta(seconds=self.connection_timeout),
-                ) as session:
-                    for attempt in range(self.max_retries):
-                        try:
-                            await session.initialize()
-                            result = await session.call_tool(
-                                tool_name,
-                                arguments=parameters,
-                                read_timeout_seconds=timedelta(
-                                    seconds=self.execution_timeout
-                                ),
-                            )
-                            if getattr(result, "content", None):
-                                parts: List[str] = []
-                                for item in result.content:
-                                    text = getattr(item, "text", None)
-                                    if text is not None:
-                                        parts.append(text)
-                                response_text = "\n".join(parts)
-                            if attempt > 0:
-                                logger.info(
-                                    f"MCP tool execution succeeded on attempt {attempt + 1}"
-                                )
-                            break
-                        except Exception as e:  # noqa: BLE001
-                            if is_timeout_error(e) and attempt < self.max_retries - 1:
-                                logger.warning(
-                                    f"MCP tool execution attempt {attempt + 1} failed: {e}"
-                                )
-                                await asyncio.sleep(self.delay_between_retries)
+    async def _async_execute_tool(self, tool_name: str, parameters: Dict[str, Any]) -> str:
+        """Execute tool using FastMCP client with enhanced result handling."""
+        for attempt in range(self.max_retries):
+            try:
+                async with self.client:
+                    result = await self.client.call_tool(
+                        tool_name, 
+                        parameters, 
+                        timeout=self.execution_timeout,
+                        raise_on_error=False
+                    )
+                    
+                    # Check for errors using FastMCP's structured error detection
+                    if result.is_error:
+                        error_content = []
+                        for content in result.content:
+                            if hasattr(content, 'text'):
+                                error_content.append(content.text)
                             else:
-                                response_text = f"MCP tool execution failed: {e}"
-                                logger.error(response_text)
-                                break
-            return response_text
+                                error_content.append(str(content))
+                        return f"Tool execution error: {' '.join(error_content)}"
+                    
+                    # Use FastMCP's structured data handling
+                    if result.data is not None:
+                        # FastMCP provides fully hydrated Python objects
+                        return str(result.data)
+                    elif result.content:
+                        # Fallback to content blocks when no structured data
+                        parts = []
+                        for content in result.content:
+                            if hasattr(content, 'text'):
+                                parts.append(content.text)
+                            elif hasattr(content, 'data'):
+                                parts.append(f"Binary data: {len(content.data)} bytes")
+                            else:
+                                parts.append(str(content))
+                        return "\n".join(parts)
+                    else:
+                        # No content available
+                        return "Tool execution completed with no output"
+                        
+                if attempt > 0:
+                    logger.info(f"Tool execution succeeded on attempt {attempt + 1}")
+                break
+                
+            except ClientError as e:
+                error_msg = f"Tool execution error: {e}"
+                logger.error(error_msg)
+                return error_msg
+                
+            except Exception as e:  # noqa: BLE001
+                if is_timeout_error(e) and attempt < self.max_retries - 1:
+                    logger.warning(f"Tool execution attempt {attempt + 1} failed: {e}")
+                    await asyncio.sleep(self.delay_between_retries)
+                else:
+                    error_msg = f"Tool execution failed: {e}"
+                    logger.error(error_msg)
+                    return error_msg
+        
+        return "Tool execution failed after all retry attempts"
 
-        return _run_async(_async_execute())
+    @classmethod
+    def from_url(
+        cls, 
+        url: str, 
+        auth: Optional[str] = None, 
+        headers: Optional[Dict[str, str]] = None,
+        **kwargs
+    ) -> 'MCPTool':
+        """Create MCPTool for HTTP server with authentication.
+        
+        Args:
+            url: HTTP URL of the MCP server
+            auth: Bearer token for authentication
+            headers: Custom headers to send with requests
+            **kwargs: Additional arguments to pass to MCPTool constructor
+            
+        Returns:
+            MCPTool instance configured for HTTP transport
+        """
+        return cls(config=url, auth=auth, headers=headers, **kwargs)
+        
+    @classmethod
+    def from_config_file(cls, config_path: str, **kwargs) -> 'MCPTool':
+        """Create MCPTool from MCP configuration file.
+        
+        Args:
+            config_path: Path to MCP configuration JSON file
+            **kwargs: Additional arguments to pass to MCPTool constructor
+            
+        Returns:
+            MCPTool instance configured from the file
+        """
+        with open(config_path, 'r') as f:
+            config = json.load(f)
+        
+        return cls(config=config, **kwargs)
+        
+    @classmethod
+    def from_multi_server(cls, servers: Dict[str, str], **kwargs) -> 'MCPTool':
+        """Create MCPTool for multiple HTTP servers.
+        
+        Args:
+            servers: Dictionary mapping server names to URLs
+            **kwargs: Additional arguments to pass to MCPTool constructor
+            
+        Returns:
+            MCPTool instance configured for multiple servers
+        """
+        config = {
+            "mcpServers": {
+                name: {
+                    "transport": "http",
+                    "url": url
+                }
+                for name, url in servers.items()
+            }
+        }
+        return cls(config=config, **kwargs)
+
+    def close(self):
+        """Clean up resources."""
+        try:
+            if hasattr(self.client, 'close'):
+                _run_async(self.client.close())
+        except Exception:
+            # Ignore cleanup errors - the client may already be closed
+            # or the event loop may have been closed
+            pass
+
+    def __del__(self):
+        """Cleanup on deletion."""
+        if hasattr(self, 'client') and self.client:
+            try:
+                self.close()
+            except Exception:
+                pass  # Ignore cleanup errors during deletion
 
     def instruction_string(self) -> str:
         """Return instruction string for using the MCP tool."""
         tools = self.get_available_tools()
         if not tools:
             return (
-                "MCP server connection failed. No tools available.\n"
-                "Please check your MCP server configuration."
+                f"MCP server connection failed. No tools available.\n"
+                f"Please check your MCP server configuration: {self._get_server_description()}"
             )
 
         tool_descriptions = []
@@ -264,14 +503,30 @@ class MCPTool(BaseTool):
                 desc += f" (Parameters: {', '.join(params)})"
             tool_descriptions.append(desc)
 
+        server_desc = self._get_server_description()
         return (
-            "You have access to MCP (Model Context Protocol) tools to help with various tasks.\n\n"
+            f"You have access to MCP (Model Context Protocol) tools from {server_desc}.\n\n"
             "Available MCP tools:\n"
             + "\n".join(tool_descriptions)
             + "\n\nTo use an MCP tool, format your request as:\n"
             '<mcp_tool name="tool_name">{"parameter1": "value1", "parameter2": "value2"}</mcp_tool>\n\n'
-            "The tool will execute and return results to help with your task."
+            "The tool will execute via MCP protocol and return structured results to help with your task."
         )
+        
+    def _get_server_description(self) -> str:
+        """Get a human-readable description of the server configuration."""
+        if isinstance(self.raw_config, str):
+            return f"HTTP server at {self.raw_config}"
+        elif isinstance(self.raw_config, dict) and "mcpServers" in self.raw_config:
+            servers = list(self.raw_config["mcpServers"].keys())
+            if len(servers) == 1:
+                server_config = self.raw_config["mcpServers"][servers[0]]
+                url = server_config.get("url", "unknown")
+                return f"HTTP server '{servers[0]}' at {url}"
+            else:
+                return f"multi-server configuration with {len(servers)} servers: {', '.join(servers)}"
+        else:
+            return str(self.raw_config)
 
     def execute_action(self, action: str) -> Tuple[bool, bool, str, str]:
         """Execute the MCP tool action.
@@ -298,7 +553,13 @@ class MCPTool(BaseTool):
         try:
             # Execute the MCP tool (synchronously)
             response = self._execute_mcp_tool(tool_name, parameters)
-            has_error = "failed" in response.lower()
+            # More sophisticated error detection - check for explicit error indicators
+            has_error = (
+                "error" in response.lower() or 
+                "failed" in response.lower() or
+                "exception" in response.lower()
+            ) # TODO: @changyu -  add more robust error detection. If any error keyword 
+              #     in response, this will return True, which is not ideal.
             observation = f"\n<mcp_result>\n{response}\n</mcp_result>\n"
             return True, has_error, observation, parsed_action
 
