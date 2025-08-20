@@ -186,6 +186,9 @@ class MCPTool(BaseTool):
         # Tool discovery and caching
         self._available_tools: Optional[List[Dict[str, Any]]] = None
         self._tools_discovered = False
+
+        # Sanity check
+        assert self.get_available_tools(), "No tools available"
         
     def _normalize_config(
         self, 
@@ -229,7 +232,7 @@ class MCPTool(BaseTool):
             # Ensure all servers default to HTTP transport if not specified
             normalized = config.copy()
             if "mcpServers" in normalized:
-                for server_name, server_config in normalized["mcpServers"].items():
+                for _, server_config in normalized["mcpServers"].items():
                     if "transport" not in server_config:
                         server_config["transport"] = "http"
             return normalized
@@ -246,7 +249,7 @@ class MCPTool(BaseTool):
         """Create FastMCP client with normalized configuration."""
         # If no log_handler provided, use a silent handler by default
         if log_handler is None:
-            log_handler = lambda msg: None  # Silent handler - does nothing with log messages
+            log_handler = lambda _: None  # Silent handler - does nothing with log messages
             
         client_kwargs = {
             'timeout': timeout,
@@ -477,28 +480,43 @@ class MCPTool(BaseTool):
     def instruction_string(self) -> str:
         """Return instruction string for using the MCP tool."""
         tools = self.get_available_tools()
-        if not tools:
-            return (
-                f"MCP server connection failed. No tools available.\n"
-                f"Please check your MCP server configuration: {self._get_server_description()}"
-            )
 
-        tool_descriptions = []
+        # Convert tools to the required JSON format
+        tool_functions = []
         for tool in sorted(tools, key=lambda t: t.get("name", "")):
-            desc = f"- {tool['name']}: {tool['description']}"
-            if tool.get("parameters", {}).get("properties"):
-                params = list(tool["parameters"]["properties"].keys())
-                desc += f" (Parameters: {', '.join(params)})"
-            tool_descriptions.append(desc)
+            func_def = {
+                "type": "function",
+                "function": {
+                    "name": tool["name"],
+                    "description": tool["description"],
+                    "parameters": tool.get("parameters", {"type": "object", "properties": {}})
+                }
+            }
+            tool_functions.append(json.dumps(func_def))
 
-        server_desc = self._get_server_description()
         return (
-            f"You have access to MCP (Model Context Protocol) tools from {server_desc}.\n\n"
-            "Available MCP tools:\n"
-            + "\n".join(tool_descriptions)
-            + "\n\nTo use an MCP tool, format your request as:\n"
-            '<mcp_tool name="tool_name">{"parameter1": "value1", "parameter2": "value2"}</mcp_tool>\n\n'
-            "The tool will execute via MCP protocol and return structured results to help with your task."
+            f"# Tool-Use Instructions\n\n"
+            f"In this environment you have access to a set of tools you can use to answer the user's question.\n\n"
+            f"You only have access to the tools provided below. You can only use one tool per message, and will receive the result of that tool in the user's next response. You use tools step-by-step to accomplish a given task, with each tool-use informed by the result of the previous tool-use.\n\n"
+            f"Tool-use is formatted using XML-style tags. The tool-use is enclosed in <tool_call></tool_call> and each parameter is similarly enclosed within its own set of tags.\n\n"
+            f"## Parameters\n"
+            f"- tool_name: (required) The name of the tool to execute\n"
+            f"- arguments: (required) A JSON object containing the tool's input parameters, following the tool's input schema. Quotes within strings must be properly escaped. Ensure the JSON is valid.\n\n"
+            f"## Usage Example\n"
+            f'<tool_call>\n'
+            f'<tool_name>tool_name_here</tool_name>\n'
+            f'<arguments>\n'
+            f'{{\n'
+            f'  "param1": "value1",\n'
+            f'  "param2": "value2 \\"escaped string\\""\n'
+            f'}}\n'
+            f'</arguments>\n'
+            f'</tool_call>\n\n'
+            f"## Available Tools\n"
+            f"Here are the functions available within <tools></tools> XML tags:\n\n"
+            f"<tools>\n"
+            + "\n".join(tool_functions) +
+            f"\n</tools>"
         )
         
     def _get_server_description(self) -> str:
