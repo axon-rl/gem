@@ -27,13 +27,13 @@ from gem.wrappers.wrapper_factory import WRAPPER_FACTORY
 # Example actions using the sample Time MCP server tools in gem.tools.mcp_server.time_mcp
 TEST_ACTIONS = [
     # Valid MCP tool calls
-    '<mcp_tool name="current_time">{"format": "YYYY-MM-DD", "timezone": "UTC"}</mcp_tool> ...',
-    '<mcp_tool name="days_in_month">{"date": "2025-03-01"}</mcp_tool> ...',
-    '<think>I need to compute the relative time</think><mcp_tool name="relative_time">{"time": "2025-12-31 23:50:00"}</mcp_tool> ...',
-    '```<mcp_tool name="get_week_year">{"date": "2025-03-23"}</mcp_tool> ... <mcp_tool name="convert_time">{"sourceTimezone": "Asia/Shanghai", "targetTimezone": "Europe/London", "time": "2025-03-23 12:30:00"}</mcp_tool>``` ...',
+    '<tool_call><tool_name>current_time</tool_name><arguments>{"format": "YYYY-MM-DD", "timezone": "UTC"}</arguments></tool_call> ...',
+    '<tool_call><tool_name>days_in_month</tool_name><arguments>{"date": "2025-03-01"}</arguments></tool_call> ...',
+    '<think>I need to compute the relative time</think><tool_call><tool_name>relative_time</tool_name><arguments>{"time": "2025-12-31 23:50:00"}</arguments></tool_call> ...',
+    '```<tool_call><tool_name>get_week_year</tool_name><arguments>{"date": "2025-03-23"}</arguments></tool_call> ... <tool_call><tool_name>convert_time</tool_name><arguments>{"sourceTimezone": "Asia/Shanghai", "targetTimezone": "Europe/London", "time": "2025-03-23 12:30:00"}</arguments></tool_call>``` ...',
     # Invalid/edge cases
     'Dummy action',
-    '<mcp_tool name="non_existing_tool">{"foo": "bar"}</mcp_tool> ...',
+    '<tool_call><tool_name>non_existing_tool</tool_name><arguments>{"foo": "bar"}</arguments></tool_call> ...',
 ]
 
 
@@ -46,7 +46,7 @@ def test_single_action(mcp_url: str, env_name: str = "game:GuessTheNumber-v0"):
       python -m tests.test_tool.test_mcp_tool single_action --mcp_url http://127.0.0.1:8081/time-mcp
     """
     env = gem.make(env_name, max_turns=4)
-    tool = MCPTool.from_url(mcp_url)
+    tool = MCPTool.from_url(mcp_url, validate_on_init=False)
     env = ToolEnvWrapper(env, tools=[tool], max_tool_uses=3)
     obs, info = env.reset()
 
@@ -77,7 +77,7 @@ def test_episode(
 
     env = gem.make(env_name, max_turns=3, load_from_cache_file=False)
     policy = lambda _: random.choice(TEST_ACTIONS)
-    tool = MCPTool.from_url(mcp_url)
+    tool = MCPTool.from_url(mcp_url, validate_on_init=False)
 
     print(f"Using MCP server: {mcp_url}")
 
@@ -133,7 +133,7 @@ def test_llm_episode(
     # Create a simple single-question dataset encouraging the use of MCP tool
     question = (
         "Get the current date in UTC. Use the MCP tool with: "
-        "<mcp_tool name=\"current_time\">{\"format\": \"YYYY-MM-DD\", \"timezone\": \"UTC\"}</mcp_tool>"
+        "<tool_call><tool_name>current_time</tool_name><arguments>{\"format\": \"YYYY-MM-DD\", \"timezone\": \"UTC\"}</arguments></tool_call>"
     )
     prompt = (
         "You must reason inside <think> and </think>. If you need external info, call the MCP tool as shown. "
@@ -167,7 +167,7 @@ def test_llm_episode(
         action = response[0].outputs[0].text
         return action
 
-    tool = MCPTool.from_url(mcp_url)
+    tool = MCPTool.from_url(mcp_url, validate_on_init=False)
 
     print(f"Using MCP server: {mcp_url}")
 
