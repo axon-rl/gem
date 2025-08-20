@@ -145,8 +145,8 @@ class MCPTool(BaseTool):
         max_retries: int = 3,
         delay_between_retries: float = 1.0,
         execution_timeout: float = 30.0,
+        validate_on_init: bool = True,
         num_workers: int = 1,
-        **kwargs,
     ):
         """Initialize the MCP tool using configuration.
 
@@ -186,9 +186,24 @@ class MCPTool(BaseTool):
         # Tool discovery and caching
         self._available_tools: Optional[List[Dict[str, Any]]] = None
         self._tools_discovered = False
-
-        # Sanity check
-        assert self.get_available_tools(), "No tools available"
+        
+        # Perform sanity check unless explicitly disabled
+        if validate_on_init:
+            try:
+                tools = self.get_available_tools()
+                if not tools:
+                    raise ValueError(
+                        f"No tools available from MCP server(s). "
+                        f"Please check your server configuration: {self._get_server_description()}"
+                    )
+            except Exception as e:
+                # Re-raise with more context if it's not already our custom error
+                if "No tools available" not in str(e):
+                    raise ValueError(
+                        f"Failed to connect to MCP server(s): {e}. "
+                        f"Server configuration: {self._get_server_description()}"
+                    ) from e
+                raise
         
     def _normalize_config(
         self, 
@@ -282,11 +297,31 @@ class MCPTool(BaseTool):
             try:
                 async with self.client:
                     mcp_tools = await self.client.list_tools()
+                    is_multi = self._is_multi_server()
+                    server_names = self._get_server_names()
+                    
                     for tool in mcp_tools:
+                        # FastMCP client should already return prefixed names for multi-server configs
+                        # but we'll add server info for debugging and clarity
+                        tool_name = tool.name
+                        server_info = {"is_multi_server": is_multi, "servers": server_names}
+                        
+                        # Try to detect which server this tool belongs to
+                        if is_multi:
+                            detected_server = None
+                            for server_name in server_names:
+                                if tool_name.startswith(f"{server_name}_"):
+                                    detected_server = server_name
+                                    break
+                            server_info["detected_server"] = detected_server
+                        else:
+                            server_info["detected_server"] = server_names[0] if server_names else "default"
+                        
                         tool_info = {
-                            "name": tool.name,
+                            "name": tool_name,
                             "description": tool.description or "",
                             "parameters": tool.inputSchema,
+                            "server_info": server_info,
                         }
                         tools.append(tool_info)
                 break
@@ -307,7 +342,7 @@ class MCPTool(BaseTool):
     def _parse_action(self, action: str) -> Tuple[str, str, Dict[str, Any], bool]:
         """Parse action to extract tool name and parameters.
 
-        Expected format: <mcp_tool name="tool_name">{"param1": "value1"}</mcp_tool>
+        Expected format: <tool_call><tool_name>tool_name</tool_name><arguments>{"param1": "value1"}</arguments></tool_call>
 
         Args:
             action: Raw action string from agent
@@ -315,7 +350,8 @@ class MCPTool(BaseTool):
         Returns:
             tuple: (tool_name, parsed_action, parameters_dict, is_valid)
         """
-        pattern = r'<mcp_tool\s+name="([^"]+)">(.*?)</mcp_tool>'
+        # New XML format pattern
+        pattern = r'<tool_call>\s*<tool_name>([^<]+)</tool_name>\s*<arguments>(.*?)</arguments>\s*</tool_call>'
         match = re.search(pattern, action, re.DOTALL)
 
         if not match:
@@ -323,7 +359,7 @@ class MCPTool(BaseTool):
 
         tool_name = match.group(1).strip()
         params_str = match.group(2).strip()
-        parsed_action = action[: match.end()]
+        parsed_action = match.group(0)
 
         try:
             if params_str:
@@ -484,11 +520,19 @@ class MCPTool(BaseTool):
         # Convert tools to the required JSON format
         tool_functions = []
         for tool in sorted(tools, key=lambda t: t.get("name", "")):
+            # Enhance description with server information for multi-server configs
+            description = tool["description"]
+            server_info = tool.get("server_info", {})
+            
+            if server_info.get("is_multi_server") and server_info.get("detected_server"):
+                server_name = server_info["detected_server"]
+                description = f"[{server_name}] {description}" if description else f"[{server_name}] Tool from {server_name} server"
+            
             func_def = {
                 "type": "function",
                 "function": {
                     "name": tool["name"],
-                    "description": tool["description"],
+                    "description": description,
                     "parameters": tool.get("parameters", {"type": "object", "properties": {}})
                 }
             }
@@ -519,6 +563,19 @@ class MCPTool(BaseTool):
             f"\n</tools>"
         )
         
+    def _get_server_names(self) -> List[str]:
+        """Get list of server names from configuration."""
+        if isinstance(self.raw_config, str):
+            return ["default"]  # Single server gets default name
+        elif isinstance(self.raw_config, dict) and "mcpServers" in self.raw_config:
+            return list(self.raw_config["mcpServers"].keys())
+        else:
+            return ["default"]
+    
+    def _is_multi_server(self) -> bool:
+        """Check if this is a multi-server configuration."""
+        return len(self._get_server_names()) > 1
+    
     def _get_server_description(self) -> str:
         """Get a human-readable description of the server configuration."""
         if isinstance(self.raw_config, str):
