@@ -137,7 +137,12 @@ class DockerEnv(Env):
                         info["parsed_action"] = parsed_action
                         info["tool_type"] = "terminal-bash"
                         cmd = yaml_data.get("cmd", "")
-                        output, exit_code = asyncio.run(self.executor.execute(cmd))
+                        output, exit_code = asyncio.run(
+                            self.executor.execute(
+                                cmd,
+                                timeout=yaml_data.get("timeout_secs", 30),
+                            )
+                        )
                         observation = f"<bash_output>{output}</bash_output>"
                         if exit_code != 0:
                             self.bash_error_count += 1
