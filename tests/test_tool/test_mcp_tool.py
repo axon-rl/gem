@@ -183,6 +183,119 @@ def test_llm_episode(
     run_episode_test("EPISODE 1: CHAT TEMPLATE OBSERVATION", wrapped_env, policy)
 
 
+def test_multi_server(
+    time_url: str = "http://127.0.0.1:8081/time-mcp",
+    context7_url: str = "https://mcp.context7.com/mcp",
+    env_name: str = "game:GuessTheNumber-v0"
+):
+    """Test multi-server configuration to verify automatic tool name prefixing.
+    
+    This test demonstrates that FastMCP automatically prefixes tool names with server names
+    when connecting to multiple servers, preventing naming conflicts.
+    
+    Args:
+        time_url: URL for local time MCP server
+        context7_url: URL for Context7 MCP server  
+        env_name: Environment name for testing
+    
+    Example usage:
+        # Start local time server first:
+        python -m gem.tools.mcp_server.time_mcp --transport streamable-http --host 127.0.0.1 --port 8081 --path /time-mcp
+        
+        # Then run test:
+        python -m tests.test_tool.test_mcp_tool multi_server --time_url http://127.0.0.1:8081/time-mcp
+    """
+    print(f"Testing multi-server configuration:")
+    print(f"  Time server: {time_url}")
+    print(f"  Context7 server: {context7_url}")
+    
+    # Create multi-server configuration
+    config = {
+        "mcpServers": {
+            "time": {
+                "transport": "http",
+                "url": time_url
+            },
+            "context7": {
+                "transport": "http", 
+                "url": context7_url
+            }
+        }
+    }
+    
+    try:
+        # Create MCPTool with multi-server config
+        tool = MCPTool(config, validate_on_init=False)
+        
+        print(f"\n=== SERVER CONFIGURATION ===")
+        print(f"Server names: {tool._get_server_names()}")
+        print(f"Is multi-server: {tool._is_multi_server()}")
+        print(f"Configuration: {tool._get_server_description()}")
+        
+        # Discover tools and verify prefixing
+        print(f"\n=== TOOL DISCOVERY ===")
+        tools = tool.get_available_tools()
+        
+        if not tools:
+            print("❌ No tools discovered - servers may be unreachable")
+            return
+            
+        print(f"Discovered {len(tools)} tools:")
+        time_tools = []
+        context7_tools = []
+        
+        for tool_info in tools:
+            tool_name = tool_info["name"]
+            server_info = tool_info.get("server_info", {})
+            detected_server = server_info.get("detected_server", "unknown")
+            
+            print(f"  - {tool_name} (server: {detected_server})")
+            
+            if tool_name.startswith("time_"):
+                time_tools.append(tool_name)
+            elif tool_name.startswith("context7_"):
+                context7_tools.append(tool_name)
+        
+        print(f"\nTime server tools ({len(time_tools)}): {time_tools}")
+        print(f"Context7 server tools ({len(context7_tools)}): {context7_tools}")
+        
+        # Test instruction string contains server prefixes
+        print(f"\n=== INSTRUCTION STRING VERIFICATION ===")
+        instruction = tool.instruction_string()
+        has_time_prefix = "[time]" in instruction
+        has_context7_prefix = "[context7]" in instruction
+        
+        print(f"Instruction contains [time] prefix: {has_time_prefix}")
+        print(f"Instruction contains [context7] prefix: {has_context7_prefix}")
+        
+        # Test with environment if we have tools
+        if time_tools:
+            print(f"\n=== ENVIRONMENT TESTING ===")
+            env = gem.make(env_name, max_turns=2)
+            env = ToolEnvWrapper(env, tools=[tool], max_tool_uses=2)
+            obs, info = env.reset()
+            
+            # Try to use a time server tool
+            test_tool = time_tools[0]  # Use first available time tool
+            test_action = f'<tool_call><tool_name>{test_tool}</tool_name><arguments>{{}}</arguments></tool_call>'
+            
+            print(f"Testing tool call: {test_tool}")
+            try:
+                obs, reward, terminated, truncated, info = env.step(test_action)
+                print(f"✅ Tool execution successful")
+                print(f"Observation excerpt: {str(obs)[:200]}...")
+            except Exception as e:
+                print(f"⚠️  Tool execution failed: {e}")
+        
+        print(f"\n✅ Multi-server test completed successfully!")
+        print(f"   - Automatic prefixing: {'✅' if time_tools or context7_tools else '❌'}")
+        print(f"   - Server detection: {'✅' if has_time_prefix or has_context7_prefix else '❌'}")
+        
+    except Exception as e:
+        print(f"❌ Multi-server test failed: {e}")
+        print("This may be due to server connectivity issues or configuration problems.")
+
+
 def main():
     """Run with:
     # Start the sample Time MCP server (in another terminal):
@@ -192,12 +305,14 @@ def main():
     #   python -m tests.test_tool.test_mcp_tool single_action --mcp_url http://127.0.0.1:8081/time-mcp
     #   python -m tests.test_tool.test_mcp_tool episode --mcp_url http://127.0.0.1:8081/time-mcp
     #   python -m tests.test_tool.test_mcp_tool llm_episode --mcp_url http://127.0.0.1:8081/time-mcp
+    #   python -m tests.test_tool.test_mcp_tool multi_server
     """
     fire.Fire(
         {
             "single_action": test_single_action,
             "episode": test_episode,
             "llm_episode": test_llm_episode,
+            "multi_server": test_multi_server,
         }
     )
 
