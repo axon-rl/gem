@@ -98,22 +98,24 @@ def test_llm_inference(model: str = "Qwen/Qwen2.5-14B-Instruct"):
     env.close()
 
 
-def test_openai(model: str = "gpt-5-nano"):
+def test_openai(model: str = "gpt-5-nano", task_name: str = "csv-to-parquet"):
     from openai import OpenAI
 
     client = OpenAI()
 
-    task_id = "./tasks/_eval/csv-to-parquet"
+    task_path = f"./tasks/_eval/{task_name}"
+
+    try:
+        test_weights = json.load(open(os.path.join(task_path, "test_weights.json")))
+    except Exception:
+        test_weights = None
 
     env = DockerEnv(
         task_configs=[
             TaskConfig(
-                task_name="test",
-                task_path=task_id,
-                instruction="Convert the file '/app/data.csv' into a Parquet file named '/app/data.parquet'. The CSV file contains sample data with headers.",
-                test_weights=json.load(
-                    open(os.path.join(task_id, "test_weights.json"))
-                ),
+                task_name=f"test_{task_name}",
+                task_path=task_path,
+                test_weights=test_weights,
                 max_retry=20,
             )
         ],
@@ -156,7 +158,7 @@ def test_openai(model: str = "gpt-5-nano"):
         messages.append({"role": "user", "content": next_obs})
 
     env.close()
-    save_path = os.path.join(task_id, f"{model}-episode-{int(time.time())}.json")
+    save_path = os.path.join(task_path, f"{model}-episode-{int(time.time())}.json")
     json.dump(episode, open(save_path, "w"), indent=4)
 
 

@@ -24,7 +24,6 @@ class TaskConfig:
 
     task_name: str
     task_path: str
-    instruction: str
     test_weights: Dict[str, float]
     max_test_timeout_sec: float = 300.0
     max_retry: int = 5
@@ -97,7 +96,7 @@ class DockerEnv(Env):
         self.done = False
         self.bash_error_count = 0
 
-        return self.current_task_config.instruction, {}
+        return self.trial_handler.instruction, {}
 
     def step(
         self, action: str
