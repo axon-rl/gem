@@ -67,6 +67,7 @@ class DockerEnv(Env):
             client_container_name=self.trial_handler.client_container_name,
             client_image_name=self.trial_handler.client_image_name,
             docker_compose_path=self.trial_handler.task_paths.docker_compose_path,
+            docker_image_name_prefix=f"gem_{self.env_name}_{self.current_task_config.task_name}",
             commands_path=self.trial_handler.trial_paths.commands_path,
             sessions_logs_path=self.trial_handler.trial_paths.sessions_path,
             agent_logs_path=self.trial_handler.trial_paths.agent_logging_dir,

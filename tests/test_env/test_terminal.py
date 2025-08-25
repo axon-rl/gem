@@ -64,7 +64,7 @@ def test_llm_inference(model: str = "Qwen/Qwen2.5-14B-Instruct"):
     )
     obs, _ = env.reset()
 
-    with open("gem/envs/terminal/prompt.md", "r") as file:
+    with open("tests/test_env/terminal_agent_prompt.md", "r") as file:
         SYSTEM_PROMPT = file.read()
 
     messages = [
@@ -123,7 +123,7 @@ def test_openai(model: str = "gpt-5-nano", task_name: str = "csv-to-parquet"):
     )
     obs, _ = env.reset()
 
-    with open("gem/envs/terminal/prompt.md", "r") as file:
+    with open("tests/test_env/terminal_agent_prompt.md", "r") as file:
         SYSTEM_PROMPT = file.read()
 
     messages = [
@@ -139,27 +139,33 @@ def test_openai(model: str = "gpt-5-nano", task_name: str = "csv-to-parquet"):
         },
     ]
 
-    done = False
-    episode = []
-    while not done:
-        response = client.responses.create(model=model, input=messages)
-        action = response.output_text
-        print("ACT", action)
-        next_obs, reward, terminated, truncated, info = env.step(action)
-        episode.append(
-            {"observation": obs, "action": action, "reward": reward, "info": info}
-        )
-        done = terminated or truncated
-        obs = next_obs
-        print("NEXT_OBS", next_obs)
-        print("REW", reward)
-        print("-" * 20)
-        messages.append({"role": "assistant", "content": action})
-        messages.append({"role": "user", "content": next_obs})
-
-    env.close()
-    save_path = os.path.join(task_path, f"{model}-episode-{int(time.time())}.json")
-    json.dump(episode, open(save_path, "w"), indent=4)
+    try:
+        done = False
+        episode = []
+        while not done:
+            response = client.responses.create(model=model, input=messages)
+            action = response.output_text
+            print("ACT", action)
+            next_obs, reward, terminated, truncated, info = env.step(action)
+            episode.append(
+                {"observation": obs, "action": action, "reward": reward, "info": info}
+            )
+            done = terminated or truncated
+            obs = next_obs
+            print("NEXT_OBS", next_obs)
+            print("REW", reward)
+            print("-" * 20)
+            messages.append({"role": "assistant", "content": action})
+            messages.append({"role": "user", "content": next_obs})
+        env.close()
+        save_path = os.path.join(task_path, f"{model}-episode-{int(time.time())}.json")
+        json.dump(episode, open(save_path, "w"), indent=4)
+    except Exception as e:
+        env.close()
+        if episode:
+            save_path = os.path.join(task_path, f"{model}-episode-{int(time.time())}.json")
+            json.dump(episode, open(save_path, "w"), indent=4)
+        raise e
 
 
 if __name__ == "__main__":
