@@ -15,12 +15,12 @@
 """
 Entry script of using OAT to RL-tune LLM agents on GEM environments.
 """
-
 import functools
 import json
 import logging
 import os
 import re
+import time
 from copy import deepcopy
 from dataclasses import dataclass
 from typing import List, Literal, Optional, Sequence, Tuple
@@ -394,7 +394,10 @@ class Actor(PPOActor):
                 prompt_token_ids = sub_outputs[sub_i].prompt_token_ids
                 token_ids = sub_outputs[sub_i].outputs[0].token_ids
                 response_logprobs = sub_outputs[sub_i].outputs[0].logprobs
-                response_logprobs = [item[token_ids[i]].logprob for i, item in enumerate(response_logprobs)]
+                response_logprobs = [
+                    item[token_ids[i]].logprob
+                    for i, item in enumerate(response_logprobs)
+                ]
                 response_is_truncated = (
                     sub_outputs[sub_i].outputs[0].finish_reason == "length"
                 )
@@ -476,6 +479,7 @@ class Actor(PPOActor):
                         "actor/discount_factor": self.args.gamma,
                         "actor/discounted_step_return": returns[i],
                         "actor/response_is_truncated": step_data.response_is_truncated,
+                        "actor/timestamp": time.time_ns(),
                     },
                 )
             )

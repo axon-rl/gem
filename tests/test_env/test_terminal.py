@@ -98,10 +98,31 @@ def test_llm_inference(model: str = "Qwen/Qwen2.5-14B-Instruct"):
     env.close()
 
 
-def test_openai(model: str = "gpt-5-nano", task_name: str = "csv-to-parquet"):
+def test_openai(
+    model: str = "gpt-5-nano",
+    task_name: str = "csv-to-parquet",
+    use_open_router: bool = False,
+):
+    import os
+
     from openai import OpenAI
 
-    client = OpenAI()
+    _api_key = (
+        os.environ.get("OPENROUTER_API_KEY")
+        if use_open_router
+        else os.environ.get("OPENAI_API_KEY")
+    )
+    assert (
+        _api_key
+    ), "Please provide valid api key via env var: OPENROUTER_API_KEY | OPENAI_API_KEY"
+    client = OpenAI(
+        base_url=(
+            "https://openrouter.ai/api/v1"
+            if use_open_router
+            else "https://api.openai.com/v1"
+        ),
+        api_key=_api_key,
+    )
 
     task_path = f"./tasks/_eval/{task_name}"
 
@@ -130,12 +151,7 @@ def test_openai(model: str = "gpt-5-nano", task_name: str = "csv-to-parquet"):
         {"role": "developer", "content": SYSTEM_PROMPT},
         {
             "role": "user",
-            "content": [
-                {
-                    "type": "input_text",
-                    "text": obs,
-                },
-            ],
+            "content": obs,
         },
     ]
 
@@ -143,8 +159,14 @@ def test_openai(model: str = "gpt-5-nano", task_name: str = "csv-to-parquet"):
         done = False
         episode = []
         while not done:
-            response = client.responses.create(model=model, input=messages)
-            action = response.output_text
+            if use_open_router:
+                completion = client.chat.completions.create(
+                    model=model, messages=messages
+                )
+                action = completion.choices[0].message.content
+            else:
+                response = client.responses.create(model=model, input=messages)
+                action = response.output_text
             print("ACT", action)
             next_obs, reward, terminated, truncated, info = env.step(action)
             episode.append(
@@ -158,12 +180,16 @@ def test_openai(model: str = "gpt-5-nano", task_name: str = "csv-to-parquet"):
             messages.append({"role": "assistant", "content": action})
             messages.append({"role": "user", "content": next_obs})
         env.close()
+        model = model.replace("/", "_")
         save_path = os.path.join(task_path, f"{model}-episode-{int(time.time())}.json")
         json.dump(episode, open(save_path, "w"), indent=4)
     except Exception as e:
         env.close()
         if episode:
-            save_path = os.path.join(task_path, f"{model}-episode-{int(time.time())}.json")
+            model = model.replace("/", "_")
+            save_path = os.path.join(
+                task_path, f"{model}-episode-{int(time.time())}.json"
+            )
             json.dump(episode, open(save_path, "w"), indent=4)
         raise e
 
@@ -181,4 +207,5 @@ if __name__ == "__main__":
     python -m tests.test_env.test_terminal hello_world
     python -m tests.test_env.test_terminal llm_inference
     python -m tests.test_env.test_terminal openai
+    python -m tests.test_env.test_terminal openai --model google/gemini-2.5-flash-lite --use_open_router
     """
