@@ -201,8 +201,9 @@ Comprehensive test suite with 63 tests covering:
 
 Run tests:
 ```bash
-make test-multiagent      # Run tests only
-make test-multiagent-all  # Run tests and examples
+pytest -xvs tests/test_multiagent/
+cd examples/multiagent && python conversation.py
+cd examples/multiagent && python collaboration.py
 ```
 
 ## API Comparison with PettingZoo
