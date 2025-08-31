@@ -198,6 +198,11 @@ class MCPTool(BaseTool):
         self.max_retries = max_retries
         self.delay_between_retries = delay_between_retries
         self.execution_timeout = execution_timeout
+        
+        # Store initialization parameters for reconfiguration
+        self._log_handler = log_handler
+        self._progress_handler = progress_handler
+        self._sampling_handler = sampling_handler
 
         # Tool discovery and caching
         self._available_tools: Optional[List[Dict[str, Any]]] = None
@@ -412,6 +417,17 @@ class MCPTool(BaseTool):
         """Execute tool using FastMCP client with enhanced result handling."""
         for attempt in range(self.max_retries):
             try:
+                # Recreate client on retry attempts to handle stdio connection issues
+                if attempt > 0:
+                    # TODO: @changyu check if this is necessary
+                    logger.info(f"Recreating client for retry attempt {attempt + 1}")
+                    self.client = self._create_client(
+                        self.client._log_handler if hasattr(self.client, '_log_handler') else None,
+                        self.client._progress_handler if hasattr(self.client, '_progress_handler') else None,
+                        self.client._sampling_handler if hasattr(self.client, '_sampling_handler') else None,
+                        self.execution_timeout
+                    )
+                
                 async with self.client:
                     result = await self.client.call_tool(
                         tool_name, 
@@ -454,14 +470,24 @@ class MCPTool(BaseTool):
                         return "Tool execution completed with no output"
                 
             except ClientError as e:
-                error_msg = f"[Tool execution error: {e}]"
-                logger.error(error_msg)
-                return error_msg
+                error_str = str(e)
+                # Retry on connection failures
+                if "failed to connect" in error_str.lower() and attempt < self.max_retries - 1:
+                    logger.warning(f"Tool execution attempt {attempt + 1} failed with connection error: {e}")
+                    await asyncio.sleep(self.delay_between_retries)
+                    continue
+                else:
+                    error_msg = f"[Tool execution error: {e}]"
+                    logger.error(error_msg)
+                    return error_msg
                 
             except Exception as e:  # noqa: BLE001
-                if is_timeout_error(e) and attempt < self.max_retries - 1:
+                error_str = str(e)
+                should_retry = (is_timeout_error(e) or "failed to connect" in error_str.lower()) and attempt < self.max_retries - 1
+                if should_retry:
                     logger.warning(f"Tool execution attempt {attempt + 1} failed: {e}")
                     await asyncio.sleep(self.delay_between_retries)
+                    continue
                 else:
                     error_msg = f"[Tool execution failed: {e}]"
                     logger.error(error_msg)
@@ -556,6 +582,41 @@ class MCPTool(BaseTool):
             }
         }
         return cls(config=config, **kwargs)
+
+    def reconfigure(self, new_config: Union[str, Dict[str, Any]], auth: Optional[Union[str, BearerAuth]] = None, headers: Optional[Dict[str, str]] = None):
+        """Reconfigure the MCP tool with new configuration.
+        
+        This method allows updating the configuration (e.g., database URL) and recreates
+        the FastMCP client with the new settings. This is useful when the underlying
+        service configuration changes during the tool's lifecycle.
+        
+        Args:
+            new_config: New MCP server configuration (URL string or config dict)
+            auth: Optional authentication for URL string input
+            headers: Optional headers for URL string input
+        """
+        logger.info(f"Reconfiguring MCPTool with new configuration")
+        
+        # Close existing client if it exists
+        self.close()
+        
+        # Update configuration
+        self.raw_config = new_config
+        self.normalized_config = self._normalize_config(new_config, auth, headers)
+        
+        # Recreate client with new configuration
+        self.client = self._create_client(
+            self._log_handler,
+            self._progress_handler, 
+            self._sampling_handler,
+            self.execution_timeout
+        )
+        
+        # Reset tool discovery cache to force re-discovery with new client
+        self._available_tools = None
+        self._tools_discovered = False
+        
+        logger.info(f"MCPTool reconfiguration completed: {self._get_server_description()}")
 
     def close(self):
         """Clean up resources."""
@@ -693,6 +754,3 @@ class MCPTool(BaseTool):
             logger.error(error_msg)
             return False, True, error_msg, parsed_action
 
-
-if __name__ == "__main__":
-    pass 
