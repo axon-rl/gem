@@ -127,6 +127,22 @@ class MCPTool(BaseTool):
             headers={"X-Custom": "value"},
             log_handler=my_log_handler
         )
+        
+        # Local stdio MCP server (spawned via command)
+        tool = MCPTool.from_local_command({
+            "command": "pipx",
+            "args": ["run", "postgres-mcp-server", "postgresql://..."]
+        })
+
+        # Inline config with local stdio server (transport will default to 'stdio')
+        tool = MCPTool({
+            "mcpServers": {
+                "db": {
+                    "command": "pipx",
+                    "args": ["run", "postgres-mcp-server", "postgresql://..."]
+                }
+            }
+        })
     """
 
     tool_type = "mcp"
@@ -244,13 +260,30 @@ class MCPTool(BaseTool):
                 }
             }
         elif isinstance(config, dict):
-            # Ensure all servers default to HTTP transport if not specified
-            normalized = config.copy()
-            if "mcpServers" in normalized:
+            # If it's already an mcpServers map, normalize each server entry
+            if "mcpServers" in config:
+                normalized = config.copy()
                 for _, server_config in normalized["mcpServers"].items():
                     if "transport" not in server_config:
-                        server_config["transport"] = "http"
-            return normalized
+                        # Infer transport: stdio when command/args present; otherwise http
+                        if ("command" in server_config) or ("args" in server_config):
+                            server_config["transport"] = "stdio"
+                        else:
+                            server_config["transport"] = "http"
+                return normalized
+            
+            # Otherwise treat the dict as a single server_params entry
+            server_config = config.copy()
+            if "transport" not in server_config:
+                if ("command" in server_config) or ("args" in server_config):
+                    server_config["transport"] = "stdio"
+                else:
+                    server_config["transport"] = "http"
+            return {
+                "mcpServers": {
+                    "default": server_config
+                }
+            }
         else:
             raise ValueError(f"Unsupported config type: {type(config)}")
             
@@ -474,6 +507,35 @@ class MCPTool(BaseTool):
         return cls(config=config, **kwargs)
         
     @classmethod
+    def from_local_command(
+        cls,
+        server_params: Dict[str, Any],
+        name: str = "default",
+        **kwargs,
+    ) -> 'MCPTool':
+        """Create MCPTool for a local stdio MCP server spawned by a command.
+        
+        The server_params should include at least:
+        - command: The executable to run (e.g., "pipx")
+        - args: A list of arguments (e.g., ["run", "postgres-mcp-server", "postgresql://..."])
+        Optionally include "env" or other fields supported by FastMCP.
+        
+        Args:
+            server_params: Parameters defining how to spawn the server process
+            name: Logical server name used when multiple servers are configured
+            **kwargs: Additional arguments to pass to MCPTool constructor
+        
+        Returns:
+            MCPTool instance configured for stdio transport
+        """
+        config = {
+            "mcpServers": {
+                name: server_params
+            }
+        }
+        return cls(config=config, **kwargs)
+        
+    @classmethod
     def from_multi_server(cls, servers: Dict[str, str], **kwargs) -> 'MCPTool':
         """Create MCPTool for multiple HTTP servers.
         
@@ -584,8 +646,13 @@ class MCPTool(BaseTool):
             servers = list(self.raw_config["mcpServers"].keys())
             if len(servers) == 1:
                 server_config = self.raw_config["mcpServers"][servers[0]]
-                url = server_config.get("url", "unknown")
-                return f"HTTP server '{servers[0]}' at {url}"
+                transport = server_config.get("transport", "http")
+                if transport == "stdio":
+                    cmd = server_config.get("command", "<command>")
+                    return f"local stdio server '{servers[0]}' via command: {cmd}"
+                else:
+                    url = server_config.get("url", "unknown")
+                    return f"HTTP server '{servers[0]}' at {url}"
             else:
                 return f"multi-server configuration with {len(servers)} servers: {', '.join(servers)}"
         else:
@@ -625,3 +692,7 @@ class MCPTool(BaseTool):
             error_msg = f"MCP tool execution failed: {e}"
             logger.error(error_msg)
             return False, True, error_msg, parsed_action
+
+
+if __name__ == "__main__":
+    pass 
