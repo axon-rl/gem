@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for environment conversions between AEC and Parallel."""
-
 from typing import Any, Dict, Optional, Tuple
 
 import pytest
@@ -31,7 +29,6 @@ from gem.multiagent.utils import (
 
 
 class MockAECEnv(AECEnv):
-    """Mock AEC environment for testing."""
 
     def __init__(self):
         super().__init__()
@@ -71,7 +68,7 @@ class MockAECEnv(AECEnv):
             self.step_count += 1
 
     def reset(self, seed: Optional[int] = None) -> Tuple[str, Dict[str, Any]]:
-        # Call MultiAgentEnv.reset directly, not AECEnv.reset
+
         MultiAgentEnv.reset(self, seed)
         self.agents = self.possible_agents.copy()
         self._agent_selector.reinit(self.agents)
@@ -89,7 +86,6 @@ class MockAECEnv(AECEnv):
 
 
 class MockParallelEnv(ParallelEnv):
-    """Mock Parallel environment for testing."""
 
     def __init__(self):
         super().__init__()
@@ -125,11 +121,9 @@ class MockParallelEnv(ParallelEnv):
 
         self.step_count += 1
 
-        # Update internal state
         self.terminations = terminations
         self.truncations = truncations
 
-        # Remove dead agents
         self._remove_dead_agents()
 
         return observations, rewards, terminations, truncations, infos
@@ -137,7 +131,7 @@ class MockParallelEnv(ParallelEnv):
     def reset(
         self, seed: Optional[int] = None
     ) -> Tuple[Dict[str, str], Dict[str, Dict]]:
-        # Call MultiAgentEnv.reset directly, not ParallelEnv.reset
+
         MultiAgentEnv.reset(self, seed)
         self.agents = self.possible_agents.copy()
         self.step_count = 0
@@ -149,10 +143,8 @@ class MockParallelEnv(ParallelEnv):
 
 
 class TestAECToParallelWrapper:
-    """Test AEC to Parallel conversion."""
 
     def test_initialization(self):
-        """Test wrapper initialization."""
         aec_env = MockAECEnv()
         wrapper = AECToParallelWrapper(aec_env)
 
@@ -162,7 +154,6 @@ class TestAECToParallelWrapper:
         assert wrapper.action_spaces == aec_env.action_spaces
 
     def test_reset(self):
-        """Test reset through wrapper."""
         aec_env = MockAECEnv()
         wrapper = AECToParallelWrapper(aec_env)
 
@@ -175,7 +166,6 @@ class TestAECToParallelWrapper:
         assert observations["agent2"] == "obs_agent2_0"
 
     def test_step(self):
-        """Test parallel step through wrapper."""
         aec_env = MockAECEnv()
         wrapper = AECToParallelWrapper(aec_env)
         wrapper.reset()
@@ -190,7 +180,6 @@ class TestAECToParallelWrapper:
         assert all(not term for term in terms.values())
 
     def test_step_with_termination(self):
-        """Test step with agent termination."""
         aec_env = MockAECEnv()
         wrapper = AECToParallelWrapper(aec_env)
         wrapper.reset()
@@ -204,25 +193,20 @@ class TestAECToParallelWrapper:
         assert "agent2" in wrapper.agents
 
     def test_validate_actions(self):
-        """Test action validation."""
         aec_env = MockAECEnv()
         wrapper = AECToParallelWrapper(aec_env)
         wrapper.reset()
 
-        # Missing action
         with pytest.raises(ValueError, match="Missing actions"):
             wrapper.step({"agent1": "good"})
 
-        # Extra action
         with pytest.raises(ValueError, match="Actions provided for non-active agents"):
             wrapper.step({"agent1": "good", "agent2": "good", "agent3": "good"})
 
 
 class TestParallelToAECWrapper:
-    """Test Parallel to AEC conversion."""
 
     def test_initialization(self):
-        """Test wrapper initialization."""
         parallel_env = MockParallelEnv()
         wrapper = ParallelToAECWrapper(parallel_env)
 
@@ -233,7 +217,6 @@ class TestParallelToAECWrapper:
         assert wrapper.agent_selection is not None
 
     def test_reset(self):
-        """Test reset through wrapper."""
         parallel_env = MockParallelEnv()
         wrapper = ParallelToAECWrapper(parallel_env)
 
@@ -244,7 +227,6 @@ class TestParallelToAECWrapper:
         assert isinstance(info, dict)
 
     def test_observe(self):
-        """Test observation method."""
         parallel_env = MockParallelEnv()
         wrapper = ParallelToAECWrapper(parallel_env)
         wrapper.reset()
@@ -256,12 +238,10 @@ class TestParallelToAECWrapper:
         assert obs2 == "obs_agent2_0"
 
     def test_step_buffering(self):
-        """Test action buffering in AEC mode."""
         parallel_env = MockParallelEnv()
         wrapper = ParallelToAECWrapper(parallel_env)
         wrapper.reset()
 
-        # First agent action - should be buffered
         assert wrapper.agent_selection == "agent1"
         wrapper.step("good")
 
@@ -269,20 +249,16 @@ class TestParallelToAECWrapper:
         assert wrapper._action_buffer["agent1"] == "good"
         assert wrapper.agent_selection == "agent2"
 
-        # Second agent action - should trigger parallel step
         wrapper.step("bad")
 
-        # Action buffer should be cleared after parallel step
         assert len(wrapper._action_buffer) == 0
-        assert wrapper.agent_selection == "agent1"  # Back to first agent
+        assert wrapper.agent_selection == "agent1"
 
     def test_last(self):
-        """Test last() method."""
         parallel_env = MockParallelEnv()
         wrapper = ParallelToAECWrapper(parallel_env)
         wrapper.reset()
 
-        # Get last for first agent
         obs, reward, terminated, truncated, info = wrapper.last()
 
         assert obs == "obs_agent1_0"
@@ -291,63 +267,51 @@ class TestParallelToAECWrapper:
         assert truncated is False
 
     def test_full_cycle(self):
-        """Test a full cycle of actions."""
         parallel_env = MockParallelEnv()
         wrapper = ParallelToAECWrapper(parallel_env)
         wrapper.reset()
 
-        # Complete one full cycle
-        wrapper.step("good")  # agent1
-        wrapper.step("bad")  # agent2
+        wrapper.step("good")
+        wrapper.step("bad")
 
-        # Check that parallel step was executed
         assert parallel_env.step_count == 1
 
-        # Check rewards were updated
         obs, reward, _, _, _ = wrapper.last()
-        # Note: reward for agent1 should be available after the cycle
+
         assert wrapper._rewards["agent1"] == 1.0
         assert wrapper._rewards["agent2"] == 0.0
 
     def test_dead_step(self):
-        """Test handling of dead steps."""
         parallel_env = MockParallelEnv()
         wrapper = ParallelToAECWrapper(parallel_env)
         wrapper.reset()
 
-        # Terminate an agent
         wrapper._terminations["agent1"] = True
 
-        # Dead step should not add to buffer
         wrapper.step(None)
         assert "agent1" not in wrapper._action_buffer
         assert wrapper.agent_selection == "agent2"
 
 
 class TestConversionFunctions:
-    """Test the convenience conversion functions."""
 
     def test_aec_to_parallel_function(self):
-        """Test aec_to_parallel convenience function."""
         aec_env = MockAECEnv()
         parallel_env = aec_to_parallel(aec_env)
 
         assert isinstance(parallel_env, ParallelEnv)
         assert isinstance(parallel_env, AECToParallelWrapper)
 
-        # Test it works
         observations, infos = parallel_env.reset()
         assert len(observations) == 2
 
     def test_parallel_to_aec_function(self):
-        """Test parallel_to_aec convenience function."""
         parallel_env = MockParallelEnv()
         aec_env = parallel_to_aec(parallel_env)
 
         assert isinstance(aec_env, AECEnv)
         assert isinstance(aec_env, ParallelToAECWrapper)
 
-        # Test it works
         obs, info = aec_env.reset()
         assert isinstance(obs, str)
         assert aec_env.agent_selection is not None

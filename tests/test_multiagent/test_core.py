@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for multi-agent core components."""
-
 from typing import Any, Dict, Optional, Tuple
 
 import pytest
@@ -22,10 +20,8 @@ from gem.multiagent.multi_agent_env import MultiAgentEnv
 
 
 class TestMultiAgentEnv:
-    """Test the base MultiAgentEnv class."""
 
     def test_initialization(self):
-        """Test that MultiAgentEnv initializes correctly."""
 
         class SimpleMultiAgentEnv(MultiAgentEnv):
             def step(
@@ -45,7 +41,6 @@ class TestMultiAgentEnv:
         assert isinstance(env.infos, dict)
 
     def test_agent_management(self):
-        """Test agent list management."""
 
         class TestEnv(MultiAgentEnv):
             def step(
@@ -55,11 +50,9 @@ class TestMultiAgentEnv:
 
         env = TestEnv()
 
-        # Set possible agents
         env.possible_agents = ["agent1", "agent2", "agent3"]
         assert env.max_num_agents == 3
 
-        # Set active agents
         env.agents = ["agent1", "agent2"]
         assert env.num_agents == 2
         assert "agent1" in env.agents
@@ -67,7 +60,6 @@ class TestMultiAgentEnv:
         assert "agent3" not in env.agents
 
     def test_observation_and_action_spaces(self):
-        """Test observation and action space methods."""
 
         class TestEnv(MultiAgentEnv):
             def __init__(self):
@@ -101,7 +93,6 @@ class TestMultiAgentEnv:
         assert env.action_space("agent3") is None
 
     def test_reward_accumulation(self):
-        """Test reward accumulation and clearing."""
 
         class TestEnv(MultiAgentEnv):
             def step(
@@ -112,27 +103,22 @@ class TestMultiAgentEnv:
         env = TestEnv()
         env.agents = ["agent1", "agent2"]
 
-        # Set initial rewards
         env.rewards = {"agent1": 1.0, "agent2": 0.5}
 
-        # Accumulate rewards
         env._accumulate_rewards()
         assert env._cumulative_rewards["agent1"] == 1.0
         assert env._cumulative_rewards["agent2"] == 0.5
 
-        # Accumulate again
         env.rewards = {"agent1": 0.5, "agent2": 1.0}
         env._accumulate_rewards()
         assert env._cumulative_rewards["agent1"] == 1.5
         assert env._cumulative_rewards["agent2"] == 1.5
 
-        # Clear rewards
         env._clear_rewards()
         assert env.rewards["agent1"] == 0.0
         assert env.rewards["agent2"] == 0.0
 
     def test_dead_step_detection(self):
-        """Test dead step detection."""
 
         class TestEnv(MultiAgentEnv):
             def step(
@@ -147,7 +133,6 @@ class TestMultiAgentEnv:
         assert env._was_dead_step("") is False
 
     def test_reset(self):
-        """Test environment reset."""
 
         class TestEnv(MultiAgentEnv):
             def __init__(self):
@@ -165,15 +150,12 @@ class TestMultiAgentEnv:
 
         env = TestEnv()
 
-        # Modify state
         env.agents = ["agent1"]
         env.terminations = {"agent1": True}
         env.rewards = {"agent1": 1.0}
 
-        # Reset
         env.reset()
 
-        # Check state is reset
         assert env.agents == ["agent1", "agent2"]
         assert env.terminations == {"agent1": False, "agent2": False}
         assert env.truncations == {"agent1": False, "agent2": False}
@@ -181,7 +163,6 @@ class TestMultiAgentEnv:
         assert env._cumulative_rewards == {"agent1": 0.0, "agent2": 0.0}
 
     def test_state_not_implemented(self):
-        """Test that state() raises NotImplementedError by default."""
 
         class TestEnv(MultiAgentEnv):
             def step(
