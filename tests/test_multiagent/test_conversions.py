@@ -19,13 +19,14 @@ from typing import Any, Dict, Optional, Tuple
 import pytest
 
 from gem.multiagent.aec_env import AECEnv
-from gem.multiagent.agent_selector import AgentSelector
-from gem.multiagent.conversions import (
+from gem.multiagent.utils import AgentSelector
+from gem.multiagent.utils import (
     AECToParallelWrapper,
     ParallelToAECWrapper,
     aec_to_parallel,
     parallel_to_aec,
 )
+from gem.multiagent.multi_agent_env import MultiAgentEnv
 from gem.multiagent.parallel_env import ParallelEnv
 
 
@@ -70,7 +71,8 @@ class MockAECEnv(AECEnv):
             self.step_count += 1
 
     def reset(self, seed: Optional[int] = None) -> Tuple[str, Dict[str, Any]]:
-        super().reset(seed)
+        # Call MultiAgentEnv.reset directly, not AECEnv.reset
+        MultiAgentEnv.reset(self, seed)
         self.agents = self.possible_agents.copy()
         self._agent_selector.reinit(self.agents)
         self.agent_selection = self._agent_selector.selected
@@ -135,7 +137,8 @@ class MockParallelEnv(ParallelEnv):
     def reset(
         self, seed: Optional[int] = None
     ) -> Tuple[Dict[str, str], Dict[str, Dict]]:
-        super().reset(seed)
+        # Call MultiAgentEnv.reset directly, not ParallelEnv.reset
+        MultiAgentEnv.reset(self, seed)
         self.agents = self.possible_agents.copy()
         self.step_count = 0
 
@@ -211,7 +214,7 @@ class TestAECToParallelWrapper:
             wrapper.step({"agent1": "good"})
 
         # Extra action
-        with pytest.raises(ValueError, match="Extra actions"):
+        with pytest.raises(ValueError, match="Actions provided for non-active agents"):
             wrapper.step({"agent1": "good", "agent2": "good", "agent3": "good"})
 
 

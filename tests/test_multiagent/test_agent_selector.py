@@ -15,7 +15,7 @@
 """Tests for agent selector utility."""
 
 
-from gem.multiagent.agent_selector import AgentSelector
+from gem.multiagent.utils import AgentSelector
 
 
 class TestAgentSelector:

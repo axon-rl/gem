@@ -19,8 +19,8 @@ from typing import Any, Dict, Optional, Tuple
 import pytest
 
 from gem.multiagent.aec_env import AECEnv, AECIterable
-from gem.multiagent.agent_selector import AgentSelector
-from gem.multiagent.core import MultiAgentEnv
+from gem.multiagent.utils import AgentSelector
+from gem.multiagent.multi_agent_env import MultiAgentEnv
 
 
 class SimpleAECEnv(AECEnv):

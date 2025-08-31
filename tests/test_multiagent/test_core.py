@@ -18,7 +18,7 @@ from typing import Any, Dict, Optional, Tuple
 
 import pytest
 
-from gem.multiagent.core import MultiAgentEnv
+from gem.multiagent.multi_agent_env import MultiAgentEnv
 
 
 class TestMultiAgentEnv:

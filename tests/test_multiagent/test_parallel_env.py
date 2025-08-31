@@ -18,6 +18,7 @@ from typing import Dict, Optional, Tuple
 
 import pytest
 
+from gem.multiagent.multi_agent_env import MultiAgentEnv
 from gem.multiagent.parallel_env import ParallelEnv
 
 
@@ -103,7 +104,8 @@ class SimpleParallelEnv(ParallelEnv):
     def reset(
         self, seed: Optional[int] = None
     ) -> Tuple[Dict[str, str], Dict[str, Dict]]:
-        super().reset(seed)
+        # Call MultiAgentEnv.reset directly, not ParallelEnv.reset
+        MultiAgentEnv.reset(self, seed)
 
         self.agents = self.possible_agents.copy()
         self.step_count = 0
