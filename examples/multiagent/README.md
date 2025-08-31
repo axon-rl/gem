@@ -1,207 +1,152 @@
-# Multi-Agent Environment Examples
+# Multi-Agent Examples
 
-This directory contains examples demonstrating the multi-agent environment capabilities in GEM.
+This directory contains two examples demonstrating different multi-agent scenarios in GEM.
 
 ## Examples
 
-### 1. User-Tool Interaction (`user_tool_interaction.py`)
+### 1. conversation.py - User-Assistant Dialogue
+Demonstrates a **conversational scenario** between a user and an assistant with tool capabilities.
 
-Demonstrates a sequential (AEC) multi-agent environment where a user agent interacts with a tool agent to accomplish tasks.
-
-**Features:**
-- Sequential turn-based interaction
-- User agent with multiple strategies (scripted, LLM, human)
-- Tool agent with search, Python execution, and response capabilities
-- Conversation management and termination handling
-
-**Run:**
-```bash
-python user_tool_interaction.py
-```
-
-### 2. Collaborative Question Answering (`collaborative_qa.py`)
-
-Shows a parallel multi-agent environment where multiple specialized agents work together to answer questions.
-
-**Features:**
-- Parallel execution with all agents acting simultaneously
-- Three specialized agents: Researcher, Validator, and Synthesizer
-- Shared information board for collaboration
-- Reward shaping for successful collaboration
+**Key Features:**
+- Turn-based conversation (uses AEC/sequential execution)
+- Assistant can execute Python code via PythonCodeTool
+- Assistant can search for information via SearchTool
+- Natural dialogue flow with tool integration
 
 **Run:**
 ```bash
-python collaborative_qa.py
+python conversation.py
 ```
 
-## Key Concepts
+**Environment Class:** `ConversationEnv`
 
-### AEC (Agent Environment Cycle) Environments
+**Use Cases:**
+- Chatbots with tool use
+- Interactive coding assistants
+- Q&A systems with external capabilities
 
-In AEC environments, agents take turns acting sequentially:
+### 2. collaboration.py - Multi-Agent Team Task
+Demonstrates **collaborative problem-solving** where multiple agents work together simultaneously.
 
-```python
-from gem.multiagent import AECEnv
+**Key Features:**
+- Agents work in parallel on shared task
+- Shared memory for information exchange
+- Collective decision making
+- All agents contribute simultaneously each round
 
-class MyAECEnv(AECEnv):
-    def step(self, action):
-        # Process action for current agent
-        # Automatically advance to next agent
-        pass
-    
-    def observe(self, agent):
-        # Get observation for specific agent
-        pass
+**Run:**
+```bash
+python collaboration.py
 ```
 
-Usage:
-```python
-env = MyAECEnv()
-obs, info = env.reset()
+**Environment Class:** `CollaborationEnv`
 
-for agent in env.agent_iter():
-    observation, reward, terminated, truncated, info = env.last()
-    if terminated or truncated:
-        action = None
-    else:
-        action = policy(observation, agent)
-    env.step(action)
+**Use Cases:**
+- Research teams analyzing problems
+- Distributed problem solving
+- Multi-perspective analysis
+- Consensus building systems
+
+## Key Differences
+
+| Aspect | Conversation | Collaboration |
+|--------|--------------|---------------|
+| Scenario | User-Assistant dialogue | Team problem solving |
+| Agents | 2 (user, assistant) | 3 (researcher, analyst, reviewer) |
+| Execution | Turn-based (AEC) | Simultaneous (Parallel) |
+| Communication | Direct dialogue | Shared memory |
+| Tools | Python, Search | Information sharing |
+| Goal | Answer user queries | Solve complex problems |
+
+## Architecture
+
+Both examples use GEM's multi-agent infrastructure:
 ```
-
-### Parallel Environments
-
-In Parallel environments, all agents act simultaneously:
-
-```python
-from gem.multiagent import ParallelEnv
-
-class MyParallelEnv(ParallelEnv):
-    def step(self, actions):
-        # Process actions from all agents at once
-        # Return results for all agents
-        pass
-```
-
-Usage:
-```python
-env = MyParallelEnv()
-observations, infos = env.reset()
-
-while env.agents:
-    actions = {agent: policy(observations[agent]) for agent in env.agents}
-    observations, rewards, terminations, truncations, infos = env.step(actions)
-```
-
-### Agent Types
-
-GEM provides base agent classes for building custom agents:
-
-```python
-from gem.multiagent.agents import BaseAgent
-
-class MyAgent(BaseAgent):
-    def act(self, observation):
-        # Generate action based on observation
-        return action
-    
-    def reset(self):
-        # Reset agent state
-        pass
-```
-
-Pre-built agents:
-- `UserAgent`: Simulates user interactions with various strategies
-- `ToolAgent`: Executes tools and APIs based on requests
-
-### Environment Registration
-
-Register multi-agent environments just like single-agent ones:
-
-```python
-from gem import register, make
-
-register(
-    "MyMultiAgentEnv-v0",
-    entry_point="path.to:MyMultiAgentEnv",
-    kwargs={"param": value}
-)
-
-env = make("MyMultiAgentEnv-v0")
-```
-
-### Conversion Between APIs
-
-Convert between AEC and Parallel interfaces:
-
-```python
-from gem.multiagent.conversions import aec_to_parallel, parallel_to_aec
-
-# Convert AEC to Parallel
-aec_env = MyAECEnv()
-parallel_env = aec_to_parallel(aec_env)
-
-# Convert Parallel to AEC
-parallel_env = MyParallelEnv()
-aec_env = parallel_to_aec(parallel_env)
+gem/multiagent/
+├── __init__.py
+├── multi_agent_env.py    # Base class for all multi-agent environments
+├── aec_env.py            # Sequential execution (used by conversation.py)
+├── parallel_env.py       # Parallel execution (used by collaboration.py)
+└── utils.py              # AgentSelector and conversion utilities
 ```
 
 ## Creating Your Own Multi-Agent Environment
 
-1. **Choose the appropriate API**: 
-   - Use AEC for turn-based, sequential scenarios
-   - Use Parallel for simultaneous action scenarios
+### For Conversational Scenarios (like conversation.py):
+```python
+from gem.multiagent.aec_env import AECEnv
+from gem.multiagent.multi_agent_env import MultiAgentEnv
+from gem.multiagent.utils import AgentSelector
 
-2. **Define agents and their roles**:
-   - Set `possible_agents` and `agents` lists
-   - Define observation and action spaces per agent
+class MyConversationEnv(AECEnv):
+    def __init__(self):
+        super().__init__()
+        self.possible_agents = ["user", "assistant"]
+        self.agents = self.possible_agents.copy()
+        self._agent_selector = AgentSelector(self.agents)
+        self.agent_selection = self._agent_selector.selected
+        
+    def step(self, action):
+        # Process one agent's action at a time
+        self._agent_selector.next()
+        self.agent_selection = self._agent_selector.selected
+        
+    def reset(self, seed=None):
+        # Important: Call MultiAgentEnv.reset() directly
+        MultiAgentEnv.reset(self, seed)
+        # Reset your environment state
+        return initial_observation, {}
+```
 
-3. **Implement core methods**:
-   - `reset()`: Initialize environment state
-   - `step()`: Process agent actions
-   - `observe()` (AEC only): Get agent observations
+### For Collaborative Scenarios (like collaboration.py):
+```python
+from gem.multiagent.parallel_env import ParallelEnv
+from gem.multiagent.multi_agent_env import MultiAgentEnv
 
-4. **Manage agent lifecycle**:
-   - Track terminations and truncations
-   - Remove dead agents when appropriate
-   - Handle rewards and information
+class MyCollaborationEnv(ParallelEnv):
+    def __init__(self):
+        super().__init__()
+        self.possible_agents = ["agent1", "agent2", "agent3"]
+        self.agents = self.possible_agents.copy()
+        
+    def step(self, actions):
+        # Process all agents' actions simultaneously
+        observations = {}
+        rewards = {}
+        for agent in self.agents:
+            observations[agent] = process(actions[agent])
+            rewards[agent] = calculate_reward(agent)
+        return observations, rewards, terminations, truncations, infos
+        
+    def reset(self, seed=None):
+        # Important: Call MultiAgentEnv.reset() directly
+        MultiAgentEnv.reset(self, seed)
+        # Reset your environment state
+        return observations, infos
+```
 
-5. **Test your environment**:
-   - Ensure proper agent coordination
-   - Verify termination conditions
-   - Check reward distribution
+## Important Implementation Notes
 
-## Advanced Features
+1. **Reset Method**: Always call `MultiAgentEnv.reset(self, seed)` directly in your reset method, not `super().reset()` to avoid NotImplementedError.
 
-### Inter-Agent Communication
+2. **Agent Management**: The framework automatically handles agent removal when they terminate. Don't manually remove agents in your step() method.
 
-Agents can communicate through:
-- Shared state/board (as in collaborative_qa.py)
-- Direct message passing
-- Environment-mediated observations
+3. **Tool Integration**: Use GEM's existing tools from `gem.tools` for agent capabilities.
 
-### Dynamic Agent Management
+## Testing
 
-- Add/remove agents during episodes
-- Handle variable numbers of agents
-- Support heterogeneous agent types
+Run all multi-agent tests:
+```bash
+make test-multiagent
+```
 
-### Integration with GEM Tools
+Run tests with examples:
+```bash
+make test-multiagent-all
+```
 
-Multi-agent environments can use existing GEM tools:
-- Search tools for information gathering
-- Python execution for computation
-- Custom tools for domain-specific tasks
-
-## Best Practices
-
-1. **Clear Agent Roles**: Define specific responsibilities for each agent
-2. **Proper Termination**: Handle both individual and collective termination
-3. **Reward Design**: Shape rewards to encourage desired collaboration
-4. **State Management**: Maintain consistent state across agents
-5. **Testing**: Thoroughly test agent interactions and edge cases
-
-## Further Reading
+## Learn More
 
 - [Multi-Agent Design Document](../../docs/multi_agent_design.md)
-- [PettingZoo Documentation](https://pettingzoo.farama.org/)
-- [GEM Core Documentation](../../README.md)
+- [GEM Documentation](../../README.md)
+- [PettingZoo Documentation](https://pettingzoo.farama.org/) (inspiration for the API)
