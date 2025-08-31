@@ -15,8 +15,8 @@
 """Agent implementations for multi-agent environments."""
 
 from gem.multiagent.agents.base_agent import BaseAgent
-from gem.multiagent.agents.user_agent import UserAgent
 from gem.multiagent.agents.tool_agent import ToolAgent
+from gem.multiagent.agents.user_agent import UserAgent
 
 __all__ = [
     "BaseAgent",

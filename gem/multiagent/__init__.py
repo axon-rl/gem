@@ -14,11 +14,11 @@
 
 """Multi-agent environment support for GEM."""
 
-from gem.multiagent.core import MultiAgentEnv
 from gem.multiagent.aec_env import AECEnv
-from gem.multiagent.parallel_env import ParallelEnv
 from gem.multiagent.agent_selector import AgentSelector
 from gem.multiagent.conversions import aec_to_parallel, parallel_to_aec
+from gem.multiagent.core import MultiAgentEnv
+from gem.multiagent.parallel_env import ParallelEnv
 
 __all__ = [
     "MultiAgentEnv",
