@@ -137,12 +137,9 @@ class MyCollaborationEnv(ParallelEnv):
 
 Run all multi-agent tests:
 ```bash
-make test-multiagent
-```
-
-Run tests with examples:
-```bash
-make test-multiagent-all
+pytest -xvs tests/test_multiagent/
+cd examples/multiagent && python conversation.py
+cd examples/multiagent && python collaboration.py
 ```
 
 ## Learn More
