@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document describes the implemented multi-agent environment support in GEM (Gym for LLMs). The design follows PettingZoo's proven multi-agent APIs while maintaining compatibility with GEM's existing architecture.
+This document describes the implemented multi-agent environment support in GEM (General Experience Maker). The design follows PettingZoo's proven multi-agent APIs while maintaining compatibility with GEM's existing architecture.
 
 ## Design Principles
 

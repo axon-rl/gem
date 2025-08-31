@@ -1,6 +1,6 @@
 # Multi-Agent Examples
 
-This directory contains two examples demonstrating different multi-agent scenarios in GEM.
+This directory contains two examples demonstrating different multi-agent scenarios in GEM (General Experience Maker).
 
 ## Examples
 
