@@ -119,7 +119,7 @@ class AECToParallelWrapper(ParallelEnv, EnvWrapper):
             if agent in actions:
                 self.aec_env.agent_selection = agent
                 obs_before = self.aec_env.observe(agent)
-                
+
                 self.aec_env.step(actions[agent])
 
                 observations[agent] = self.aec_env.observe(agent)
@@ -127,7 +127,7 @@ class AECToParallelWrapper(ParallelEnv, EnvWrapper):
                 terminations[agent] = self.aec_env.terminations.get(agent, False)
                 truncations[agent] = self.aec_env.truncations.get(agent, False)
                 infos[agent] = self.aec_env.infos.get(agent, {})
-                
+
                 self.aec_env._cumulative_rewards[agent] = 0.0
 
         self.agents = [

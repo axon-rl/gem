@@ -81,15 +81,14 @@ class AECIterable:
             raise StopIteration
 
         if all(
-            self.env.terminations.get(a, False)
-            or self.env.truncations.get(a, False)
+            self.env.terminations.get(a, False) or self.env.truncations.get(a, False)
             for a in self._agents_snapshot
         ):
             raise StopIteration
 
         agent = self._agents_snapshot[self._agent_index % len(self._agents_snapshot)]
-        
+
         self._agent_index = (self._agent_index + 1) % len(self._agents_snapshot)
         self.iter_count += 1
-        
+
         return agent

@@ -19,15 +19,15 @@ from typing import Any, Dict, Optional, Tuple
 import pytest
 
 from gem.multiagent.aec_env import AECEnv
-from gem.multiagent.utils import AgentSelector
+from gem.multiagent.multi_agent_env import MultiAgentEnv
+from gem.multiagent.parallel_env import ParallelEnv
 from gem.multiagent.utils import (
     AECToParallelWrapper,
+    AgentSelector,
     ParallelToAECWrapper,
     aec_to_parallel,
     parallel_to_aec,
 )
-from gem.multiagent.multi_agent_env import MultiAgentEnv
-from gem.multiagent.parallel_env import ParallelEnv
 
 
 class MockAECEnv(AECEnv):
