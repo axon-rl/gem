@@ -318,6 +318,7 @@ def test_mcpmark_openai(
     import os
     import time
 
+    import anthropic
     from openai import OpenAI
 
     model_provider_map = {
@@ -330,6 +331,11 @@ def test_mcpmark_openai(
             'models_keyword': ['gemini'],
             'base_url_env': 'LLM_GATEWAY_BASE_URL',
             'api_key_env': 'LLM_GATEWAY_API_KEY',
+        },
+        'anthropic': {
+            'models_keyword': ['claude'],
+            'api_key_env': 'ANTHROPIC_API_KEY',
+            'base_url_env': 'ANTHROPIC_BASE_URL',
         }
     }
     model_provider = None
@@ -343,10 +349,14 @@ def test_mcpmark_openai(
     assert (
         _api_key
     ), f"Please provide valid api key via env var: {model_provider_map[model_provider]['api_key_env']}"
-    client = OpenAI(
-        base_url=_base_url,
-        api_key=_api_key,
-    )
+    
+    if model_provider == 'anthropic':
+        client = anthropic.Anthropic(api_key=_api_key)
+    else:
+        client = OpenAI(
+            base_url=_base_url,
+            api_key=_api_key,
+        )
 
     def get_mcp_config(env):
         """Helper function to get MCP configuration for current database."""
@@ -388,19 +398,32 @@ def test_mcpmark_openai(
             print(f"Task {i}/{n_tasks}: {category_id}/{task_id} already exists, skipping")
             continue
 
-        messages = [
-            {
-                "role": "system" if 'claude' in model else "developer",
-                "content": SYSTEM_PROMPT,
-            },
-            {"role": "user", "content": obs},
-        ]
+        if model_provider == 'anthropic':
+            messages = [
+                {"role": "user", "content": obs},
+            ]
+        else:
+            messages = [
+                {"role": "developer","content": SYSTEM_PROMPT},
+                {"role": "user", "content": obs},
+            ]
 
         try:
             done = False
             episode = []
             while not done:
-                if model_provider != 'openai':
+                if model_provider == 'anthropic':
+                    response = client.messages.create(
+                        model=model,
+                        max_tokens=1000,
+                        messages=messages,
+                        system=SYSTEM_PROMPT,
+                        stop_sequences=["</tool_call>"]
+                    )
+                    action = response.content[0].text
+                    if not action.endswith("</tool_call>"):
+                        action = action + "</tool_call>"
+                elif model_provider == 'llm-gateway':
                     completion = client.chat.completions.create(
                         model=model, messages=messages
                     )
