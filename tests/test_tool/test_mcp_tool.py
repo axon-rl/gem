@@ -17,12 +17,16 @@ from functools import partial
 from typing import Optional
 
 import fire
+from dotenv import load_dotenv
 
 import gem
+from gem.envs.mcpmark import MCPMarkEnv
 from gem.tools.mcp_tool import MCPTool
 from gem.tools.tool_env_wrapper import ToolEnvWrapper
 from gem.utils.debug import run_and_print_episode
 from gem.wrappers.wrapper_factory import WRAPPER_FACTORY
+
+load_dotenv()
 
 # Example actions using the sample Time MCP server tools in gem.tools.mcp_server.time_mcp
 TEST_ACTIONS = [
@@ -296,6 +300,139 @@ def test_multi_server(
         print("This may be due to server connectivity issues or configuration problems.")
 
 
+def test_mcpmark_openai(
+    model: str = "gpt-5-nano",
+    mcp_service: str = "postgres",
+    tasks: str = "lego/consistency_enforcement",
+    save_root: str = "evals/benchmarks/mcpmark"
+):
+    """Test MCPMarkEnv with OpenAI/OpenRouter models using MCPTool integration.
+    
+    Args:
+        model: Model to use (e.g., "gpt-5-nano")
+        mcp_service: MCP service name for MCPMarkEnv
+        tasks: Tasks to run ("all", "category", or "category/task")
+        save_root: Root directory to save episodes
+    """
+    import json
+    import os
+    import time
+
+    from openai import OpenAI
+
+    model_provider_map = {
+        'openai': {
+            'models_keyword': ['gpt'],
+            'base_url_env': 'OPENAI_BASE_URL', 
+            'api_key_env': 'OPENAI_API_KEY',
+        },
+        'llm-gateway': {
+            'models_keyword': ['gemini'],
+            'base_url_env': 'LLM_GATEWAY_BASE_URL',
+            'api_key_env': 'LLM_GATEWAY_API_KEY',
+        }
+    }
+    model_provider = None
+    for k, v in model_provider_map.items():
+        if any(keyword in model for keyword in v['models_keyword']):
+            model_provider = k
+            break
+
+    _api_key = os.environ.get(model_provider_map[model_provider]['api_key_env'], None)
+    _base_url = os.environ.get(model_provider_map[model_provider]['base_url_env'], None)
+    assert (
+        _api_key
+    ), f"Please provide valid api key via env var: {model_provider_map[model_provider]['api_key_env']}"
+    client = OpenAI(
+        base_url=_base_url,
+        api_key=_api_key,
+    )
+
+    def get_mcp_config(env):
+        """Helper function to get MCP configuration for current database."""
+        database_url = env.unwrapped.state_manager.get_service_config_for_agent()["database_url"]
+        return {
+            "mcpServers": {
+                "postgres": {
+                    "command": "pipx",
+                    "args": ["run", "postgres-mcp", "--access-mode=unrestricted"],
+                    "env": {
+                        "DATABASE_URI": database_url,
+                    },
+                }
+            }
+        }
+    
+    # seed=None to use default order of tasks
+    env = MCPMarkEnv(mcp_service=mcp_service, tasks=tasks, seed=None) 
+    n_tasks = env.task_size
+    tool = MCPTool(get_mcp_config(env))
+    env = ToolEnvWrapper(env, tools=[tool], max_tool_uses=20)
+
+    with open("tests/test_tool/mcp_tool_prompt.md", "r") as file:
+        SYSTEM_PROMPT = file.read()
+    
+    for i in range(n_tasks):
+        obs, info = env.reset()
+        tool.reconfigure(get_mcp_config(env))
+        current_task = env.unwrapped.current_task
+        category_id = current_task.category_id
+        task_id = current_task.task_id
+        print("=" * 20)
+        print(f"Task {i}/{n_tasks}: {category_id}/{task_id}")
+
+        messages = [
+            {
+                "role": "system" if 'claude' in model else "developer",
+                "content": SYSTEM_PROMPT,
+            },
+            {"role": "user", "content": obs},
+        ]
+
+        try:
+            done = False
+            episode = []
+            while not done:
+                if model_provider != 'openai':
+                    completion = client.chat.completions.create(
+                        model=model, messages=messages
+                    )
+                    action = completion.choices[0].message.content
+                else:
+                    response = client.responses.create(model=model, input=messages)
+                    action = response.output_text
+                print("ACT", action)
+                next_obs, reward, terminated, truncated, info = env.step(action)
+                episode.append(
+                    {"observation": obs, "action": action, "reward": reward, "info": info}
+                )
+                done = terminated or truncated
+                obs = next_obs
+                print("NEXT_OBS", next_obs)
+                print("REW", reward)
+                print("-" * 20)
+                messages.append({"role": "assistant", "content": action})
+                messages.append({"role": "user", "content": next_obs})
+            
+            # Save episode results
+            model_safe = model.replace("/", "_").replace(":", "_")
+            save_path = f"{save_root}/{mcp_service}/{model_safe}-{category_id}_{task_id}-episode-{int(time.time())}.json"
+            os.makedirs(os.path.dirname(save_path), exist_ok=True)
+            json.dump(episode, open(save_path, "w"), indent=4)
+            print(f"Episode saved to: {save_path}")
+            
+        except Exception as e:
+            # Save partial episode on error
+            if episode:
+                model_safe = model.replace("/", "_").replace(":", "_")
+                save_path = f"{save_root}/{mcp_service}/{model_safe}-{category_id}_{task_id}-episode-error-{int(time.time())}.json"
+                os.makedirs(os.path.dirname(save_path), exist_ok=True)
+                json.dump(episode, open(save_path, "w"), indent=4)
+                print(f"Partial episode saved to: {save_path}")
+            
+            print(f"Error: {e}")
+
+
 def main():
     """Run with:
     # Start the sample Time MCP server (in another terminal):
@@ -306,6 +443,7 @@ def main():
     #   python -m tests.test_tool.test_mcp_tool episode --mcp_url http://127.0.0.1:8081/time-mcp
     #   python -m tests.test_tool.test_mcp_tool llm_episode --mcp_url http://127.0.0.1:8081/time-mcp
     #   python -m tests.test_tool.test_mcp_tool multi_server
+    #   python -m tests.test_tool.test_mcp_tool mcpmark_openai
     """
     fire.Fire(
         {
@@ -313,6 +451,7 @@ def main():
             "episode": test_episode,
             "llm_episode": test_llm_episode,
             "multi_server": test_multi_server,
+            "mcpmark_openai": test_mcpmark_openai,
         }
     )
 
