@@ -368,6 +368,7 @@ def test_mcpmark_openai(
     n_tasks = env.task_size
     tool = MCPTool(get_mcp_config(env))
     env = ToolEnvWrapper(env, tools=[tool], max_tool_uses=20)
+    model_safe = model.replace("/", "_").replace(":", "_")
 
     with open("tests/test_tool/mcp_tool_prompt.md", "r") as file:
         SYSTEM_PROMPT = file.read()
@@ -380,6 +381,12 @@ def test_mcpmark_openai(
         task_id = current_task.task_id
         print("=" * 20)
         print(f"Task {i}/{n_tasks}: {category_id}/{task_id}")
+
+        if _run_exist(
+            f"{save_root}/{mcp_service}/{model_safe}-{category_id}_{task_id}-episode-*.json"
+        ):
+            print(f"Task {i}/{n_tasks}: {category_id}/{task_id} already exists, skipping")
+            continue
 
         messages = [
             {
@@ -415,7 +422,6 @@ def test_mcpmark_openai(
                 messages.append({"role": "user", "content": next_obs})
             
             # Save episode results
-            model_safe = model.replace("/", "_").replace(":", "_")
             save_path = f"{save_root}/{mcp_service}/{model_safe}-{category_id}_{task_id}-episode-{int(time.time())}.json"
             os.makedirs(os.path.dirname(save_path), exist_ok=True)
             json.dump(episode, open(save_path, "w"), indent=4)
@@ -424,13 +430,20 @@ def test_mcpmark_openai(
         except Exception as e:
             # Save partial episode on error
             if episode:
-                model_safe = model.replace("/", "_").replace(":", "_")
                 save_path = f"{save_root}/{mcp_service}/{model_safe}-{category_id}_{task_id}-episode-error-{int(time.time())}.json"
                 os.makedirs(os.path.dirname(save_path), exist_ok=True)
                 json.dump(episode, open(save_path, "w"), indent=4)
                 print(f"Partial episode saved to: {save_path}")
             
             print(f"Error: {e}")
+
+def _run_exist(save_path: str): 
+    import glob
+    import os
+
+    pattern = os.path.expandvars(os.path.expanduser(save_path))
+    matches = glob.glob(pattern)
+    return len(matches) > 0
 
 
 def main():
