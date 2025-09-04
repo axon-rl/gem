@@ -1,25 +1,15 @@
 
 apt-get install net-tools
 
-temp_dir=$(mktemp -d)
-
-# 显示创建的临时文件夹路径
-echo "创建的临时文件夹: $temp_dir"
-cd ${temp_dir}
-git clone https://github.com/axon-rl/gem.git
-cd ./gem/
-git checkout fix-random2
-pip3 install -e .
-
 cd /mnt/
 
 git clone https://github.com/OpenRLHF/OpenRLHF.git
-pip3 install -e . -i  https://mirrors.cloud.aliyuncs.com/pypi/simple --trusted-host mirrors.cloud.aliyuncs.com
+pip3 install -e .
 
-# pip install gem-llm
+pip install gem-llm
 
-pip3 install math-verify loguru fastapi uvicorn httpx python-multipart aiohttp aiolimiter pysbd jsonlines coloredlogs pebble aiolimiter -i  https://mirrors.cloud.aliyuncs.com/pypi/simple --trusted-host mirrors.cloud.aliyuncs.com
-pip3 install func_timeout sentencex requests_futures timeout_decorator flashtext pygments -i  https://mirrors.cloud.aliyuncs.com/pypi/simple --trusted-host mirrors.cloud.aliyuncs.com
+pip3 install math-verify loguru fastapi uvicorn httpx python-multipart aiohttp aiolimiter pysbd jsonlines coloredlogs pebble aiolimiter
+pip3 install func_timeout sentencex requests_futures timeout_decorator flashtext pygments 
 
 export WARMUP=0.0
 export LR=1e-6
