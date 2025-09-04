@@ -23,11 +23,68 @@ import numpy as np
 def ppprint(x):
     if isinstance(x, (list, tuple)):
         for i, item in enumerate(x):
-            print("-" * 5, f"{i+1}/{len(x)}:")
+            print("-" * 5, f"{i + 1}/{len(x)}:")
             pprint(item)
             print("")
     else:
         pprint(x)
+
+
+def run_and_print_episode_with_selective_step(
+    env, policy, ignore_done: bool = False, max_steps: int = 1e9
+):
+    start_time = time.time()
+    obs, _ = env.reset()
+    done = False
+    step_count = 0
+    while True:
+        step_count += 1
+        action = policy(obs)
+        # random select 50% as active actions
+        active_actions = {}
+        while not active_actions:
+            active_actions = {
+                i: a for i, a in enumerate(action) if np.random.rand() > 0.5
+            }
+
+        next_obs, reward, terminated, truncated, _ = env.step(active_actions)
+
+        print("=" * 30)
+        print(f"Step {step_count}")
+        print(
+            "-" * 10,
+            "action",
+            "-" * 10,
+        )
+        ppprint(active_actions)
+        print(
+            "-" * 10,
+            "next_observation",
+            "-" * 10,
+        )
+        ppprint(next_obs)
+        print(
+            "-" * 10,
+            "reward",
+            "-" * 10,
+        )
+        ppprint(reward)
+
+        done = terminated | truncated
+
+        print("terminated: ", terminated, "truncated: ", truncated)
+        if isinstance(done, np.ndarray):
+            done = done.all()
+
+        print("=" * 30)
+        obs = next_obs
+
+        if not ignore_done and done:
+            break
+        if step_count >= max_steps:
+            break
+
+    print(f"----TIME: {time.time() - start_time:.2f} seconds")
 
 
 def run_and_print_episode(env, policy, ignore_done: bool = False, max_steps: int = 1e9):

@@ -23,8 +23,7 @@ from datasets import Dataset, DatasetDict, load_dataset
 
 from gem.core import Env
 from gem.utils.constants import TERMINAL_STATE
-from gem.utils.parsing import (extract_last_boxed_answer,
-                               extract_last_tagged_answer)
+from gem.utils.parsing import extract_last_boxed_answer, extract_last_tagged_answer
 from gem.utils.qa_em import em_check
 
 logger = logging.getLogger(__name__)
@@ -102,8 +101,9 @@ class QaEnv(Env):
 
     def reset(self, seed: Optional[None] = None) -> Tuple[str, dict[str, Any]]:
         """Sample a question from the dataset."""
+        super().reset(seed)
         if seed is not None:
-            self.idx = random.randint(0, len(self.dataset))
+            self.idx = random.randint(0, len(self.dataset) - 1)
         else:
             if self.idx == len(self.dataset):
                 self.epoch += 1

@@ -15,12 +15,12 @@
 """
 Entry script of using OAT to RL-tune LLM agents on GEM environments.
 """
-
 import functools
 import json
 import logging
 import os
 import re
+import time
 from copy import deepcopy
 from dataclasses import dataclass
 from typing import List, Literal, Optional, Sequence, Tuple
@@ -131,6 +131,7 @@ class Transition:
     prompt_ids: list
     response: str
     response_ids: list
+    response_logprobs: list
 
     response_is_truncated: bool
     action_is_formatted: bool
@@ -293,6 +294,7 @@ class Actor(PPOActor):
                         prompt_ids=extra[i]["prompt_ids"],
                         response=extra[i]["response"],
                         response_ids=extra[i]["response_ids"],
+                        response_logprobs=extra[i]["response_logprobs"],
                         response_is_truncated=extra[i]["response_is_truncated"],
                         action_is_formatted=extra[i]["action_is_formatted"],
                     )
@@ -391,6 +393,11 @@ class Actor(PPOActor):
                 raw_action = sub_outputs[sub_i].outputs[0].text
                 prompt_token_ids = sub_outputs[sub_i].prompt_token_ids
                 token_ids = sub_outputs[sub_i].outputs[0].token_ids
+                response_logprobs = sub_outputs[sub_i].outputs[0].logprobs
+                response_logprobs = [
+                    item[token_ids[i]].logprob
+                    for i, item in enumerate(response_logprobs)
+                ]
                 response_is_truncated = (
                     sub_outputs[sub_i].outputs[0].finish_reason == "length"
                 )
@@ -411,6 +418,7 @@ class Actor(PPOActor):
                         "prompt_ids": prompt_token_ids,
                         "response": raw_action,
                         "response_ids": token_ids,
+                        "response_logprobs": response_logprobs,
                         "response_is_truncated": response_is_truncated,
                         "action_is_formatted": extracted_action != INVALID_ACTION,
                         "generation_failed": False,
@@ -457,8 +465,8 @@ class Actor(PPOActor):
                     prompt_ids=step_data.prompt_ids,
                     response=step_data.response,
                     response_ids=step_data.response_ids,
-                    response_logprobs=None,  # Re-calculated on learner side.
-                    # response_logprobs=step_data["response_logprobs"],
+                    # response_logprobs=None,  # Re-calculated on learner side.
+                    response_logprobs=step_data.response_logprobs,
                     rewards=dense_rewards,
                     loss_mask=(
                         not step_data.response_is_truncated
@@ -471,6 +479,7 @@ class Actor(PPOActor):
                         "actor/discount_factor": self.args.gamma,
                         "actor/discounted_step_return": returns[i],
                         "actor/response_is_truncated": step_data.response_is_truncated,
+                        "actor/timestamp": time.time_ns(),
                     },
                 )
             )

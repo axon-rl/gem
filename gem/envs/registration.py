@@ -19,8 +19,7 @@ from dataclasses import dataclass, field
 from functools import partial
 from typing import Any, Callable, Dict, Optional, Sequence, Union
 
-from gem import Env
-from gem.core import EnvWrapper
+from gem.core import Env, EnvWrapper
 from gem.vector.async_vector_env import AsyncVectorEnv
 from gem.vector.sync_vector_env import SyncVectorEnv
 from gem.vector.vector_env import VectorEnv
@@ -38,11 +37,11 @@ class EnvSpec:
 ENV_REGISTRY: Dict[str, EnvSpec] = {}
 
 
-def register(id: str, entry_point: Union[Callable, str], **kwargs: Any):
+def register(env_id: str, entry_point: Union[Callable, str], **kwargs: Any):
     """Register an environment with a given ID."""
-    if id in ENV_REGISTRY:
-        raise ValueError(f"Environment {id} already registered.")
-    ENV_REGISTRY[id] = EnvSpec(id=id, entry_point=entry_point, kwargs=kwargs)
+    if env_id in ENV_REGISTRY:
+        raise ValueError(f"Environment {env_id} already registered.")
+    ENV_REGISTRY[env_id] = EnvSpec(id=env_id, entry_point=entry_point, kwargs=kwargs)
 
 
 def print_envs():

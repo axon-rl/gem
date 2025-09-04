@@ -46,6 +46,7 @@ class ReasoningGymEnv(Env):
 
     def reset(self, seed: Optional[None] = None) -> Tuple[str, dict[str, Any]]:
         """Sample a question from the dataset."""
+        super().reset(seed)
         if seed is not None:
             data = random.choice(self.dataset)
             if (self.idx + 1) % self.size == 0:
