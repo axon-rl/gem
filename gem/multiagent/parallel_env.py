@@ -31,16 +31,7 @@ class ParallelEnv(MultiAgentEnv):
         Dict[str, bool],
         Dict[str, Dict],
     ]:
-        if set(actions.keys()) != set(self.agents):
-            missing = set(self.agents) - set(actions.keys())
-            extra = set(actions.keys()) - set(self.agents)
-            msg = []
-            if missing:
-                msg.append(f"Missing actions for agents: {missing}")
-            if extra:
-                msg.append(f"Extra actions for non-active agents: {extra}")
-            raise ValueError(". ".join(msg))
-
+        self._validate_actions(actions)
         raise NotImplementedError
 
     @abc.abstractmethod
