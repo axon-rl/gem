@@ -1,7 +1,3 @@
-# OPENRLHF with GEM
-
-In this document, we demonstrate how to integrate [OpenRLHF](https://github.com/OpenRLHF/OpenRLHF) v0.8.10 with GEM to train your own agents. One of our key goals is to enable seamless integration with all major frameworks, allowing researchers to use their preferred tools while **easily comparing results across different setups**. We believe this level of interoperability is central to the mission of building a standardized suite of environments.
-
 ## Training with OpenRLHF
 
 [OpenRLHF](https://github.com/OpenRLHF/OpenRLHF) is supported as the RL framework to integrate with GEM.
