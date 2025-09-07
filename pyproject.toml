@@ -48,6 +48,7 @@ search = [
 
 mcp = [
   "fastmcp",
+  "pyyaml>=6.0.0",
 ]
 
 [project.urls]
