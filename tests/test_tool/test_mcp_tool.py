@@ -377,7 +377,7 @@ def test_mcpmark_openai(
     env = MCPMarkEnv(mcp_service=mcp_service, tasks=tasks, seed=None) 
     n_tasks = env.task_size
     tool = MCPTool(get_mcp_config(env))
-    env = ToolEnvWrapper(env, tools=[tool], max_tool_uses=20)
+    env = ToolEnvWrapper(env, tools=[tool], max_tool_uses=30)
     model_safe = model.replace("/", "_").replace(":", "_")
 
     with open("tests/test_tool/mcp_tool_prompt.md", "r") as file:
