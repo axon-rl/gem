@@ -14,7 +14,6 @@
 
 import random
 from functools import partial
-from typing import Optional
 
 import fire
 from dotenv import load_dotenv
@@ -36,7 +35,7 @@ TEST_ACTIONS = [
     '<think>I need to compute the relative time</think><tool_call><tool_name>relative_time</tool_name><arguments>{"time": "2025-12-31 23:50:00"}</arguments></tool_call> ...',
     '```<tool_call><tool_name>get_week_year</tool_name><arguments>{"date": "2025-03-23"}</arguments></tool_call> ... <tool_call><tool_name>convert_time</tool_name><arguments>{"sourceTimezone": "Asia/Shanghai", "targetTimezone": "Europe/London", "time": "2025-03-23 12:30:00"}</arguments></tool_call>``` ...',
     # Invalid/edge cases
-    'Dummy action',
+    "Dummy action",
     '<tool_call><tool_name>non_existing_tool</tool_name><arguments>{"foo": "bar"}</arguments></tool_call> ...',
 ]
 
@@ -137,7 +136,7 @@ def test_llm_episode(
     # Create a simple single-question dataset encouraging the use of MCP tool
     question = (
         "Get the current date in UTC. Use the MCP tool with: "
-        "<tool_call><tool_name>current_time</tool_name><arguments>{\"format\": \"YYYY-MM-DD\", \"timezone\": \"UTC\"}</arguments></tool_call>"
+        '<tool_call><tool_name>current_time</tool_name><arguments>{"format": "YYYY-MM-DD", "timezone": "UTC"}</arguments></tool_call>'
     )
     prompt = (
         "You must reason inside <think> and </think>. If you need external info, call the MCP tool as shown. "
@@ -190,99 +189,93 @@ def test_llm_episode(
 def test_multi_server(
     time_url: str = "http://127.0.0.1:8081/time-mcp",
     context7_url: str = "https://mcp.context7.com/mcp",
-    env_name: str = "game:GuessTheNumber-v0"
+    env_name: str = "game:GuessTheNumber-v0",
 ):
     """Test multi-server configuration to verify automatic tool name prefixing.
-    
+
     This test demonstrates that FastMCP automatically prefixes tool names with server names
     when connecting to multiple servers, preventing naming conflicts.
-    
+
     Args:
         time_url: URL for local time MCP server
-        context7_url: URL for Context7 MCP server  
+        context7_url: URL for Context7 MCP server
         env_name: Environment name for testing
-    
+
     Example usage:
         # Start local time server first:
         python -m gem.tools.mcp_server.time_mcp --transport streamable-http --host 127.0.0.1 --port 8081 --path /time-mcp
-        
+
         # Then run test:
         python -m tests.test_tool.test_mcp_tool multi_server --time_url http://127.0.0.1:8081/time-mcp
     """
     print(f"Testing multi-server configuration:")
     print(f"  Time server: {time_url}")
     print(f"  Context7 server: {context7_url}")
-    
+
     # Create multi-server configuration
     config = {
         "mcpServers": {
-            "time": {
-                "transport": "http",
-                "url": time_url
-            },
-            "context7": {
-                "transport": "http", 
-                "url": context7_url
-            }
+            "time": {"transport": "http", "url": time_url},
+            "context7": {"transport": "http", "url": context7_url},
         }
     }
-    
+
     try:
         # Create MCPTool with multi-server config
         tool = MCPTool(config, validate_on_init=False)
-        
+
         print(f"\n=== SERVER CONFIGURATION ===")
         print(f"Server names: {tool._get_server_names()}")
         print(f"Is multi-server: {tool._is_multi_server()}")
         print(f"Configuration: {tool._get_server_description()}")
-        
+
         # Discover tools and verify prefixing
         print(f"\n=== TOOL DISCOVERY ===")
         tools = tool.get_available_tools()
-        
+
         if not tools:
             print("❌ No tools discovered - servers may be unreachable")
             return
-            
+
         print(f"Discovered {len(tools)} tools:")
         time_tools = []
         context7_tools = []
-        
+
         for tool_info in tools:
             tool_name = tool_info["name"]
             server_info = tool_info.get("server_info", {})
             detected_server = server_info.get("detected_server", "unknown")
-            
+
             print(f"  - {tool_name} (server: {detected_server})")
-            
+
             if tool_name.startswith("time_"):
                 time_tools.append(tool_name)
             elif tool_name.startswith("context7_"):
                 context7_tools.append(tool_name)
-        
+
         print(f"\nTime server tools ({len(time_tools)}): {time_tools}")
         print(f"Context7 server tools ({len(context7_tools)}): {context7_tools}")
-        
+
         # Test instruction string contains server prefixes
         print(f"\n=== INSTRUCTION STRING VERIFICATION ===")
         instruction = tool.instruction_string()
         has_time_prefix = "[time]" in instruction
         has_context7_prefix = "[context7]" in instruction
-        
+
         print(f"Instruction contains [time] prefix: {has_time_prefix}")
         print(f"Instruction contains [context7] prefix: {has_context7_prefix}")
-        
+
         # Test with environment if we have tools
         if time_tools:
             print(f"\n=== ENVIRONMENT TESTING ===")
             env = gem.make(env_name, max_turns=2)
             env = ToolEnvWrapper(env, tools=[tool], max_tool_uses=2)
             obs, info = env.reset()
-            
+
             # Try to use a time server tool
             test_tool = time_tools[0]  # Use first available time tool
-            test_action = f'<tool_call><tool_name>{test_tool}</tool_name><arguments>{{}}</arguments></tool_call>'
-            
+            test_action = f"<tool_call><tool_name>{test_tool}</tool_name><arguments>{{}}</arguments></tool_call>"
+
             print(f"Testing tool call: {test_tool}")
             try:
                 obs, reward, terminated, truncated, info = env.step(test_action)
@@ -290,24 +283,30 @@ def test_multi_server(
                 print(f"Observation excerpt: {str(obs)[:200]}...")
             except Exception as e:
                 print(f"⚠️  Tool execution failed: {e}")
-        
+
         print(f"\n✅ Multi-server test completed successfully!")
-        print(f"   - Automatic prefixing: {'✅' if time_tools or context7_tools else '❌'}")
-        print(f"   - Server detection: {'✅' if has_time_prefix or has_context7_prefix else '❌'}")
-        
+        print(
+            f"   - Automatic prefixing: {'✅' if time_tools or context7_tools else '❌'}"
+        )
+        print(
+            f"   - Server detection: {'✅' if has_time_prefix or has_context7_prefix else '❌'}"
+        )
+
     except Exception as e:
         print(f"❌ Multi-server test failed: {e}")
-        print("This may be due to server connectivity issues or configuration problems.")
+        print(
+            "This may be due to server connectivity issues or configuration problems."
+        )
 
 
 def test_mcpmark_openai(
     model: str = "gpt-5-nano",
     mcp_service: str = "postgres",
     tasks: str = "lego/consistency_enforcement",
-    save_root: str = "evals/benchmarks/mcpmark"
+    save_root: str = "evals/benchmarks/mcpmark",
 ):
     """Test MCPMarkEnv with OpenAI/OpenRouter models using MCPTool integration.
-    
+
     Args:
         model: Model to use (e.g., "gpt-5-nano")
         mcp_service: MCP service name for MCPMarkEnv
@@ -322,35 +321,35 @@ def test_mcpmark_openai(
     from openai import OpenAI
 
     model_provider_map = {
-        'openai': {
-            'models_keyword': ['gpt'],
-            'base_url_env': 'OPENAI_BASE_URL', 
-            'api_key_env': 'OPENAI_API_KEY',
+        "openai": {
+            "models_keyword": ["gpt"],
+            "base_url_env": "OPENAI_BASE_URL",
+            "api_key_env": "OPENAI_API_KEY",
         },
-        'llm-gateway': {
-            'models_keyword': ['gemini'],
-            'base_url_env': 'LLM_GATEWAY_BASE_URL',
-            'api_key_env': 'LLM_GATEWAY_API_KEY',
+        "llm-gateway": {
+            "models_keyword": ["gemini"],
+            "base_url_env": "LLM_GATEWAY_BASE_URL",
+            "api_key_env": "LLM_GATEWAY_API_KEY",
         },
-        'anthropic': {
-            'models_keyword': ['claude'],
-            'api_key_env': 'ANTHROPIC_API_KEY',
-            'base_url_env': 'ANTHROPIC_BASE_URL',
-        }
+        "anthropic": {
+            "models_keyword": ["claude"],
+            "api_key_env": "ANTHROPIC_API_KEY",
+            "base_url_env": "ANTHROPIC_BASE_URL",
+        },
     }
     model_provider = None
     for k, v in model_provider_map.items():
-        if any(keyword in model for keyword in v['models_keyword']):
+        if any(keyword in model for keyword in v["models_keyword"]):
             model_provider = k
             break
 
-    _api_key = os.environ.get(model_provider_map[model_provider]['api_key_env'], None)
-    _base_url = os.environ.get(model_provider_map[model_provider]['base_url_env'], None)
+    _api_key = os.environ.get(model_provider_map[model_provider]["api_key_env"], None)
+    _base_url = os.environ.get(model_provider_map[model_provider]["base_url_env"], None)
     assert (
         _api_key
     ), f"Please provide valid api key via env var: {model_provider_map[model_provider]['api_key_env']}"
-    
-    if model_provider == 'anthropic':
+
+    if model_provider == "anthropic":
         client = anthropic.Anthropic(api_key=_api_key)
     else:
         client = OpenAI(
@@ -360,7 +359,9 @@ def test_mcpmark_openai(
 
     def get_mcp_config(env):
         """Helper function to get MCP configuration for current database."""
-        database_url = env.unwrapped.state_manager.get_service_config_for_agent()["database_url"]
+        database_url = env.unwrapped.state_manager.get_service_config_for_agent()[
+            "database_url"
+        ]
         return {
             "mcpServers": {
                 "postgres": {
@@ -372,9 +373,9 @@ def test_mcpmark_openai(
                 }
             }
         }
-    
+
     # seed=None to use default order of tasks
-    env = MCPMarkEnv(mcp_service=mcp_service, tasks=tasks, seed=None) 
+    env = MCPMarkEnv(mcp_service=mcp_service, tasks=tasks, seed=None)
     n_tasks = env.task_size
     tool = MCPTool(get_mcp_config(env))
     env = ToolEnvWrapper(env, tools=[tool], max_tool_uses=30)
@@ -382,7 +383,7 @@ def test_mcpmark_openai(
 
     with open("tests/test_tool/mcp_tool_prompt.md", "r") as file:
         SYSTEM_PROMPT = file.read()
-    
+
     for i in range(n_tasks):
         obs, info = env.reset()
         tool.reconfigure(get_mcp_config(env))
@@ -395,16 +396,18 @@ def test_mcpmark_openai(
         if _run_exist(
             f"{save_root}/{mcp_service}/{model_safe}-{category_id}_{task_id}-episode-*.json"
         ):
-            print(f"Task {i}/{n_tasks}: {category_id}/{task_id} already exists, skipping")
+            print(
+                f"Task {i}/{n_tasks}: {category_id}/{task_id} already exists, skipping"
+            )
             continue
 
-        if model_provider == 'anthropic':
+        if model_provider == "anthropic":
             messages = [
                 {"role": "user", "content": obs},
             ]
         else:
             messages = [
-                {"role": "developer","content": SYSTEM_PROMPT},
+                {"role": "developer", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": obs},
             ]
 
@@ -412,18 +415,18 @@ def test_mcpmark_openai(
             done = False
             episode = []
             while not done:
-                if model_provider == 'anthropic':
+                if model_provider == "anthropic":
                     response = client.messages.create(
                         model=model,
                         max_tokens=1000,
                         messages=messages,
                         system=SYSTEM_PROMPT,
-                        stop_sequences=["</tool_call>"]
+                        stop_sequences=["</tool_call>"],
                     )
                     action = response.content[0].text
                     if not action.endswith("</tool_call>"):
                         action = action + "</tool_call>"
-                elif model_provider == 'llm-gateway':
+                elif model_provider == "llm-gateway":
                     completion = client.chat.completions.create(
                         model=model, messages=messages
                     )
@@ -434,7 +437,12 @@ def test_mcpmark_openai(
                 print("ACT", action)
                 next_obs, reward, terminated, truncated, info = env.step(action)
                 episode.append(
-                    {"observation": obs, "action": action, "reward": reward, "info": info}
+                    {
+                        "observation": obs,
+                        "action": action,
+                        "reward": reward,
+                        "info": info,
+                    }
                 )
                 done = terminated or truncated
                 obs = next_obs
@@ -443,13 +451,13 @@ def test_mcpmark_openai(
                 print("-" * 20)
                 messages.append({"role": "assistant", "content": action})
                 messages.append({"role": "user", "content": next_obs})
-            
+
             # Save episode results
             save_path = f"{save_root}/{mcp_service}/{model_safe}-{category_id}_{task_id}-episode-{int(time.time())}.json"
             os.makedirs(os.path.dirname(save_path), exist_ok=True)
             json.dump(episode, open(save_path, "w"), indent=4)
             print(f"Episode saved to: {save_path}")
-            
+
         except Exception as e:
             # Save partial episode on error
             if episode:
@@ -457,10 +465,11 @@ def test_mcpmark_openai(
                 os.makedirs(os.path.dirname(save_path), exist_ok=True)
                 json.dump(episode, open(save_path, "w"), indent=4)
                 print(f"Partial episode saved to: {save_path}")
-            
+
             print(f"Error: {e}")
 
-def _run_exist(save_path: str): 
+
+def _run_exist(save_path: str):
     import glob
     import os
 
