@@ -1,4 +1,4 @@
-# Adapted from https://github.com/yokingma/time-mcp 
+# Adapted from https://github.com/yokingma/time-mcp
 
 import calendar
 import logging
@@ -23,6 +23,7 @@ app = FastMCP("mcp-time-server")
 # -----------------------------
 # Helpers
 # -----------------------------
+
 
 def _local_tz():
     return datetime.now().astimezone().tzinfo
@@ -101,13 +102,16 @@ def _parse_date(date_str: str) -> datetime:
 # Tools
 # -----------------------------
 
+
 @app.tool(
     annotations={
         "title": "Get current date/time in optional timezone",
         "readOnlyHint": True,
     }
 )
-def current_time(format: str = "YYYY-MM-DD HH:mm:ss", timezone: Optional[str] = None) -> str:
+def current_time(
+    format: str = "YYYY-MM-DD HH:mm:ss", timezone: Optional[str] = None
+) -> str:
     """
     Return the current date/time using a limited set of Moment.js-like formats and optional IANA timezone.
 
@@ -262,46 +266,48 @@ if __name__ == "__main__":
     # Parse command line arguments for transport selection
     parser = argparse.ArgumentParser(description="Time MCP Server")
     parser.add_argument(
-        "--transport", 
-        choices=["stdio", "http", "streamable-http"], 
+        "--transport",
+        choices=["stdio", "http", "streamable-http"],
         default="streamable-http",
-        help="Transport protocol to use (default: streamable-http)"
+        help="Transport protocol to use (default: streamable-http)",
     )
     parser.add_argument(
-        "--host", 
-        default="127.0.0.1", 
-        help="Host to bind to for HTTP transport (default: 127.0.0.1)"
+        "--host",
+        default="127.0.0.1",
+        help="Host to bind to for HTTP transport (default: 127.0.0.1)",
     )
     parser.add_argument(
-        "--port", 
-        type=int, 
-        default=8081, 
-        help="Port to bind to for HTTP transport (default: 8081)"
+        "--port",
+        type=int,
+        default=8081,
+        help="Port to bind to for HTTP transport (default: 8081)",
     )
     parser.add_argument(
-        "--path", 
-        default="/time-mcp", 
-        help="Path for HTTP endpoint (default: /time-mcp)"
+        "--path",
+        default="/time-mcp",
+        help="Path for HTTP endpoint (default: /time-mcp)",
     )
     parser.add_argument(
-        "--log-level", 
-        choices=["DEBUG", "INFO", "WARNING", "ERROR"], 
+        "--log-level",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR"],
         default="INFO",
-        help="Log level (default: INFO)"
+        help="Log level (default: INFO)",
     )
-    
+
     args = parser.parse_args()
-    
+
     # Configure logging based on the specified log level
     logging.basicConfig(
         level=getattr(logging, args.log_level.upper()),
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
-    
+
     # Run the server with the specified transport
     if args.transport in ["http", "streamable-http"]:
         logger.info("Starting Time MCP Server with Streamable HTTP transport")
-        logger.info(f"Server will be available at: http://{args.host}:{args.port}{args.path}")
+        logger.info(
+            f"Server will be available at: http://{args.host}:{args.port}{args.path}"
+        )
         logger.info(f"Log level: {args.log_level}")
         logger.info("Press Ctrl+C to stop the server")
         app.run(
@@ -309,7 +315,7 @@ if __name__ == "__main__":
             host=args.host,
             port=args.port,
             path=args.path,
-            log_level=args.log_level.lower()
+            log_level=args.log_level.lower(),
         )
     else:
         # Default stdio transport
