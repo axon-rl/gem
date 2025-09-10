@@ -1,3 +1,17 @@
+# Copyright 2025 AxonRL Team. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import json
 import os
 import time
@@ -148,7 +162,16 @@ def test_openai(
         SYSTEM_PROMPT = file.read()
 
     messages = [
-        {"role": "developer", "content": SYSTEM_PROMPT},
+        {
+            "role": "system" if "claude" in model else "developer",
+            "content": [
+                {
+                    "type": "text",
+                    "text": SYSTEM_PROMPT,
+                    "cache_control": {"type": "ephemeral"},
+                }
+            ],
+        },
         {
             "role": "user",
             "content": obs,
@@ -161,9 +184,11 @@ def test_openai(
         while not done:
             if use_open_router:
                 completion = client.chat.completions.create(
-                    model=model, messages=messages
+                    model=model,
+                    messages=messages,
                 )
                 action = completion.choices[0].message.content
+                print(completion.usage)
             else:
                 response = client.responses.create(model=model, input=messages)
                 action = response.output_text
@@ -178,7 +203,10 @@ def test_openai(
             print("REW", reward)
             print("-" * 20)
             messages.append({"role": "assistant", "content": action})
-            messages.append({"role": "user", "content": next_obs})
+            next_obs_content = {"type": "text", "text": next_obs}
+            if len(next_obs) >= len(SYSTEM_PROMPT):
+                next_obs_content["cache_control"] = {"type": "ephemeral"}
+            messages.append({"role": "user", "content": [next_obs_content]})
         env.close()
         model = model.replace("/", "_")
         save_path = os.path.join(task_path, f"{model}-episode-{int(time.time())}.json")
