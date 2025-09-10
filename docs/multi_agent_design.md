@@ -2,15 +2,14 @@
 
 ## Overview
 
-This document describes the implemented multi-agent environment support in GEM (General Experience Maker). The design follows PettingZoo's proven multi-agent APIs while maintaining compatibility with GEM's existing architecture.
+This document describes the multi-agent environment support in GEM (General Experience Maker), designed specifically for LLM-based multi-agent scenarios. The design provides a unified API that naturally extends GEM's text-based environment paradigm to multiple agents.
 
-## Design Principles
+## Core Design Principles
 
-1. **Separation of Concerns**: GEM provides environment infrastructure only; agent implementations belong in examples
-2. **Compatibility**: Seamlessly integrates with GEM's existing `Env` base class and registration system
-3. **Flexibility**: Supports both sequential (AEC) and parallel agent execution models
-4. **Simplicity**: Clean API without comments in implementation
-5. **Type Safety**: Clear interfaces with type hints
+1. **LLM-First**: Optimized for text-based observations and actions
+2. **Unified API**: Single class handles both sequential and simultaneous interactions
+3. **Natural Language**: Agents communicate through text, matching LLM capabilities
+4. **Simple**: Minimal abstraction layers, easy to understand and extend
 
 ## Architecture
 
@@ -20,237 +19,432 @@ This document describes the implemented multi-agent environment support in GEM (
 gem/
 ├── multiagent/
 │   ├── __init__.py
-│   ├── multi_agent_env.py    # Base class for all multi-agent environments
-│   ├── aec_env.py            # Sequential execution environment
-│   ├── parallel_env.py       # Parallel execution environment
-│   └── utils.py              # AgentSelector and conversion utilities
-├── tests/
-│   └── test_multiagent/
-│       ├── test_aec_env.py
-│       ├── test_parallel_env.py
-│       ├── test_core.py
-│       ├── test_agent_selector.py
-│       └── test_conversions.py
-└── examples/
-    └── multiagent/
-        ├── conversation.py    # User-assistant dialogue example
-        ├── collaboration.py   # Multi-agent collaboration example
-        └── README.md
+│   ├── multiagent_env.py    # Unified multi-agent environment
+│   └── utils.py              # AgentSelector and helpers
 ```
 
-### Core Components
+### Core MultiAgentEnv Class
 
-#### 1. MultiAgentEnv Base Class
+```python
+from typing import Dict, List, Optional, Tuple, Union
+from gem.core import Env
 
-Located in `gem/multiagent/multi_agent_env.py`:
+class MultiAgentEnv(Env):
+    """
+    Unified multi-agent environment for LLM agents.
+    Supports both sequential (turn-based) and simultaneous interactions.
+    """
+    
+    def __init__(self, simultaneous: bool = True):
+        super().__init__()
+        
+        # Agent configuration
+        self.agents: List[str] = []
+        self.possible_agents: List[str] = []
+        
+        # Interaction mode
+        self.simultaneous = simultaneous
+        
+        # Agent states
+        self.terminations: Dict[str, bool] = {}
+        self.truncations: Dict[str, bool] = {}
+        self.rewards: Dict[str, float] = {}
+        self.infos: Dict[str, dict] = {}
+        
+        # For sequential mode
+        self._agent_selector: Optional[AgentSelector] = None
+        
+    def step(self, action: Union[str, Dict[str, str]]) -> Tuple:
+        """
+        Execute one step in the environment.
+        
+        Args:
+            action: 
+                - str: Single action for current agent (sequential mode)
+                - Dict[str, str]: Actions for all agents (simultaneous mode)
+                
+        Returns:
+            Sequential mode: (obs, reward, terminated, truncated, info)
+            Simultaneous mode: (obs_dict, rewards_dict, terminations_dict, truncations_dict, infos_dict)
+        """
+        
+    def reset(self, seed: Optional[int] = None) -> Tuple:
+        """
+        Reset the environment.
+        
+        Returns:
+            Sequential mode: (observation, info) for first agent
+            Simultaneous mode: (observations_dict, infos_dict) for all agents
+        """
+        
+    def observe(self, agent: str) -> str:
+        """Get text observation for specific agent."""
+        
+    @property
+    def current_agent(self) -> Optional[str]:
+        """Current agent in sequential mode."""
+```
+
+## LLM-Optimized Features
+
+### 1. Text-Based Communication
+
+All observations and actions are strings, perfect for LLM agents:
+
+```python
+class ConversationEnv(MultiAgentEnv):
+    def observe(self, agent: str) -> str:
+        if agent == "user":
+            return "You are chatting with an AI assistant. Ask a question."
+        else:
+            return f"User said: {self.last_message}. Please respond helpfully."
+```
+
+### 2. Natural Language Actions
+
+Actions are text strings that can be:
+- Direct messages: `"Hello, how can I help?"`
+- Tool calls: `"search: quantum computing"`
+- Commands: `"terminate_conversation"`
+
+```python
+def step(self, action: Union[str, Dict[str, str]]):
+    if isinstance(action, str):
+        # Sequential: process single agent's text action
+        message = action
+        tool_call = self.parse_tool_call(message)
+        if tool_call:
+            result = self.execute_tool(tool_call)
+    else:
+        # Simultaneous: process all agents' text actions
+        for agent, message in action.items():
+            self.process_message(agent, message)
+```
+
+### 3. Shared Context
+
+Multi-agent LLM environments often need shared context:
 
 ```python
 class MultiAgentEnv(Env):
-    @property
-    def agents(self) -> List[str]:
-        """Currently active agents."""
-        
-    @property
-    def possible_agents(self) -> List[str]:
-        """All possible agents that could be in the environment."""
-        
-    def observation_space(self, agent: str) -> Any:
-        """Returns observation space for a specific agent."""
-        
-    def action_space(self, agent: str) -> Any:
-        """Returns action space for a specific agent."""
-```
-
-Key features:
-- Extends GEM's base `Env` class
-- Manages per-agent states (rewards, terminations, truncations)
-- Provides reward accumulation
-- Implements dead step detection
-
-#### 2. AEC (Agent Environment Cycle) API
-
-Sequential execution where agents take turns (`gem/multiagent/aec_env.py`):
-
-```python
-class AECEnv(MultiAgentEnv):
-    @property
-    def agent_selection(self) -> str:
-        """Currently selected agent that should take an action."""
+    def __init__(self):
+        super().__init__()
+        self.shared_memory: List[str] = []  # Conversation history
+        self.global_context: str = ""       # Shared world state
         
     def observe(self, agent: str) -> str:
-        """Get observation for specific agent."""
-        
-    def last(self) -> Tuple[str, float, bool, bool, dict]:
-        """Returns observation, reward, terminated, truncated, info."""
-        
-    def step(self, action: Optional[str]) -> None:
-        """Process action for current agent."""
-        
-    def agent_iter(self, max_iter: int = 2**63) -> AECIterable:
-        """Returns an iterator over agents."""
+        # Each agent sees shared context + agent-specific view
+        return f"{self.global_context}\n\n{self.agent_view(agent)}"
 ```
 
-Usage pattern:
+## Interaction Patterns
+
+### Sequential Mode (Turn-Based)
+
+Perfect for conversations, negotiations, or any turn-based interaction:
+
 ```python
-for agent in env.agent_iter():
-    observation, reward, terminated, truncated, info = env.last()
-    action = policy(observation, agent)
-    env.step(action)
+class DialogueEnv(MultiAgentEnv):
+    def __init__(self):
+        super().__init__(simultaneous=False)
+        self.possible_agents = ["user", "assistant"]
+        self.conversation_history = []
+        
+    def observe(self, agent: str) -> str:
+        # Show conversation history
+        history = "\n".join(self.conversation_history[-10:])
+        return f"Conversation:\n{history}\n\nYour turn ({agent}):"
+        
+    def step(self, action: str) -> Tuple:
+        # Add message to history
+        current = self.current_agent
+        self.conversation_history.append(f"{current}: {action}")
+        
+        # Check for conversation end
+        terminated = "goodbye" in action.lower()
+        
+        # Move to next agent
+        self._agent_selector.next()
+        
+        # Return next observation
+        next_obs = self.observe(self.current_agent)
+        return next_obs, 0.0, terminated, False, {}
 ```
 
-#### 3. Parallel API
+### Simultaneous Mode
 
-Simultaneous execution where all agents act at once (`gem/multiagent/parallel_env.py`):
+For collaborative problem-solving where agents work in parallel:
 
 ```python
-class ParallelEnv(MultiAgentEnv):
-    def step(self, actions: Dict[str, str]) -> Tuple[
-        Dict[str, str],      # observations
-        Dict[str, float],    # rewards
-        Dict[str, bool],     # terminated
-        Dict[str, bool],     # truncated
-        Dict[str, dict]      # infos
-    ]:
-        """Execute actions for all agents simultaneously."""
+class TeamProblemSolvingEnv(MultiAgentEnv):
+    def __init__(self):
+        super().__init__(simultaneous=True)
+        self.possible_agents = ["researcher", "coder", "reviewer"]
+        self.shared_workspace = {}
+        
+    def step(self, actions: Dict[str, str]) -> Tuple:
+        observations = {}
+        rewards = {}
+        
+        # All agents contribute simultaneously
+        for agent, action in actions.items():
+            if agent == "researcher":
+                self.shared_workspace["research"] = action
+            elif agent == "coder":
+                self.shared_workspace["code"] = action
+            elif agent == "reviewer":
+                feedback = self.review(action)
+                self.shared_workspace["feedback"] = feedback
+                
+        # Everyone sees the updated workspace
+        for agent in self.agents:
+            observations[agent] = str(self.shared_workspace)
+            rewards[agent] = self.evaluate_progress()
+            
+        return observations, rewards, self.terminations, self.truncations, self.infos
 ```
 
-Usage pattern:
+## Agent Management
+
+### Dynamic Agent Addition/Removal
+
 ```python
+def add_agent(self, agent_id: str, role: str = "participant"):
+    """Add new agent to environment."""
+    if agent_id not in self.possible_agents:
+        self.possible_agents.append(agent_id)
+    if agent_id not in self.agents:
+        self.agents.append(agent_id)
+        self.terminations[agent_id] = False
+        self.truncations[agent_id] = False
+        self.rewards[agent_id] = 0.0
+        self.infos[agent_id] = {"role": role}
+
+def remove_agent(self, agent_id: str):
+    """Remove agent from active list."""
+    if agent_id in self.agents:
+        self.agents.remove(agent_id)
+        self.terminations[agent_id] = True
+```
+
+### Agent Roles and Capabilities
+
+```python
+class MultiAgentEnv(Env):
+    def __init__(self):
+        super().__init__()
+        self.agent_capabilities = {}  # What each agent can do
+        self.agent_roles = {}         # Agent's role in the environment
+        
+    def register_agent(self, agent_id: str, capabilities: List[str], role: str):
+        self.agent_capabilities[agent_id] = capabilities
+        self.agent_roles[agent_id] = role
+```
+
+## Tool Integration
+
+Multi-agent LLM environments often need tool access:
+
+```python
+from gem.tools import PythonCodeTool, SearchTool
+
+class ToolEnabledMultiAgentEnv(MultiAgentEnv):
+    def __init__(self):
+        super().__init__()
+        self.tools = {
+            "python": PythonCodeTool(),
+            "search": SearchTool(),
+        }
+        
+    def step(self, action: Union[str, Dict[str, str]]):
+        # Parse tool calls from action
+        if "execute:" in action:
+            tool_name, tool_input = action.split("execute:", 1)
+            tool_result = self.tools[tool_name].execute_action(tool_input)
+            observation = f"Tool result: {tool_result}"
+        else:
+            observation = self.process_dialogue(action)
+```
+
+## Example Implementations
+
+### 1. User-Assistant Conversation
+
+```python
+class ConversationEnv(MultiAgentEnv):
+    def __init__(self):
+        super().__init__(simultaneous=False)
+        self.possible_agents = ["user", "assistant"]
+        self.agents = self.possible_agents.copy()
+        self._agent_selector = AgentSelector(self.agents)
+        self.messages = []
+        
+    def observe(self, agent: str) -> str:
+        if not self.messages:
+            return "Start the conversation"
+        return f"Conversation history:\n" + "\n".join(self.messages[-5:])
+        
+    def step(self, action: str):
+        current = self.current_agent
+        self.messages.append(f"{current}: {action}")
+        
+        # Simple reward based on response quality
+        reward = len(action.split()) / 100.0  # Reward longer responses
+        
+        # Check termination
+        terminated = any(word in action.lower() for word in ["goodbye", "exit", "quit"])
+        
+        # Next agent's turn
+        self._agent_selector.next()
+        
+        return self.observe(self.current_agent), reward, terminated, False, {}
+```
+
+### 2. Multi-Agent Collaboration
+
+```python
+class CollaborationEnv(MultiAgentEnv):
+    def __init__(self):
+        super().__init__(simultaneous=True)
+        self.possible_agents = ["researcher", "analyst", "reviewer"]
+        self.agents = self.possible_agents.copy()
+        self.shared_doc = ""
+        self.iteration = 0
+        
+    def step(self, actions: Dict[str, str]):
+        observations = {}
+        rewards = {}
+        
+        # Process all contributions
+        contributions = []
+        for agent, action in actions.items():
+            contributions.append(f"[{agent}]: {action}")
+            
+        # Update shared document
+        self.shared_doc = "\n".join(contributions)
+        self.iteration += 1
+        
+        # Everyone sees the combined work
+        for agent in self.agents:
+            observations[agent] = f"Iteration {self.iteration}:\n{self.shared_doc}"
+            rewards[agent] = self.evaluate_quality(self.shared_doc)
+            
+        # Terminate after 10 iterations
+        terminated = self.iteration >= 10
+        for agent in self.agents:
+            self.terminations[agent] = terminated
+            
+        return observations, rewards, self.terminations, self.truncations, self.infos
+```
+
+## Usage Patterns
+
+### Sequential Usage
+
+```python
+env = ConversationEnv()
+obs, info = env.reset()
+
+for agent in env.agent_iter(max_iter=100):
+    obs = env.observe(agent)
+    
+    # Get action from LLM
+    if agent == "user":
+        action = get_user_input()
+    else:
+        action = llm.generate(obs)
+    
+    obs, reward, terminated, truncated, info = env.step(action)
+    
+    if terminated or truncated:
+        break
+```
+
+### Simultaneous Usage
+
+```python
+env = CollaborationEnv()
+observations, infos = env.reset()
+
 while env.agents:
-    actions = {agent: policy(obs[agent]) for agent in env.agents}
+    actions = {}
+    for agent in env.agents:
+        # Each agent acts based on their observation
+        actions[agent] = llm.generate(observations[agent], role=agent)
+    
     observations, rewards, terminations, truncations, infos = env.step(actions)
+    
+    # Remove terminated agents
+    env.agents = [a for a in env.agents if not terminations[a]]
 ```
 
-### Utilities
+## Advanced Features
 
-Located in `gem/multiagent/utils.py`:
+### Message Passing
 
-#### AgentSelector
-Manages agent turn order in AEC environments:
 ```python
-class AgentSelector:
-    def __init__(self, agents: List[str])
-    def next(self) -> str
-    def is_first(self) -> bool
-    def is_last(self) -> bool
-    def remove_agent(self, agent: str)
+class MultiAgentEnv(Env):
+    def __init__(self):
+        super().__init__()
+        self.message_buffer = defaultdict(list)
+        
+    def send_message(self, from_agent: str, to_agent: str, message: str):
+        self.message_buffer[to_agent].append({
+            "from": from_agent,
+            "message": message,
+            "timestamp": self.current_step
+        })
+        
+    def get_messages(self, agent: str) -> List[Dict]:
+        messages = self.message_buffer[agent]
+        self.message_buffer[agent] = []  # Clear after reading
+        return messages
 ```
 
-#### Environment Converters
-- `AECToParallelWrapper`: Converts AEC to Parallel interface
-- `ParallelToAECWrapper`: Converts Parallel to AEC interface
-- `aec_to_parallel()`: Convenience function
-- `parallel_to_aec()`: Convenience function
-
-## Implementation Examples
-
-### Example 1: conversation.py
-
-Demonstrates user-assistant dialogue with tool use:
-- Uses AEC (sequential) execution
-- Integrates PythonCodeTool and SearchTool from gem.tools
-- Natural turn-based conversation
-
-### Example 2: collaboration.py
-
-Demonstrates multi-agent team collaboration:
-- Uses Parallel execution
-- Shared memory for information exchange
-- All agents work simultaneously
-
-## Key Implementation Details
-
-### 1. Reset Method Pattern
-
-To avoid NotImplementedError, subclasses must call `MultiAgentEnv.reset()` directly:
+### Hierarchical Agents
 
 ```python
-def reset(self, seed=None):
-    from gem.multiagent.multi_agent_env import MultiAgentEnv
-    MultiAgentEnv.reset(self, seed)
-    # Your reset logic here
-    return observations, infos
-```
-
-### 2. Agent Lifecycle Management
-
-- Agents are automatically removed when terminated
-- Use `_was_dead_step()` to detect actions for terminated agents
-- Maintain separate `agents` (active) and `possible_agents` (all) lists
-
-### 3. Tool Integration
-
-Examples show integration with GEM's tool infrastructure:
-```python
-from gem.tools.python_code_tool import PythonCodeTool
-from gem.tools.search_tool import SearchTool
-
-self.python_tool = PythonCodeTool()
-is_valid, has_error, result, _ = self.python_tool.execute_action(action)
+class HierarchicalMultiAgentEnv(MultiAgentEnv):
+    def __init__(self):
+        super().__init__()
+        self.agent_hierarchy = {
+            "manager": ["worker1", "worker2", "worker3"],
+            "reviewer": ["manager"]
+        }
+        
+    def step(self, actions):
+        # Process in hierarchical order
+        for supervisor, subordinates in self.agent_hierarchy.items():
+            if supervisor in actions:
+                # Supervisor action affects subordinates
+                for sub in subordinates:
+                    self.assign_task(sub, actions[supervisor])
 ```
 
 ## Testing
 
-Comprehensive test suite with 63 tests covering:
-- Core MultiAgentEnv functionality
-- AEC environment and iteration
-- Parallel environment
-- AgentSelector utility
-- Environment converters
-- Edge cases and error handling
+The unified API makes testing straightforward:
 
-Run tests:
-```bash
-pytest -xvs tests/test_multiagent/
-cd examples/multiagent && python conversation.py
-cd examples/multiagent && python collaboration.py
+```python
+def test_multiagent_env():
+    # Test sequential mode
+    env = ConversationEnv()
+    obs, info = env.reset()
+    assert isinstance(obs, str)
+    
+    obs, reward, term, trunc, info = env.step("Hello")
+    assert env.current_agent == "assistant"
+    
+    # Test simultaneous mode
+    env = CollaborationEnv()
+    obs, info = env.reset()
+    assert isinstance(obs, dict)
+    
+    actions = {agent: f"Action from {agent}" for agent in env.agents}
+    obs, rewards, terms, truncs, infos = env.step(actions)
+    assert len(obs) == len(env.agents)
 ```
-
-## API Comparison with PettingZoo
-
-| Feature | PettingZoo | GEM Multi-Agent |
-|---------|------------|-----------------|
-| AEC API | ✓ | ✓ |
-| Parallel API | ✓ | ✓ |
-| Agent Management | ✓ | ✓ |
-| Reward Accumulation | ✓ | ✓ |
-| Dead Step Detection | ✓ | ✓ |
-| Environment Converters | ✓ | ✓ |
-| Registration System | ✓ | ✓ (uses GEM's) |
-| Tool Integration | - | ✓ (gem.tools) |
-
-## Design Decisions
-
-1. **No Agent Code in Core**: All agent implementations are in examples, keeping the core library focused on environment infrastructure.
-
-2. **Clean Code**: No comments in implementation files for cleaner codebase.
-
-3. **Scenario-Based Examples**: Examples named by their scenarios (conversation, collaboration) rather than technical patterns.
-
-4. **Direct Reset Call**: Avoiding super().reset() pattern to prevent NotImplementedError.
-
-5. **Automatic Agent Management**: Framework handles agent removal on termination.
-
-## Future Extensions
-
-Potential areas for enhancement:
-- Hierarchical agents
-- Dynamic agent spawning
-- Advanced communication protocols
-- Large-scale multi-agent support (10+ agents)
-- Integration with LLM providers for agent policies
-
-## Migration from Single-Agent
-
-To convert a single-agent GEM environment to multi-agent:
-
-1. Choose execution model (AEC or Parallel)
-2. Extend appropriate base class
-3. Define `possible_agents` list
-4. Implement per-agent observation/action spaces
-5. Update step() to handle agent-specific logic
-6. Use AgentSelector for turn management (AEC only)
 
 ## Conclusion
 
-The multi-agent framework successfully extends GEM with robust multi-agent capabilities while maintaining clean architecture and separation of concerns. The implementation provides a solid foundation for multi-agent LLM environments with tool integration.
+This unified multi-agent design for GEM provides a clean, LLM-optimized API for building multi-agent environments. By focusing on text-based interaction and providing both sequential and simultaneous modes in a single class, we make it easy to create sophisticated multi-agent scenarios for LLM research and applications.
