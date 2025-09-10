@@ -21,10 +21,10 @@ import random
 from typing import Any, Optional, SupportsFloat, Tuple
 
 from datasets import Dataset, DatasetDict, load_dataset
-from oat.utils.math_grader import boxed_reward_fn
 
 from gem.core import Env
 from gem.utils.constants import TERMINAL_STATE
+from gem.utils.math_grader import boxed_reward_fn
 
 logger = logging.getLogger(__name__)
 verify_fn = functools.partial(
