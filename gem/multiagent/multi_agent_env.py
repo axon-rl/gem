@@ -14,7 +14,7 @@
 # limitations under the License.
 
 import abc
-from typing import Any, Dict, Iterator, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from gem.core import Env
 
@@ -150,11 +150,6 @@ class MultiAgentEnv(Env):
             if agent in self.agents
         }
 
-    def agent_iter(self, max_iter: int = 2**63) -> Iterator[str]:
-        if not self.agent_selector:
-            raise ValueError("agent_iter requires AgentSelector to be initialized")
-
-        return AECIterator(self, max_iter)
 
     def add_agent(self, agent_id: str):
         if agent_id in self.agents:
@@ -263,20 +258,3 @@ class AgentSelector:
             else:
                 self._current_idx = 0
                 self.selected = None
-
-
-class AECIterator:
-
-    def __init__(self, env: MultiAgentEnv, max_iter: int):
-        self.env = env
-        self.iters_til_term = max_iter
-
-    def __iter__(self):
-        return self
-
-    def __next__(self) -> str:
-        if not self.env.agents or self.iters_til_term <= 0:
-            raise StopIteration
-
-        self.iters_til_term -= 1
-        return self.env.agent_selector.selected if self.env.agent_selector else None
