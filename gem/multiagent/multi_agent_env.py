@@ -150,7 +150,6 @@ class MultiAgentEnv(Env):
             if agent in self.agents
         }
 
-
     def add_agent(self, agent_id: str):
         if agent_id in self.agents:
             return

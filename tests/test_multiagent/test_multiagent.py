@@ -172,30 +172,42 @@ def test_agent_selector_advanced():
     agents = ["a1", "a2", "a3", "a4"]
     selector = AgentSelector(agents, mode="sequential")
 
-    logger.info(f"Initial: selected={selector.selected}, is_first={selector.is_first()}, is_last={selector.is_last()}")
+    logger.info(
+        f"Initial: selected={selector.selected}, is_first={selector.is_first()}, is_last={selector.is_last()}"
+    )
 
     for i in range(len(agents)):
-        logger.info(f"Position {i}: selected={selector.selected}, is_first={selector.is_first()}, is_last={selector.is_last()}")
+        logger.info(
+            f"Position {i}: selected={selector.selected}, is_first={selector.is_first()}, is_last={selector.is_last()}"
+        )
         selector.next()
 
     assert selector.is_first() == True, "Should be at first agent after full cycle"
     logger.info("Full cycle completed, back to first agent")
 
     selector.reinit(["x1", "x2"])
-    logger.info(f"After reinit with 2 agents: selected={selector.selected}, is_first={selector.is_first()}, is_last={selector.is_last()}")
+    logger.info(
+        f"After reinit with 2 agents: selected={selector.selected}, is_first={selector.is_first()}, is_last={selector.is_last()}"
+    )
 
     selector.next()
     assert selector.is_last() == True, "Should be at last agent with 2-agent list"
 
     selector.add_agent("x3")
-    logger.info(f"After adding x3: agents={selector._agents}, selected={selector.selected}")
+    logger.info(
+        f"After adding x3: agents={selector._agents}, selected={selector.selected}"
+    )
 
     selector.remove_agent("x1")
-    logger.info(f"After removing x1: agents={selector._agents}, selected={selector.selected}")
+    logger.info(
+        f"After removing x1: agents={selector._agents}, selected={selector.selected}"
+    )
 
     selector.remove_agent("x2")
     selector.remove_agent("x3")
-    logger.info(f"After removing all: agents={selector._agents}, selected={selector.selected}")
+    logger.info(
+        f"After removing all: agents={selector._agents}, selected={selector.selected}"
+    )
 
     assert selector.selected is None, "Selected should be None when no agents"
     assert selector._agents == [], "Agents list should be empty"
@@ -215,7 +227,9 @@ def test_get_active_states():
     assert "agent_0" in active_states, "agent_0 should be active initially"
 
     obs, reward, term, trunc, info = active_states["agent_0"]
-    logger.info(f"Sequential active state: agent=agent_0, obs={obs[:20]}..., reward={reward}")
+    logger.info(
+        f"Sequential active state: agent=agent_0, obs={obs[:20]}..., reward={reward}"
+    )
 
     env_par = SimpleTestEnv(mode="parallel")
     env_par.reset()
@@ -296,7 +310,9 @@ def test_dead_agent_removal():
 
     for _ in range(10):
         if env.agents:
-            actions = {agent: "action" for agent in env.agent_selector.get_active_agents()}
+            actions = {
+                agent: "action" for agent in env.agent_selector.get_active_agents()
+            }
             env.step(actions)
 
     assert len(env.agents) == 0, "All agents should be removed after truncation"
