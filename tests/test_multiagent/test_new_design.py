@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 
-from typing import Dict, Tuple, Any
-import sys
 import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../..'))
+import sys
+from typing import Dict, Tuple
 
-from gem.multiagent import MultiAgentEnv, AgentSelector
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../.."))
+
+from gem.multiagent import AgentSelector, MultiAgentEnv
 
 
 class SimpleTestEnv(MultiAgentEnv):
@@ -26,7 +27,7 @@ class SimpleTestEnv(MultiAgentEnv):
         Dict[str, float],
         Dict[str, bool],
         Dict[str, bool],
-        Dict[str, dict]
+        Dict[str, dict],
     ]:
         observations = {}
         rewards = {}

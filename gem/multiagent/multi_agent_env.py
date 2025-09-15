@@ -14,7 +14,7 @@
 # limitations under the License.
 
 import abc
-from typing import Any, Dict, List, Optional, Tuple, Iterator
+from typing import Any, Dict, Iterator, List, Optional, Tuple
 
 from gem.core import Env
 
@@ -33,7 +33,7 @@ class MultiAgentEnv(Env):
         self.infos: Dict[str, dict] = {}
         self._cumulative_rewards: Dict[str, float] = {}
 
-        self.agent_selector: Optional['AgentSelector'] = None
+        self.agent_selector: Optional["AgentSelector"] = None
 
         self.shared_memory = []
         self.global_context = ""
@@ -43,20 +43,28 @@ class MultiAgentEnv(Env):
         Dict[str, float],
         Dict[str, bool],
         Dict[str, bool],
-        Dict[str, dict]
+        Dict[str, dict],
     ]:
         if not isinstance(actions, dict):
             raise ValueError(f"Actions must be a dict, got {type(actions)}")
 
-        active_agents = self.agent_selector.get_active_agents() if self.agent_selector else self.agents
+        active_agents = (
+            self.agent_selector.get_active_agents()
+            if self.agent_selector
+            else self.agents
+        )
 
         self._validate_actions(actions, active_agents)
 
-        observations, rewards, terminations, truncations, infos = self._process_actions(actions)
+        observations, rewards, terminations, truncations, infos = self._process_actions(
+            actions
+        )
 
         for agent in self.agents:
             if agent in rewards:
-                self._cumulative_rewards[agent] = self._cumulative_rewards.get(agent, 0.0) + rewards[agent]
+                self._cumulative_rewards[agent] = (
+                    self._cumulative_rewards.get(agent, 0.0) + rewards[agent]
+                )
 
         self._remove_dead_agents()
 
@@ -84,11 +92,13 @@ class MultiAgentEnv(Env):
         Dict[str, float],
         Dict[str, bool],
         Dict[str, bool],
-        Dict[str, dict]
+        Dict[str, dict],
     ]:
         raise NotImplementedError
 
-    def reset(self, seed: Optional[int] = None) -> Tuple[Dict[str, str], Dict[str, Any]]:
+    def reset(
+        self, seed: Optional[int] = None
+    ) -> Tuple[Dict[str, str], Dict[str, Any]]:
         if seed is not None:
             self._np_random = self._make_np_random(seed)
 
@@ -124,11 +134,15 @@ class MultiAgentEnv(Env):
             self._cumulative_rewards.get(agent, 0.0),
             self.terminations.get(agent, False),
             self.truncations.get(agent, False),
-            self.infos.get(agent, {})
+            self.infos.get(agent, {}),
         )
 
     def get_active_states(self) -> Dict[str, Tuple[str, float, bool, bool, dict]]:
-        active_agents = self.agent_selector.get_active_agents() if self.agent_selector else self.agents
+        active_agents = (
+            self.agent_selector.get_active_agents()
+            if self.agent_selector
+            else self.agents
+        )
 
         return {
             agent: self.get_state(agent)
@@ -172,7 +186,8 @@ class MultiAgentEnv(Env):
 
     def _remove_dead_agents(self):
         dead_agents = [
-            agent for agent in self.agents
+            agent
+            for agent in self.agents
             if self.terminations.get(agent, False) or self.truncations.get(agent, False)
         ]
         for agent in dead_agents:
@@ -184,11 +199,9 @@ class MultiAgentEnv(Env):
         if to_agent not in self.agents:
             raise ValueError(f"Receiver {to_agent} not in environment")
 
-        self.shared_memory.append({
-            "from": from_agent,
-            "to": to_agent,
-            "message": message
-        })
+        self.shared_memory.append(
+            {"from": from_agent, "to": to_agent, "message": message}
+        )
 
     def broadcast_message(self, from_agent: str, message: str):
         if from_agent not in self.agents:
@@ -196,11 +209,9 @@ class MultiAgentEnv(Env):
 
         for agent in self.agents:
             if agent != from_agent:
-                self.shared_memory.append({
-                    "from": from_agent,
-                    "to": agent,
-                    "message": message
-                })
+                self.shared_memory.append(
+                    {"from": from_agent, "to": agent, "message": message}
+                )
 
 
 class AgentSelector:
