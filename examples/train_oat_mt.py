@@ -20,19 +20,18 @@ import json
 import logging
 import os
 import re
-import time
 from copy import deepcopy
 from dataclasses import dataclass
-from typing import List, Literal, Optional, Sequence, Tuple
+from typing import List, Literal, Optional, Tuple
 
 import numpy as np
-import torch
 import tree
 import vllm
-from oat.algorithms.ppo import PPOActor, PPOArgs, PPOLearner
+from oat.algorithms.ppo import PPOArgs
+from oat.algorithms.ppo_multiturn import PPOMultiTurnActor, PPOMultiTurnLearner
 from oat.args import default_args_validation, get_default_args
 from oat.interface import get_program, lp
-from oat.types import Transition, TransitionData
+from oat.types import Transition
 from oat.utils.ops import masked_sum
 from torch.utils.data import Dataset
 
@@ -107,7 +106,7 @@ class Args(PPOArgs):
 
     # Reward settings
     gamma: float = 1.0  # Discount factor for Monte Carlo returns
-    norm_return: bool = True
+    whiten_adv: bool = True  # Return batch normalization
 
     # Evaluation settings
     eval_prompt_template: Literal["qwen3_general"] = "qwen3_general"
@@ -128,7 +127,7 @@ class Args(PPOArgs):
 """ +=======================================+ """
 
 
-class Actor(PPOActor):
+class Actor(PPOMultiTurnActor):
     def init(self, actor_id, save_path):
         super().init(actor_id, save_path)
         self.args.seed += 233 ** (actor_id + 1)
@@ -170,57 +169,6 @@ class Actor(PPOActor):
             async_mode=self.args.async_env,
         )
 
-    def step(
-        self, prompts=None, formatted_prompts=None, references=None
-    ) -> List[TransitionData]:
-        """Each actor.step handles the interaction between agent and environment to collect experiences."""
-        # The provided parameters are ignored since we generate prompts from the environment
-        del prompts, formatted_prompts, references
-
-        info = {}
-
-        # Play multiple episodes to generate transitions (trajectories in language MDP)
-        all_trajectories = []
-
-        finished_episodes, collection_info = self.collect_experience()
-        for ep in finished_episodes:
-            all_trajectories.extend(self.prepare_trajectories(ep))
-
-        # logging infos
-        info["actor/num_trajectories"] = len(all_trajectories)
-        info["actor/mean_episode_len"] = np.mean([len(ep) for ep in finished_episodes])
-        info["actor/mean_episode_return"] = np.mean(
-            [
-                sum(transition.rewards for transition in episode)
-                for episode in finished_episodes
-            ]
-        )
-        info["actor/mean_episode_success"] = np.mean(
-            [episode[-1].rewards == 1 for episode in finished_episodes]
-        )  # NOTE: assuming success reward is always 1
-
-        # update collection info
-        info.update(
-            {k.replace("actor/", "actor/"): v for k, v in collection_info.items()}
-        )
-
-        # Subsample trajectories if they exceed the batch size
-        if len(all_trajectories) > self.args.rollout_batch_size_per_device:
-            subsample_indices = np.random.choice(
-                len(all_trajectories),
-                self.args.rollout_batch_size_per_device,
-                replace=False,
-            )
-            all_trajectories = [all_trajectories[si] for si in subsample_indices]
-        logging.info(f"Actor finished collecting {len(all_trajectories)} trajectories")
-
-        for trajectory in all_trajectories:
-            trajectory.info.update(**info)
-
-        # Serialize and return the trajectories
-        handle = self.ipc_client.serialize_ipc(all_trajectories)
-        return handle  # type: ignore
-
     def collect_experience(self):
         logging.info(
             f"Actor-{self.actor_id} starting to collect experiences at step {self.step_count}"
@@ -242,7 +190,7 @@ class Actor(PPOActor):
                 if extra[i]["generation_failed"]:
                     num_generation_failed += 1
                     if self.args.keep_generation_failed:
-                        episodes[i][-1].rewards += reward[i]
+                        episodes[i][-1].reward += reward[i]
                         episodes[i][-1].done = True
                         finished_episodes.append(deepcopy(episodes[i]))
                         finished_episodes_tool_uses.append(
@@ -271,6 +219,7 @@ class Actor(PPOActor):
                         response_logprobs=extra[i]["response_logprobs"],
                         response_is_truncated=extra[i]["response_is_truncated"],
                         action_is_formatted=extra[i]["action_is_formatted"],
+                        info={},
                     )
                     episodes[i].append(transition)
                     if done[i]:
@@ -405,69 +354,6 @@ class Actor(PPOActor):
                 sub_i += 1
         return executable_actions, extras  # type: ignore
 
-    def prepare_trajectories(
-        self, episode: Sequence[Transition]
-    ) -> List[TransitionData]:
-        """
-        Prepare language trajectories (transitions of episode).
-
-        Args:
-            episode: A complete episode of the agent environment interaction.
-
-        Returns:
-            List of trajectory data
-        """
-        trajectory_data = []
-        rewards = [t.rewards for t in episode]
-
-        # Compute returns
-        returns = np.zeros_like(rewards, dtype=np.float32)
-        cur = 0.0
-        for i in reversed(range(len(rewards))):
-            cur = rewards[i] + self.args.gamma * cur
-            returns[i] = cur
-
-        # Distribute turn-based returns to token-level returns
-        for i, step_data in enumerate(episode):
-            dense_rewards = self.compute_token_level_rewards(
-                step_data.response_ids, returns[i]
-            )
-            # Add trajectory data
-            trajectory_data.append(
-                TransitionData(
-                    prompt=step_data.prompt,
-                    prompt_ids=step_data.prompt_ids,
-                    response=step_data.response,
-                    response_ids=step_data.response_ids,
-                    response_logprobs=step_data.response_logprobs,
-                    rewards=dense_rewards,
-                    loss_mask=(
-                        not step_data.response_is_truncated
-                        if self.args.ignore_no_eos
-                        else True
-                    ),
-                    info={
-                        "actor/action_is_formatted": step_data.action_is_formatted,
-                        "actor/step_reward": rewards[i],
-                        "actor/discount_factor": self.args.gamma,
-                        "actor/discounted_step_return": returns[i],
-                        "actor/response_is_truncated": step_data.response_is_truncated,
-                        "actor/timestamp": time.time_ns(),
-                    },
-                )
-            )
-
-        return trajectory_data
-
-    def compute_token_level_rewards(
-        self, token_ids: List[int], discounted_reward: float
-    ) -> List[float]:
-        # Initialize all tokens with zero reward
-        dense_rewards = [0.0] * len(token_ids)
-        # Last token gets full discounted reward
-        dense_rewards[-1] = discounted_reward
-        return dense_rewards
-
     def extract_action(self, text: str) -> str:
         """
         Extract and format the actual action from the model's output.
@@ -532,7 +418,7 @@ class DummyPromptDataset(Dataset):
 """ +====================================+ """
 
 
-class Learner(PPOLearner):
+class Learner(PPOMultiTurnLearner):
     def _init(self, args: Args, actors: List[Actor]) -> None:
         """
         Initialize the learner.
@@ -564,41 +450,6 @@ class Learner(PPOLearner):
             strategy.args.rollout_batch_size_per_device,
             shuffle=False,  # No need to shuffle dummy data
         )
-
-    def process_feedback_data(self, data_list: List[TransitionData]):
-        """Process collected feedback data, adding it to buffer."""
-
-        logging.info("adding data into buffer")
-
-        # Add to buffer
-        self.pi_buffer.extend(data_list)
-
-        # Also add to all_buffer if we're tracking all data
-        if self.args.dump_all_buffer:
-            self.all_buffer.extend(data_list)
-
-        # Update query step (for tracking progress)
-        self.query_step += len(data_list)
-
-    def compute_monte_carlo_advantages(self, rewards, response_masks):
-        del response_masks
-        # Return without baseline
-        advantages = rewards.sum(-1)
-        if self.args.norm_return:
-            local_sum = advantages.sum()
-            local_square_sum = (advantages**2).sum()
-            local_num = torch.tensor(
-                [advantages.numel()], dtype=torch.float32, device=advantages.device
-            )
-
-            global_sum = self.strategy.all_reduce(local_sum, op="sum")
-            global_square_sum = self.strategy.all_reduce(local_square_sum, op="sum")
-            global_num = self.strategy.all_reduce(local_num, op="sum")
-
-            mean_adv = global_sum / global_num
-            std_adv = torch.sqrt(global_square_sum / global_num - mean_adv**2)
-            advantages = (advantages - mean_adv) / (std_adv + 1e-9)
-        return advantages
 
 
 def train(args: Args):
