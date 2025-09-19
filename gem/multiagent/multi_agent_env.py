@@ -20,12 +20,15 @@ from gem.core import Env
 
 
 class MultiAgentEnv(Env):
+    '''
+    Base multi-agent environment
+    '''
 
     def __init__(self):
         super().__init__()
 
         self.agents: List[str] = []
-        self.active_mask = Dict[str, bool] = {}
+        self.active_mask: Dict[str, bool] = {}
 
         self.terminations: Dict[str, bool] = {}
         self.truncations: Dict[str, bool] = {}
@@ -57,7 +60,7 @@ class MultiAgentEnv(Env):
         '''
         Master function for environment stepping.
 
-        By default, will attempt to call the parallel step function.
+        By default, will attempt to call the Simultaneous step function.
         If not implemented, will fall back to sequential stepping.
         '''
         ret = None
@@ -66,41 +69,32 @@ class MultiAgentEnv(Env):
                 ret = self._step(action_or_actions)
             except NotImplementedError:
                 warnings.warn(
-                    "Parallel step not implemented, falling back to sequential stepping."
+                    "Simultaneous step not implemented, falling back to sequential stepping."
                 )
                 for agent in self.agent_iter:
                     # Don't silently fail, if the action is invalid
                     # let it raise an error.
-                    ret = self.step_single(action_or_actions[agent])
-
-            return self._step_global_dynamics() or ret
+                    self._handle_single_step(action_or_actions[agent])
+                ret = None
+            return self._step_global_dynamics(ret)
         else:
-            ret = self.step_single(action_or_actions)
-            if self.agent_iter.is_end():
-                ret = self._step_global_dynamics() or ret
+            ret = self._handle_single_step(action_or_actions)
+            if self._agent_iter.is_end():
+                ret = self._step_global_dynamics()
             return ret
-
     
-    def step_single(self, action: str) -> Tuple[
-        Dict[str, str],
-        Dict[str, float],
-        Dict[str, bool],
-        Dict[str, bool],
-        Dict[str, dict],
-    ]:
+    def _handle_single_step(self, action: str) -> None:
         '''
         Validation wrapper over a sequential step function.
         '''
-        self._check_agent_iterator()
-        current_agent = self.agent_iter.peek()
+        current_agent = self._agent_iter.current_agent
         if not current_agent:
             raise ValueError("No active agent selected")
         if current_agent not in self.agents:
             raise ValueError(f"Agent {current_agent} not in environment")
         
-        return self._step_single(current_agent, action)
+        self._step_single(current_agent, action)
     
-    @abc.abstractmethod
     def _step(self, actions: Dict[str, str]) -> Tuple[
         Dict[str, str],
         Dict[str, float],
@@ -114,8 +108,21 @@ class MultiAgentEnv(Env):
         '''
         raise NotImplementedError
 
-    @abc.abstractmethod
-    def _step_single(self, current_agent: str, action: str) -> Tuple[
+    def _step_single(self, current_agent: str, action: str) -> None:
+        '''
+        Sequential step function, the more general mode of 
+        operation for multi-agent environments.
+
+        Provides testing convenience and expressivity for games 
+        whose players cannot make moves in parallel (i.e. Chess)
+
+        This is because the environment steps can be broken up to be
+        on a per-player basis, allowing for more complex interactions
+        between individual players and the environment.
+        '''
+        raise NotImplementedError
+
+    def _step_global_dynamics(self, ret = None) -> Tuple[
         Dict[str, str],
         Dict[str, float],
         Dict[str, bool],
@@ -123,29 +130,22 @@ class MultiAgentEnv(Env):
         Dict[str, dict],
     ]:
         '''
-        Sequential step function, the more general mode of 
-        operation for multi-agent environments.
-
-        Provides testing convenience and expressivity for games 
-        whose players cannot make moves in parallel (i.e. Chess)
-        '''
-        raise NotImplementedError
-    
-    def _step_global_dynamics() -> Optional[Tuple[
-        Dict[str, str],
-        Dict[str, float],
-        Dict[str, bool],
-        Dict[str, bool],
-        Dict[str, dict],
-    ]]:
-        '''
         After all players have finished making their moves,
-        handle all global environmental dynamics.
-
-        Can return None, or replace the results of other `_step` functions.
+        handle all global environmental dynamics before 
+        starting a new "turn".
         '''
-        
-
+        self._reset_agent_iter()
+        if ret is None:
+            ret = self.get_all_states()
+        # Flush the cumulative rewards after each step.
+        for agent in self.agents:
+            self.rewards[agent] = 0.0
+            self._cumulative_rewards[agent] = 0.0
+            # Update the active mask
+            if self.terminations[agent] or self.truncations[agent]:
+                self.active_mask[agent] = False
+        return ret
+    
     def _validate_actions(self, actions: Dict[str, str]):
         for agent in self.agents:
             if agent not in self.terminations or self.terminations[agent]:
@@ -176,15 +176,13 @@ class MultiAgentEnv(Env):
         self.shared_memory = []
         self.global_context = ""
 
-        if self.agent_iter:
-            self._reset_agent_iter()
+        self._reset_agent_iter()
 
         observations = {agent: self.observe(agent) for agent in self.agents}
         infos = {agent: {} for agent in self.agents}
 
         return observations, infos
     
-    @abc.abstractmethod
     def observe(self, agent: str) -> str:
         raise NotImplementedError
 
@@ -200,13 +198,30 @@ class MultiAgentEnv(Env):
             self.infos.get(agent, {}),
         )
 
-    def get_active_states(self) -> Dict[str, Tuple[str, float, bool, bool, dict]]:
+    def get_all_states(self) -> Tuple[
+        Dict[str, str],
+        Dict[str, float],
+        Dict[str, bool],
+        Dict[str, bool],
+        Dict[str, dict],
+    ]:
+        # Get a tuple for all states
+        all_states = [self.get_state(agent) for agent in self.agents]
+        # Translate into "characteristic-first" instead of "agent-first"
+        observations, rewards, terminations, truncations, infos = zip(*all_states)
+        return (
+            dict(zip(self.agents, observations)),
+            dict(zip(self.agents, rewards)),
+            dict(zip(self.agents, terminations)),
+            dict(zip(self.agents, truncations)),
+            dict(zip(self.agents, infos)),
+        )
 
-        return {
-            agent: self.get_state(agent)
-            for agent in self.agents
-            if self.active_mask.get(agent, False)
-        }
+    def update_reward(self, agent: str, reward: float):
+        if agent not in self.agents:
+            raise ValueError(f"Agent {agent} not in environment")
+        self.rewards[agent] = reward
+        self._cumulative_rewards[agent] += reward
 
     def send_message(self, from_agent: str, to_agent: str, message: str):
         if from_agent not in self.agents:
@@ -236,26 +251,24 @@ class AgentIterator:
     def __init__(self, agents: List[str], active_mask):
         self._agents = agents.copy()
         self.active_mask = active_mask
+        self.current_agent = None
         self._current_idx = 0
-
-    def peek(self) -> Optional[str]:
-        if not self._agents:
-            return None
-        return self._agents[self._current_idx]
 
     def __next__(self) -> Optional[str]:
         if not any(self.active_mask):
             return None
-        agent = self._agents[self._current_idx]
+        
+        if self.is_end():
+            raise StopIteration
 
-        # Get the next agent
-        try:
+        self.current_agent = self._agents[self._current_idx]
+
+        # Point to the next agent
+        self._current_idx += 1
+        while not self.is_end() and not self.active_mask[self._agents[self._current_idx]]:
             self._current_idx += 1
-            while not self.active_mask[self._agents[self._current_idx]]:
-                self._current_idx += 1
-            return agent
-        except IndexError:
-            raise StopIteration()
+
+        return self.current_agent
     
     def is_alive(self, agent):
         try:
@@ -264,7 +277,7 @@ class AgentIterator:
             raise KeyError("Agent does not exist in this iterator.")
 
     def is_end(self):
-        return self._current_idx == len(self._agents) - 1
+        return self._current_idx >= len(self._agents)
 
     def __iter__(self):
         return self
