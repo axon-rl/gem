@@ -13,7 +13,8 @@
 # limitations under the License.
 
 import abc
-from typing import Any, Dict, List, Optional, Tuple
+import warnings
+from typing import Any, Dict, List, Union, Optional, Tuple
 
 from gem.core import Env
 
@@ -23,8 +24,8 @@ class MultiAgentEnv(Env):
     def __init__(self):
         super().__init__()
 
-        self.possible_agents: List[str] = []
         self.agents: List[str] = []
+        self.active_mask = Dict[str, bool] = {}
 
         self.terminations: Dict[str, bool] = {}
         self.truncations: Dict[str, bool] = {}
@@ -32,48 +33,121 @@ class MultiAgentEnv(Env):
         self.infos: Dict[str, dict] = {}
         self._cumulative_rewards: Dict[str, float] = {}
 
-        self.agent_selector: Optional["AgentSelector"] = None
+        self._agent_iter = None
 
         self.shared_memory = []
         self.global_context = ""
 
-    def step(self, actions: Dict[str, str]) -> Tuple[
+    def _reset_agent_iter(self):
+        self._agent_iter = AgentIterator(self.agents, self.active_mask)
+
+    @property
+    def agent_iter(self):
+        if not self._agent_iter or self._agent_iter.is_end():
+            self._reset_agent_iter()
+        return self._agent_iter
+
+    def step(self, action_or_actions: Union[str, Dict[str, str]]) -> Tuple[
         Dict[str, str],
         Dict[str, float],
         Dict[str, bool],
         Dict[str, bool],
         Dict[str, dict],
     ]:
-        if not isinstance(actions, dict):
-            raise ValueError(f"Actions must be a dict, got {type(actions)}")
+        '''
+        Master function for environment stepping.
 
-        active_agents = (
-            self.agent_selector.get_active_agents()
-            if self.agent_selector
-            else self.agents
-        )
-
-        self._validate_actions(actions, active_agents)
-
-        observations, rewards, terminations, truncations, infos = self._process_actions(
-            actions
-        )
-
-        for agent in self.agents:
-            if agent in rewards:
-                self._cumulative_rewards[agent] = (
-                    self._cumulative_rewards.get(agent, 0.0) + rewards[agent]
+        By default, will attempt to call the parallel step function.
+        If not implemented, will fall back to sequential stepping.
+        '''
+        ret = None
+        if isinstance(action_or_actions, dict):
+            try:
+                ret = self._step(action_or_actions)
+            except NotImplementedError:
+                warnings.warn(
+                    "Parallel step not implemented, falling back to sequential stepping."
                 )
+                for agent in self.agent_iter:
+                    # Don't silently fail, if the action is invalid
+                    # let it raise an error.
+                    ret = self.step_single(action_or_actions[agent])
 
-        self._remove_dead_agents()
+            return self._step_global_dynamics() or ret
+        else:
+            ret = self.step_single(action_or_actions)
+            if self.agent_iter.is_end():
+                ret = self._step_global_dynamics() or ret
+            return ret
 
-        if self.agent_selector:
-            self.agent_selector.next()
+    
+    def step_single(self, action: str) -> Tuple[
+        Dict[str, str],
+        Dict[str, float],
+        Dict[str, bool],
+        Dict[str, bool],
+        Dict[str, dict],
+    ]:
+        '''
+        Validation wrapper over a sequential step function.
+        '''
+        self._check_agent_iterator()
+        current_agent = self.agent_iter.peek()
+        if not current_agent:
+            raise ValueError("No active agent selected")
+        if current_agent not in self.agents:
+            raise ValueError(f"Agent {current_agent} not in environment")
+        
+        return self._step_single(current_agent, action)
+    
+    @abc.abstractmethod
+    def _step(self, actions: Dict[str, str]) -> Tuple[
+        Dict[str, str],
+        Dict[str, float],
+        Dict[str, bool],
+        Dict[str, bool],
+        Dict[str, dict],
+    ]:
+        '''
+        Parallel step function. As the lack of "parallel" suggests,
+        this is ideally the default mode of operation for multi-agent environments.
+        '''
+        raise NotImplementedError
 
-        return observations, rewards, terminations, truncations, infos
+    @abc.abstractmethod
+    def _step_single(self, current_agent: str, action: str) -> Tuple[
+        Dict[str, str],
+        Dict[str, float],
+        Dict[str, bool],
+        Dict[str, bool],
+        Dict[str, dict],
+    ]:
+        '''
+        Sequential step function, the more general mode of 
+        operation for multi-agent environments.
 
-    def _validate_actions(self, actions: Dict[str, str], active_agents: List[str]):
-        for agent in active_agents:
+        Provides testing convenience and expressivity for games 
+        whose players cannot make moves in parallel (i.e. Chess)
+        '''
+        raise NotImplementedError
+    
+    def _step_global_dynamics() -> Optional[Tuple[
+        Dict[str, str],
+        Dict[str, float],
+        Dict[str, bool],
+        Dict[str, bool],
+        Dict[str, dict],
+    ]]:
+        '''
+        After all players have finished making their moves,
+        handle all global environmental dynamics.
+
+        Can return None, or replace the results of other `_step` functions.
+        '''
+        
+
+    def _validate_actions(self, actions: Dict[str, str]):
+        for agent in self.agents:
             if agent not in self.terminations or self.terminations[agent]:
                 continue
             if agent not in self.truncations or self.truncations[agent]:
@@ -82,18 +156,8 @@ class MultiAgentEnv(Env):
                 raise ValueError(f"Missing action for active agent {agent}")
 
         for agent in actions:
-            if agent not in active_agents:
+            if not self.active_mask[agent]:
                 raise ValueError(f"Agent {agent} provided action but is not active")
-
-    @abc.abstractmethod
-    def _process_actions(self, actions: Dict[str, str]) -> Tuple[
-        Dict[str, str],
-        Dict[str, float],
-        Dict[str, bool],
-        Dict[str, bool],
-        Dict[str, dict],
-    ]:
-        raise NotImplementedError
 
     def reset(
         self, seed: Optional[int] = None
@@ -101,7 +165,7 @@ class MultiAgentEnv(Env):
         if seed is not None:
             self._np_random = self._make_np_random(seed)
 
-        self.agents = self.possible_agents.copy()
+        self.active_mask = {agent: True for agent in self.agents}
 
         self.terminations = {agent: False for agent in self.agents}
         self.truncations = {agent: False for agent in self.agents}
@@ -112,14 +176,14 @@ class MultiAgentEnv(Env):
         self.shared_memory = []
         self.global_context = ""
 
-        if self.agent_selector:
-            self.agent_selector.reinit(self.agents)
+        if self.agent_iter:
+            self._reset_agent_iter()
 
         observations = {agent: self.observe(agent) for agent in self.agents}
         infos = {agent: {} for agent in self.agents}
 
         return observations, infos
-
+    
     @abc.abstractmethod
     def observe(self, agent: str) -> str:
         raise NotImplementedError
@@ -137,54 +201,12 @@ class MultiAgentEnv(Env):
         )
 
     def get_active_states(self) -> Dict[str, Tuple[str, float, bool, bool, dict]]:
-        active_agents = (
-            self.agent_selector.get_active_agents()
-            if self.agent_selector
-            else self.agents
-        )
 
         return {
             agent: self.get_state(agent)
-            for agent in active_agents
-            if agent in self.agents
-        }
-
-    def add_agent(self, agent_id: str):
-        if agent_id in self.agents:
-            return
-
-        self.agents.append(agent_id)
-        self.terminations[agent_id] = False
-        self.truncations[agent_id] = False
-        self.rewards[agent_id] = 0.0
-        self.infos[agent_id] = {}
-        self._cumulative_rewards[agent_id] = 0.0
-
-        if self.agent_selector:
-            self.agent_selector.add_agent(agent_id)
-
-    def remove_agent(self, agent_id: str):
-        if agent_id not in self.agents:
-            return
-
-        self.agents.remove(agent_id)
-        del self.terminations[agent_id]
-        del self.truncations[agent_id]
-        del self.rewards[agent_id]
-        del self.infos[agent_id]
-        del self._cumulative_rewards[agent_id]
-
-        if self.agent_selector:
-            self.agent_selector.remove_agent(agent_id)
-
-    def _remove_dead_agents(self):
-        dead_agents = [
-            agent
             for agent in self.agents
-            if self.terminations.get(agent, False) or self.truncations.get(agent, False)
-        ]
-        for agent in dead_agents:
-            self.remove_agent(agent)
+            if self.active_mask.get(agent, False)
+        }
 
     def send_message(self, from_agent: str, to_agent: str, message: str):
         if from_agent not in self.agents:
@@ -206,53 +228,43 @@ class MultiAgentEnv(Env):
                     {"from": from_agent, "to": agent, "message": message}
                 )
 
-
-class AgentSelector:
-
-    def __init__(self, agents: List[str], mode: str = "sequential"):
-        self.mode = mode
+class AgentIterator:
+    '''
+    Iterator to help Sequential environments iterate over agents.
+    '''
+    
+    def __init__(self, agents: List[str], active_mask):
         self._agents = agents.copy()
+        self.active_mask = active_mask
         self._current_idx = 0
-        self.selected = self._agents[0] if self._agents else None
 
-    def get_active_agents(self) -> List[str]:
-        if self.mode == "sequential":
-            return [self.selected] if self.selected else []
-        elif self.mode == "parallel":
-            return self._agents.copy()
-        else:
-            raise ValueError(f"Unknown mode: {self.mode}")
+    def peek(self) -> Optional[str]:
+        if not self._agents:
+            return None
+        return self._agents[self._current_idx]
 
-    def next(self):
-        if self.mode == "sequential" and self._agents:
-            self._current_idx = (self._current_idx + 1) % len(self._agents)
-            self.selected = self._agents[self._current_idx]
+    def __next__(self) -> Optional[str]:
+        if not any(self.active_mask):
+            return None
+        agent = self._agents[self._current_idx]
 
-    def is_first(self) -> bool:
-        return self._current_idx == 0
+        # Get the next agent
+        try:
+            self._current_idx += 1
+            while not self.active_mask[self._agents[self._current_idx]]:
+                self._current_idx += 1
+            return agent
+        except IndexError:
+            raise StopIteration()
+    
+    def is_alive(self, agent):
+        try:
+            return self.active_mask[agent]
+        except KeyError:
+            raise KeyError("Agent does not exist in this iterator.")
 
-    def is_last(self) -> bool:
+    def is_end(self):
         return self._current_idx == len(self._agents) - 1
 
-    def reinit(self, agents: List[str]):
-        self._agents = agents.copy()
-        self._current_idx = 0
-        self.selected = self._agents[0] if self._agents else None
-
-    def add_agent(self, agent: str):
-        if agent not in self._agents:
-            self._agents.append(agent)
-
-    def remove_agent(self, agent: str):
-        if agent in self._agents:
-            idx = self._agents.index(agent)
-            self._agents.remove(agent)
-
-            if self._agents:
-                if idx <= self._current_idx:
-                    self._current_idx = max(0, self._current_idx - 1)
-                self._current_idx = self._current_idx % len(self._agents)
-                self.selected = self._agents[self._current_idx]
-            else:
-                self._current_idx = 0
-                self.selected = None
+    def __iter__(self):
+        return self
