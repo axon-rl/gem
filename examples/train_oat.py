@@ -802,9 +802,9 @@ if __name__ == "__main__":
     args.prompt_data = ""  # Don't load any dataset
     args.rollout_batch_size = args.rollout_batch_size_per_device * args.gpus
     if "concat_chat" in args.wrappers:
-        assert args.prompt_template == "no", (
-            "chat template is applied on env side already"
-        )
+        assert (
+            args.prompt_template == "no"
+        ), "chat template is applied on env side already"
     args = default_args_validation(args)
 
     # Let's go
