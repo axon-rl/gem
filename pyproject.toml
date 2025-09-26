@@ -44,6 +44,7 @@ search = [
   "transformers",
   "datasets",
   "pyserini",
+  "wikipedia"
 ]
 
 [project.urls]
