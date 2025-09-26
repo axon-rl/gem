@@ -724,9 +724,8 @@ class Actor(PPOActor):
         self, group: Sequence[Transition]
     ) -> List[TransitionData]:
         # Compute the returns
-        group_returns = (
-            []
-        )  # List (episodes) of arrays (return per transition in episode)
+        # List (episodes) of arrays (return per transition in episode)
+        group_returns = []
         for episode in group:
             rewards = [t.reward for t in episode]
             returns = np.zeros_like(rewards, dtype=np.float32)
