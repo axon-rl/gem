@@ -15,20 +15,23 @@
 """
 Entry script of using OAT to RL-tune LLM agents on GEM environments.
 """
+
 import functools
 import json
 import logging
 import os
 import re
 import time
+import uuid
+from collections import deque
 from copy import deepcopy
 from dataclasses import dataclass
 from typing import List, Literal, Optional, Sequence, Tuple
-from collections import deque
-import uuid
 
 import numpy as np
+import pandas as pd
 import torch
+import torch.distributed as dist
 import tree
 import vllm
 from oat.algorithms.ppo import PPOActor, PPOArgs, PPOLearner
@@ -46,11 +49,7 @@ from gem.wrappers.wrapper_factory import get_wrapper_fns
 """ 1. Defining constants used in our training. """
 """ +=========================================+ """
 
-from examples.train_oat import (
-    INVALID_ACTION,
-    TEMPLATE_FACTORY,
-)
-
+from examples.train_oat import INVALID_ACTION, TEMPLATE_FACTORY
 
 """ +=================================================+ """
 """ 2. Defining extra arguments/structure for training. """
@@ -227,7 +226,9 @@ class Actor(PPOActor):
             episodes, info = self.collect_experience_single(env, min_steps)
             episode_groups = [[ep] for ep in episodes]
         else:
-            episode_groups, info = self.collect_experience_multiple(env, min_steps, self.args.num_samples)
+            episode_groups, info = self.collect_experience_multiple(
+                env, min_steps, self.args.num_samples
+            )
         return episode_groups, info
 
     def collect_experience_single(self, env, min_steps: int):
@@ -328,12 +329,10 @@ class Actor(PPOActor):
     def collect_experience_multiple(self, env, min_steps: int, num_samples: int):
         start_time = time.time()
         # If env has get_state and set_state methods then use these, otherwise deepcopy the env
-        env_has_getset_state =(
-            hasattr(env.envs[0], "get_state") and hasattr(env.envs[0], "set_state")
+        env_has_getset_state = hasattr(env.envs[0], "get_state") and hasattr(
+            env.envs[0], "set_state"
         )
-        logging.info(
-            f"Actor-{self.actor_id}: {env_has_getset_state=}"
-        )
+        logging.info(f"Actor-{self.actor_id}: {env_has_getset_state=}")
 
         # for in-progress episodes
         episodes = [[] for _ in range(env.num_envs)]
@@ -346,7 +345,7 @@ class Actor(PPOActor):
         env_queue = deque()
         id_queue = deque()
         initial_obs_queue = deque()
-        
+
         # for finished groups
         finished_groups = []
         finished_groups_ids = []
@@ -366,7 +365,7 @@ class Actor(PPOActor):
             else:
                 state = env_i
             return deepcopy(state) if apply_deepcopy else state
-        
+
         def set_env(envs, i, state, apply_deepcopy=True):
             state_ = deepcopy(state) if apply_deepcopy else state
             if env_has_getset_state:
@@ -392,16 +391,20 @@ class Actor(PPOActor):
                         and (env_to_use not in finished_groups_envs)
                     ):
                         break
-                        
+
                 finished_episodes_groups[id] = []
                 for j in range(num_samples):
                     # env_queue.append(deepcopy(env_to_use))
-                    env_queue.append(get_env_for_storing(env_to_use, apply_deepcopy=True))
+                    env_queue.append(
+                        get_env_for_storing(env_to_use, apply_deepcopy=True)
+                    )
                     id_queue.append(id)
                     initial_obs_queue.append(initial_obs)
 
         def move_finished_group(id):
-            assert len(finished_episodes_groups[id]) <= num_samples, f"{num_samples=}\n{len(finished_episodes_groups[id])=}\n{id=}\n{finished_episodes_groups=}"
+            assert len(finished_episodes_groups[id]) <= num_samples, (
+                f"{num_samples=}\n{len(finished_episodes_groups[id])=}\n{id=}\n{finished_episodes_groups=}"
+            )
             if len(finished_episodes_groups[id]) == num_samples:
                 finished_group = finished_episodes_groups.pop(id)
                 finished_groups.append(finished_group)
@@ -441,15 +444,18 @@ class Actor(PPOActor):
             done = terminated | truncated
 
             for i in range(env.num_envs):
-
                 if extra[i]["generation_failed"]:
                     num_generation_failed += 1
                     if self.args.keep_generation_failed:
                         episodes[i][-1].reward += reward[i]
                         episodes[i][-1].done = True
-                        finished_episodes_groups[ids_in_progress[i]].append(deepcopy(episodes[i]))
+                        finished_episodes_groups[ids_in_progress[i]].append(
+                            deepcopy(episodes[i])
+                        )
                         num_finished_episodes += 1
-                        finished_groups_num_transitions += move_finished_group(ids_in_progress[i])
+                        finished_groups_num_transitions += move_finished_group(
+                            ids_in_progress[i]
+                        )
                         max_ep_length = max(max_ep_length, len(episodes[i]))
                         update_metrics(info[i], done[i])
                         top_up_queue(env.envs[i])
@@ -477,9 +483,13 @@ class Actor(PPOActor):
                     )
                     episodes[i].append(transition)
                     if done[i]:
-                        finished_episodes_groups[ids_in_progress[i]].append(deepcopy(episodes[i]))
+                        finished_episodes_groups[ids_in_progress[i]].append(
+                            deepcopy(episodes[i])
+                        )
                         num_finished_episodes += 1
-                        finished_groups_num_transitions += move_finished_group(ids_in_progress[i])
+                        finished_groups_num_transitions += move_finished_group(
+                            ids_in_progress[i]
+                        )
                         max_ep_length = max(max_ep_length, len(episodes[i]))
                         update_metrics(info[i], done[i])
                         top_up_queue(env.envs[i])
@@ -494,14 +504,13 @@ class Actor(PPOActor):
                 if finished_groups_num_transitions >= min_steps:
                     break
             if finished_groups_num_transitions >= min_steps:
-                    break
+                break
 
             #     print(f"{x=}, {i=}, {finished_groups_num_transitions=}")
             # x += 1
             # assert x <= 30, f"{x=}, {finished_groups_num_transitions=}, {min_steps=}"
 
             obs = next_obs
-            
 
         info = {
             "actor/num_generation_failed": num_generation_failed,
@@ -646,20 +655,30 @@ class Actor(PPOActor):
         self, group: Sequence[Transition]
     ) -> List[TransitionData]:
         if self.args.critic_type2 in ["grpo", "drgrpo", "rloo"]:
-            assert self.args.num_samples > 1, f"{self.args.critic_type2=} requires num_samples > 1, got {self.args.num_samples=}"
+            assert self.args.num_samples > 1, (
+                f"{self.args.critic_type2=} requires num_samples > 1, got {self.args.num_samples=}"
+            )
         group_rewards_ep_level = [sum(t.reward for t in episode) for episode in group]
         # Normalize at episode level
         if self.args.critic_type2 == "grpo":
             mean = np.mean(group_rewards_ep_level)
             std = np.std(group_rewards_ep_level) + 1e-9
-            group_returns_ep_level_normalized = [(r - mean) / std for r in group_rewards_ep_level]
+            group_returns_ep_level_normalized = [
+                (r - mean) / std for r in group_rewards_ep_level
+            ]
         elif self.args.critic_type2 == "drgrpo":
             mean = np.mean(group_rewards_ep_level)
-            group_returns_ep_level_normalized = [r - mean for r in group_rewards_ep_level]
+            group_returns_ep_level_normalized = [
+                r - mean for r in group_rewards_ep_level
+            ]
         elif self.args.critic_type2 == "rloo":
             group_returns_ep_level_normalized = []
             for i, r in enumerate(group_rewards_ep_level):
-                leave_one_out = [group_rewards_ep_level[j] for j in range(len(group_rewards_ep_level)) if j != i]
+                leave_one_out = [
+                    group_rewards_ep_level[j]
+                    for j in range(len(group_rewards_ep_level))
+                    if j != i
+                ]
                 group_returns_ep_level_normalized.append(r - np.mean(leave_one_out))
         elif self.args.critic_type2 == "ep_level":
             group_returns_ep_level_normalized = group_rewards_ep_level
@@ -704,9 +723,8 @@ class Actor(PPOActor):
     def prepare_group_of_episodes_transition_level(
         self, group: Sequence[Transition]
     ) -> List[TransitionData]:
-            
         # Compute the returns
-        group_returns = [] # List (episodes) of arrays (return per transition in episode)
+        group_returns = []  # List (episodes) of arrays (return per transition in episode)
         for episode in group:
             rewards = [t.reward for t in episode]
             returns = np.zeros_like(rewards, dtype=np.float32)
@@ -804,6 +822,75 @@ class Actor(PPOActor):
             # Return invalid action if extraction fails.
             return INVALID_ACTION
 
+    def run_eval_episode(self, eval_env_id, batch_size) -> List[Transition]:
+        wrappers = get_wrapper_fns(self.args.eval_wrappers, tokenizer=self.tokenizer)
+        vec_env = gem.make_vec(
+            [eval_env_id] * batch_size,
+            wrappers=wrappers,
+            async_model=self.args.eval_async_env,
+        )
+        finished_episodes = []
+
+        def get_attr_from_wrapper(env, attr):
+            if hasattr(env, attr):
+                return getattr(env, attr)
+
+            if hasattr(env, "env"):
+                return get_attr_from_wrapper(env.env, attr)
+
+            raise ValueError(f"Cannot find {attr} in env.")
+
+        dataset = get_attr_from_wrapper(vec_env.envs[0], "dataset")
+        if batch_size > len(dataset):
+            logging.info(
+                f"eval batch size {batch_size} is larger than dataset size {len(dataset)}, set batch size to {len(dataset)}"
+            )
+            batch_size = len(dataset)
+
+        for i in range(0, len(dataset), batch_size):
+            # TODO: shall improve the logic here
+            n_parallel = min(batch_size, len(dataset) - i)
+            _kwargs_map = {
+                f"env{j}_kwargs": {"idx": i + j}
+                for j in range(min(n_parallel, len(dataset) - i))
+            }
+            obs, info = vec_env.reset(**_kwargs_map)
+            obs, info = obs[:n_parallel], info[:n_parallel]
+            episodes = [[] for _ in range(len(obs))]
+            done = np.array([False] * n_parallel)
+            while not all(done):
+                action, extra = self.agent_act(obs)
+                # distrubte action based on done mask
+                action_iter = iter(action)
+                next_obs, reward, terminated, truncated, info = vec_env.step(
+                    {i: next(action_iter) for i, d in enumerate(done) if not d}
+                )
+                obs_len = [len(self.tokenizer.encode(o)) for o in next_obs]
+                obs_exceeds_max_len = np.array(
+                    [l >= self.args.max_model_len for l in obs_len]
+                )
+                # distribute cur_done to done
+                cur_done = terminated | truncated | obs_exceeds_max_len
+                iter_idx = 0
+                for i in range(len(done)):
+                    if not done[i]:
+                        episodes[i].append(
+                            {
+                                "obs": obs[iter_idx],
+                                "action": action[iter_idx],
+                                "reward": reward[iter_idx],
+                                "next_obs": next_obs[iter_idx],
+                                "done": cur_done[iter_idx],
+                                "info": info[iter_idx],
+                            }
+                        )
+                        iter_idx += 1
+                done[~done] = cur_done
+                obs = [o for o, d in zip(next_obs, cur_done) if not d]
+
+            finished_episodes.extend(episodes)
+        return finished_episodes
+
 
 class DummyPromptDataset(Dataset):
     """Empty dataset to satisfy OAT's requirements without actually loading data."""
@@ -893,6 +980,103 @@ class Learner(PPOLearner):
             advantages = (advantages - mean_adv) / (std_adv + 1e-9)
         return advantages
 
+    def evaluate(self, _unused_dataloader, steps):
+        """Online evaluation on TIR environments."""
+        # NOTE: for one env, the evaluation is performed on each actor independently.
+        # Thus the results are `average@{n_gpus}`
+        del _unused_dataloader
+        assert not self.pi_beta_lags_behind, "pi beta lags behind for evaluation"
+        self._pre_evaluate()
+        self.strategy.print(f"Starting evaluation at {steps} steps")
+        eval_env_ids = self.args.eval_envs.split(",")
+
+        t0 = time.time()
+        futs = []
+        episodes = []
+
+        metrics = {
+            f"eval/{env_id}/{metric}": 0.0
+            for env_id in eval_env_ids
+            for metric in ["accuracy", "elapse", "response_tok_len", "mean_episode_len"]
+        }
+
+        # fn for response_tok_len
+        def response_tok_len(ep):
+            len_q = len(self.tokenizer.encode(ep[0]["obs"]))
+            len_q_and_a = len(self.tokenizer.encode(ep[-1]["obs"] + ep[-1]["action"]))
+            return len_q_and_a - len_q
+
+        for eval_env_id in eval_env_ids:
+            if self.strategy.is_rank_0():
+                futs += [
+                    actor.futures.run_eval_episode(
+                        eval_env_id, self.args.eval_batch_size
+                    )
+                    for actor in self.actors
+                ]
+                for fut in futs:
+                    episodes.extend(fut.result())
+                futs.clear()
+
+            run_elapse = time.time() - t0
+            t0 = time.time()
+            metrics.update(
+                {
+                    f"eval/{eval_env_id}/elapse": run_elapse,
+                    f"eval/{eval_env_id}/response_tok_len": np.mean(
+                        [response_tok_len(ep) for ep in episodes]
+                    ),
+                    f"eval/{eval_env_id}/accuracy": np.mean(
+                        [ep[-1]["reward"] == 1 for ep in episodes]
+                    ),
+                    f"eval/{eval_env_id}/mean_episode_len": np.mean(
+                        [len(ep) for ep in episodes]
+                    ),
+                    f"eval/{eval_env_id}/num_tool_success": np.mean(
+                        [
+                            ep[-1]["info"].get("tool_success_counter", 0)
+                            + ep[-1]["info"].get("prev_ep_tool_success_counter")
+                            for ep in episodes
+                        ]
+                    ),
+                }
+            )
+            # save the results
+            transitions = [t for ep in episodes for t in ep]
+            eval_res_path = os.path.join(self.save_path, "eval_results")
+            os.makedirs(eval_res_path, exist_ok=True)
+            pd.DataFrame(
+                {
+                    "obs": [t["obs"] for t in transitions],
+                    "action": [t["action"] for t in transitions],
+                    "reward": [t["reward"] for t in transitions],
+                    "done": [t["done"] for t in transitions],
+                    "next_obs": [t["next_obs"] for t in transitions],
+                    "info": [t["info"] for t in transitions],
+                }
+            ).to_json(
+                os.path.join(eval_res_path, f"{steps}_{eval_env_id}.json"),
+                orient="records",
+                indent=4,
+            )
+
+        dist.barrier()
+        metrics = self.strategy.broadcast(metrics)
+        metrics["eval/average/accuracy"] = np.mean(
+            [metrics[f"eval/{env_id}/accuracy"] for env_id in eval_env_ids]
+        )
+        metrics["eval/average/mean_episode_len"] = np.mean(
+            [metrics[f"eval/{env_id}/mean_episode_len"] for env_id in eval_env_ids]
+        )
+        metrics["eval/average/response_tok_len"] = np.mean(
+            [metrics[f"eval/{env_id}/response_tok_len"] for env_id in eval_env_ids]
+        )
+        metrics["eval/average/elapse"] = np.mean(
+            [metrics[f"eval/{env_id}/elapse"] for env_id in eval_env_ids]
+        )
+        self._post_evaluate()
+        return metrics
+
 
 def train(args: Args):
     """
@@ -926,9 +1110,9 @@ if __name__ == "__main__":
     args.prompt_data = ""  # Don't load any dataset
     args.rollout_batch_size = args.rollout_batch_size_per_device * args.gpus
     if "concat_chat" in args.wrappers:
-        assert (
-            args.prompt_template == "no"
-        ), "chat template is applied on env side already"
+        assert args.prompt_template == "no", (
+            "chat template is applied on env side already"
+        )
     args = default_args_validation(args)
 
     # Let's go
