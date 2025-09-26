@@ -65,6 +65,11 @@ class WikiGameEnv(Env):
     Terminal State:
         - The game **terminates** when the agent reaches the target page (p_current == p_target).
         - The game **truncates** when the agent exhausts the maximum number of allowed turns without reaching the target page
+    
+    Reward Function:
+        - +1 if the agent reaches the target page (success)
+        - -0.01 if the action was not parseable (format error)
+        - 0 otherwise.
     '''
     def __init__(self, max_turns: int = 10, **_):
         super().__init__()
@@ -220,11 +225,23 @@ class WikiGameEnv(Env):
         # Source: https://github.com/callummcdougall/ARENA_3.0/blob/main/chapter3_llm_evals/exercises/part4_llm_agents/3.4_LLM_Agents_solutions.ipynb
         next_page = self._try_resolve_page(next_page_title)
         
-        if next_page is None:
+        # Step 3a: Check for maximum turns reached
+        if self.turn_count >= self.max_turns:
+                    terminate_obs = f"At turn {self.turn_count}, you have reached the maximum number of turns without reaching the target page '{self.target_page.title}'."
+                    reward = LanguageGameReward.fail_reward
+                    return (
+                        terminate_obs,
+                        reward,
+                        True,
+                        True,
+                        {"suffix": self.get_task_suffix()},
+                    )
+        # Step 3b: Check if the page could not be loaded
+        elif next_page is None:
             next_obs = f"At turn {self.turn_count}, you guessed '{next_page_title}', which could not be loaded due to repeated errors."
             reward = LanguageGameReward.invalid_action_reward
 
-        # Step 3a: Check if we are on the target page.
+        # Step 3c: Check if we are on the target page.
         elif next_page.title == self.target_page:
             self.current_page = next_page
             terminate_obs = f"Congratulations! You have reached the target page '{self.target_page.title}' in {self.turn_count} turns."
@@ -236,18 +253,7 @@ class WikiGameEnv(Env):
                 False,
                 {"suffix": self.get_task_suffix()},
             )
-        # Step 3b: Check for maximum turns reached
-        elif self.turn_count >= self.max_turns:
-            terminate_obs = f"At turn {self.turn_count}, you have reached the maximum number of turns without reaching the target page '{self.target_page.title}'."
-            reward = LanguageGameReward.fail_reward
-            return (
-                terminate_obs,
-                reward,
-                True,
-                True,
-                {"suffix": self.get_task_suffix()},
-            )
-        # Step 3c: Valid action, but not the target page.
+        # Step 3d: Valid action, but not the target page.
         else:
             self.current_page = next_page
             next_obs = (
