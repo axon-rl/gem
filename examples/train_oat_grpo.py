@@ -405,9 +405,9 @@ class Actor(PPOActor):
                     initial_obs_queue.append(initial_obs)
 
         def move_finished_group(id):
-            assert len(finished_episodes_groups[id]) <= num_samples, (
-                f"{num_samples=}\n{len(finished_episodes_groups[id])=}\n{id=}\n{finished_episodes_groups=}"
-            )
+            assert (
+                len(finished_episodes_groups[id]) <= num_samples
+            ), f"{num_samples=}\n{len(finished_episodes_groups[id])=}\n{id=}\n{finished_episodes_groups=}"
             if len(finished_episodes_groups[id]) == num_samples:
                 finished_group = finished_episodes_groups.pop(id)
                 finished_groups.append(finished_group)
@@ -658,9 +658,9 @@ class Actor(PPOActor):
         self, group: Sequence[Transition]
     ) -> List[TransitionData]:
         if self.args.critic_type2 in ["grpo", "drgrpo", "rloo"]:
-            assert self.args.num_samples > 1, (
-                f"{self.args.critic_type2=} requires num_samples > 1, got {self.args.num_samples=}"
-            )
+            assert (
+                self.args.num_samples > 1
+            ), f"{self.args.critic_type2=} requires num_samples > 1, got {self.args.num_samples=}"
         group_rewards_ep_level = [sum(t.reward for t in episode) for episode in group]
         # Normalize at episode level
         if self.args.critic_type2 == "grpo":
@@ -1118,9 +1118,9 @@ if __name__ == "__main__":
     args.prompt_data = ""  # Don't load any dataset
     args.rollout_batch_size = args.rollout_batch_size_per_device * args.gpus
     if "concat_chat" in args.wrappers:
-        assert args.prompt_template == "no", (
-            "chat template is applied on env side already"
-        )
+        assert (
+            args.prompt_template == "no"
+        ), "chat template is applied on env side already"
     args = default_args_validation(args)
 
     # Let's go
