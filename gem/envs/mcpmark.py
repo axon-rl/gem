@@ -24,8 +24,6 @@ from gem.utils.constants import TERMINAL_STATE
 
 
 class MCPMarkEnv(Env):
-    """"""
-
     def __init__(self, mcp_service: str, tasks: str = "all", seed: int = 42):
         """
         Args:
