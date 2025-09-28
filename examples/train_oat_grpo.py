@@ -77,6 +77,9 @@ class Args(PPOArgs):
     eval_input_key: str = "input"
     eval_output_key: str = "answer"
     eval_split: str = "all"
+    eval_envs: str = "eval:AMIE24"
+    eval_wrappers: str = "python_tool_no_int_reward_last_line_error,concat_chat"
+    eval_async_env: bool = False
 
     # Misc settings
     dump_experience_every: int = 1  # Dump experience data
@@ -402,9 +405,9 @@ class Actor(PPOActor):
                     initial_obs_queue.append(initial_obs)
 
         def move_finished_group(id):
-            assert (
-                len(finished_episodes_groups[id]) <= num_samples
-            ), f"{num_samples=}\n{len(finished_episodes_groups[id])=}\n{id=}\n{finished_episodes_groups=}"
+            assert len(finished_episodes_groups[id]) <= num_samples, (
+                f"{num_samples=}\n{len(finished_episodes_groups[id])=}\n{id=}\n{finished_episodes_groups=}"
+            )
             if len(finished_episodes_groups[id]) == num_samples:
                 finished_group = finished_episodes_groups.pop(id)
                 finished_groups.append(finished_group)
@@ -655,9 +658,9 @@ class Actor(PPOActor):
         self, group: Sequence[Transition]
     ) -> List[TransitionData]:
         if self.args.critic_type2 in ["grpo", "drgrpo", "rloo"]:
-            assert (
-                self.args.num_samples > 1
-            ), f"{self.args.critic_type2=} requires num_samples > 1, got {self.args.num_samples=}"
+            assert self.args.num_samples > 1, (
+                f"{self.args.critic_type2=} requires num_samples > 1, got {self.args.num_samples=}"
+            )
         group_rewards_ep_level = [sum(t.reward for t in episode) for episode in group]
         # Normalize at episode level
         if self.args.critic_type2 == "grpo":
@@ -938,12 +941,16 @@ class Learner(PPOLearner):
         # but doesn't actually load any data
         # Used to control the training episode, set a large number.
         self.prompts_dataset = DummyPromptDataset(size=int(1e9))
+        self.eval_prompts_dataset = DummyPromptDataset(size=1)  # no use currently
 
         # Create the dataloaders
         self.prompts_dataloader = strategy.setup_dataloader(
             self.prompts_dataset,
             strategy.args.rollout_batch_size_per_device,
             shuffle=False,  # No need to shuffle dummy data
+        )
+        self.eval_prompts_dataloader = strategy.setup_dataloader(
+            self.eval_prompts_dataset, batch_size=1, shuffle=False, drop_last=False
         )
 
     def process_feedback_data(self, data_list: List[TransitionData]):
@@ -1036,7 +1043,7 @@ class Learner(PPOLearner):
                     f"eval/{eval_env_id}/num_tool_success": np.mean(
                         [
                             ep[-1]["info"].get("tool_success_counter", 0)
-                            + ep[-1]["info"].get("prev_ep_tool_success_counter")
+                            + ep[-1]["info"].get("prev_ep_tool_success_counter", 0)
                             for ep in episodes
                         ]
                     ),
@@ -1111,9 +1118,9 @@ if __name__ == "__main__":
     args.prompt_data = ""  # Don't load any dataset
     args.rollout_batch_size = args.rollout_batch_size_per_device * args.gpus
     if "concat_chat" in args.wrappers:
-        assert (
-            args.prompt_template == "no"
-        ), "chat template is applied on env side already"
+        assert args.prompt_template == "no", (
+            "chat template is applied on env side already"
+        )
     args = default_args_validation(args)
 
     # Let's go
