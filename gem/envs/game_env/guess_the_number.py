@@ -31,7 +31,7 @@ class GuessTheNumberEnv(Env):
         self.min_number = min_number
         self.max_number = max_number
         self.max_turns = max_turns
-        self.is_random = min_number is None or max_number is None
+        self._is_random = min_number is None or max_number is None
         self.reset()
 
     def _get_instructions(self) -> str:
@@ -50,9 +50,9 @@ class GuessTheNumberEnv(Env):
 
     def reset(self, seed: Optional[int] = None) -> Tuple[str, dict[str, Any]]:
         super().reset(seed)
-        if self.is_random:
-            self.min_number = 1
-            self.max_number = random.randint(self.min_number + 1, 100)
+        if self._is_random:
+            self.min_number = random.randint(1, 10)
+            self.max_number = random.randint(self.min_number + 5, self.min_number + 50)
             self.max_turns = math.ceil(math.sqrt(self.max_number - self.min_number)) + 1
 
         self.game_number = random.randint(self.min_number, self.max_number)

@@ -38,7 +38,7 @@ class WordleEnv(Env):
         self.word_length = word_length
         self.only_real_words = only_real_words
         self.max_turns = max_turns
-        self.is_random = word_length is None
+        self._is_random = word_length is None or max_turns is None
         self.all_words = words.words("en-basic")
         self.reset()
 
@@ -60,8 +60,9 @@ class WordleEnv(Env):
 
     def reset(self, seed: Optional[int] = None) -> Tuple[str, dict[str, Any]]:
         super().reset(seed)
-        if self.is_random:
-            self.word_length = random.randint(3, 6)
+        if self._is_random:
+            self.word_length = random.randint(3, 5)
+            self.max_turns = self.word_length * 5
         self.available_words = [
             word
             for word in self.all_words

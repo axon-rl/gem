@@ -24,6 +24,8 @@ import time
 from copy import deepcopy
 from dataclasses import dataclass
 from typing import List, Literal, Optional, Sequence, Tuple
+from collections import deque
+import uuid
 
 import numpy as np
 import torch
@@ -32,8 +34,8 @@ import vllm
 from oat.algorithms.ppo import PPOActor, PPOArgs, PPOLearner
 from oat.args import default_args_validation, get_default_args
 from oat.interface import get_program, lp
-from oat.types import Transition, TransitionData
-from oat.utils.ops import masked_sum
+from oat.types import TransitionData
+from oat.utils.ops import masked_mean, masked_sum
 from torch.utils.data import Dataset
 
 import gem
@@ -44,46 +46,10 @@ from gem.wrappers.wrapper_factory import get_wrapper_fns
 """ 1. Defining constants used in our training. """
 """ +=========================================+ """
 
-# Invalid action to be sent to the env to trigger format error penalty.
-INVALID_ACTION = "<｜INVALID_ACTION｜>"
-
-
-def apply_qwen3_game_template(observation: str) -> str:
-    return (
-        f"<|im_start|>user\nYou are playing language games. Make valid actions to win.\nObservation: {observation}"
-        "\nPlease reason step by step, and put your final answer within \\boxed{}.<|im_end|>\n"
-        "<|im_start|>assistant\n"
-    )
-
-
-def apply_no_template(observation: str) -> str:
-    return observation
-
-
-def apply_qwen3_general_template(question: str) -> str:
-    return (
-        f"<|im_start|>user\nQuestion: {question}"
-        "\nPlease reason step by step, and put your final answer within \\boxed{}.<|im_end|>\n"
-        "<|im_start|>assistant\n"
-    )
-
-
-def apply_code_template(question: str) -> str:
-    return (
-        "You are an expert Python programmer. "
-        "You will be given a question (problem specification) and will generate a correct "
-        "Python program that matches the specification and passes all tests."
-        f"\nQuestion: {question}"
-        "\nPlease reason step by step, and write your code in markdown format, e.g., ```python\n# YOUR CODE HERE\n```."
-    )
-
-
-TEMPLATE_FACTORY = {
-    "qwen3_game": apply_qwen3_game_template,
-    "no": apply_no_template,
-    "qwen3_general": apply_qwen3_general_template,
-    "code": apply_code_template,
-}
+from examples.train_oat import (
+    INVALID_ACTION,
+    TEMPLATE_FACTORY,
+)
 
 
 """ +=================================================+ """
@@ -99,15 +65,12 @@ class Args(PPOArgs):
     wrappers: str = ""
     async_env: bool = False
 
-    # Algorithm settings
-    length_norm_constant: Optional[int] = None
-
     # Template settings
     prompt_template: Literal["qwen3_game", "no", "qwen3_general", "code"] = "qwen3_game"
 
     # Reward settings
     gamma: float = 1.0  # Discount factor for Monte Carlo returns
-    norm_return: bool = True
+    norm_return: bool = False
 
     # Evaluation settings
     eval_prompt_template: Literal["qwen3_general"] = "qwen3_general"
@@ -121,6 +84,35 @@ class Args(PPOArgs):
 
     # Episode collection logic
     keep_generation_failed: bool = False  # Keep episodes with generation failures
+
+    critic_type2: Literal["grpo", "drgrpo", "rloo", "ep_level", "none"] = "none"
+
+
+@dataclass
+class Transition:
+    obs: str
+    action: str
+    reward: float
+    done: bool
+
+    prompt: str
+    prompt_ids: list
+    response: str
+    response_ids: list
+    response_logprobs: list
+
+    response_is_truncated: bool
+    action_is_formatted: bool
+
+    def format(self):
+        return {
+            "obs": self.obs,
+            "action": self.action,
+            "reward": self.reward,
+            "done": int(self.done),
+            "prompt": self.prompt,
+            "response": self.response,
+        }
 
 
 """ +=======================================+ """
@@ -177,26 +169,34 @@ class Actor(PPOActor):
         # The provided parameters are ignored since we generate prompts from the environment
         del prompts, formatted_prompts, references
 
+        logging.info(
+            f"Actor-{self.actor_id} starting to collect experiences at step {self.step_count}"
+        )
         info = {}
 
-        # Play multiple episodes to generate transitions (trajectories in language MDP)
-        all_trajectories = []
+        # Play multiple episodes to generate transitions
+        all_transitions = []
 
-        finished_episodes, collection_info = self.collect_experience()
-        for ep in finished_episodes:
-            all_trajectories.extend(self.prepare_trajectories(ep))
+        finished_groups, collection_info = self.collect_experience(
+            self.env, self.args.rollout_batch_size_per_device
+        )
+        for group in finished_groups:
+            all_transitions.extend(self.prepare_group_of_episodes(group))
 
         # logging infos
-        info["actor/num_trajectories"] = len(all_trajectories)
-        info["actor/mean_episode_len"] = np.mean([len(ep) for ep in finished_episodes])
+        flattened_episodes = []
+        for group in finished_groups:
+            flattened_episodes.extend(group)
+        info["actor/num_transitions"] = len(all_transitions)
+        info["actor/mean_episode_len"] = np.mean([len(ep) for ep in flattened_episodes])
         info["actor/mean_episode_return"] = np.mean(
             [
-                sum(transition.rewards for transition in episode)
-                for episode in finished_episodes
+                sum(transition.reward for transition in episode)
+                for episode in flattened_episodes
             ]
         )
         info["actor/mean_episode_success"] = np.mean(
-            [episode[-1].rewards == 1 for episode in finished_episodes]
+            [episode[-1].reward == 1 for episode in flattened_episodes]
         )  # NOTE: assuming success reward is always 1
 
         # update collection info
@@ -204,28 +204,33 @@ class Actor(PPOActor):
             {k.replace("actor/", "actor/"): v for k, v in collection_info.items()}
         )
 
-        # Subsample trajectories if they exceed the batch size
-        if len(all_trajectories) > self.args.rollout_batch_size_per_device:
+        # Subsample transitions if they exceed the batch size
+        if len(all_transitions) > self.args.rollout_batch_size_per_device:
             subsample_indices = np.random.choice(
-                len(all_trajectories),
+                len(all_transitions),
                 self.args.rollout_batch_size_per_device,
                 replace=False,
             )
-            all_trajectories = [all_trajectories[si] for si in subsample_indices]
-        logging.info(f"Actor finished collecting {len(all_trajectories)} trajectories")
+            all_transitions = [all_transitions[si] for si in subsample_indices]
+        logging.info(f"Actor finished collecting {len(all_transitions)} transitions")
 
-        for trajectory in all_trajectories:
-            trajectory.info.update(**info)
+        for transition in all_transitions:
+            transition.info.update(**info)
 
-        # Serialize and return the trajectories
-        handle = self.ipc_client.serialize_ipc(all_trajectories)
+        self.step_count += 1
+        # Serialize and return the transitions
+        handle = self.ipc_client.serialize_ipc(all_transitions)
         return handle  # type: ignore
 
-    def collect_experience(self):
-        logging.info(
-            f"Actor-{self.actor_id} starting to collect experiences at step {self.step_count}"
-        )
-        env, min_steps = self.env, self.args.rollout_batch_size_per_device
+    def collect_experience(self, env, min_steps: int):
+        if self.args.num_samples == 1:
+            episodes, info = self.collect_experience_single(env, min_steps)
+            episode_groups = [[ep] for ep in episodes]
+        else:
+            episode_groups, info = self.collect_experience_multiple(env, min_steps, self.args.num_samples)
+        return episode_groups, info
+
+    def collect_experience_single(self, env, min_steps: int):
         obs, _ = env.reset()
         done = False
         episodes = [[] for _ in range(env.num_envs)]
@@ -242,7 +247,7 @@ class Actor(PPOActor):
                 if extra[i]["generation_failed"]:
                     num_generation_failed += 1
                     if self.args.keep_generation_failed:
-                        episodes[i][-1].rewards += reward[i]
+                        episodes[i][-1].reward += reward[i]
                         episodes[i][-1].done = True
                         finished_episodes.append(deepcopy(episodes[i]))
                         finished_episodes_tool_uses.append(
@@ -262,7 +267,7 @@ class Actor(PPOActor):
                     transition = Transition(
                         obs=obs[i],
                         action=action[i],
-                        rewards=reward[i],
+                        reward=reward[i],
                         done=done[i],
                         prompt=extra[i]["formatted_observation"],
                         prompt_ids=extra[i]["prompt_ids"],
@@ -317,8 +322,221 @@ class Actor(PPOActor):
                     f,
                     indent=4,
                 )
-        self.step_count += 1
+
         return finished_episodes, info
+
+    def collect_experience_multiple(self, env, min_steps: int, num_samples: int):
+        start_time = time.time()
+        # If env has get_state and set_state methods then use these, otherwise deepcopy the env
+        env_has_getset_state =(
+            hasattr(env.envs[0], "get_state") and hasattr(env.envs[0], "set_state")
+        )
+        logging.info(
+            f"Actor-{self.actor_id}: {env_has_getset_state=}"
+        )
+
+        # for in-progress episodes
+        episodes = [[] for _ in range(env.num_envs)]
+        envs_in_progress = [None for _ in range(env.num_envs)]
+        ids_in_progress = [None for _ in range(env.num_envs)]
+        initial_obs_in_progress = [None for _ in range(env.num_envs)]
+        finished_episodes_groups = {}
+
+        # queues
+        env_queue = deque()
+        id_queue = deque()
+        initial_obs_queue = deque()
+        
+        # for finished groups
+        finished_groups = []
+        finished_groups_ids = []
+        finished_groups_envs = []
+        finished_groups_num_transitions = 0
+
+        # for logging
+        finished_episodes_tool_uses = []
+        finished_episodes_tool_success = []
+        num_finished_episodes = 0
+        num_generation_failed = 0
+        max_ep_length = 0
+
+        def get_env_for_storing(env_i, apply_deepcopy=True):
+            if env_has_getset_state:
+                state = env_i.get_state()
+            else:
+                state = env_i
+            return deepcopy(state) if apply_deepcopy else state
+        
+        def set_env(envs, i, state, apply_deepcopy=True):
+            state_ = deepcopy(state) if apply_deepcopy else state
+            if env_has_getset_state:
+                envs[i].set_state(state_)
+            else:
+                envs[i] = state_
+
+        def top_up_queue(env_to_use):
+            if len(env_queue) == 0:
+                while True:
+                    id = str(uuid.uuid4())
+                    if (
+                        (id not in id_queue)
+                        and (id not in ids_in_progress)
+                        and (id not in finished_groups_ids)
+                    ):
+                        break
+                while True:
+                    initial_obs, _ = env_to_use.reset()
+                    if (
+                        (env_to_use not in env_queue)
+                        and (env_to_use not in envs_in_progress)
+                        and (env_to_use not in finished_groups_envs)
+                    ):
+                        break
+                        
+                finished_episodes_groups[id] = []
+                for j in range(num_samples):
+                    # env_queue.append(deepcopy(env_to_use))
+                    env_queue.append(get_env_for_storing(env_to_use, apply_deepcopy=True))
+                    id_queue.append(id)
+                    initial_obs_queue.append(initial_obs)
+
+        def move_finished_group(id):
+            assert len(finished_episodes_groups[id]) <= num_samples, f"{num_samples=}\n{len(finished_episodes_groups[id])=}\n{id=}\n{finished_episodes_groups=}"
+            if len(finished_episodes_groups[id]) == num_samples:
+                finished_group = finished_episodes_groups.pop(id)
+                finished_groups.append(finished_group)
+                finished_groups_ids.append(deepcopy(id))
+                num_transitions_added = sum([len(ep) for ep in finished_group])
+            else:
+                num_transitions_added = 0
+            return num_transitions_added
+
+        def update_metrics(info_i, done_i):
+            finished_episodes_tool_uses.append(
+                info_i.get("prev_ep_tool_use_counter", 0)
+                if done_i
+                else info_i.get("tool_use_counter", 0)
+            )
+            finished_episodes_tool_success.append(
+                info_i.get("prev_ep_tool_success_counter", 0)
+                if done_i
+                else info_i.get("tool_success_counter", 0)
+            )
+
+        # Set initial state of each environment
+        obs, _ = env.reset()
+        for i in range(env.num_envs):
+            top_up_queue(env.envs[i])
+            envs_in_progress[i] = env_queue.popleft()
+            ids_in_progress[i] = id_queue.popleft()
+            initial_obs_in_progress[i] = initial_obs_queue.popleft()
+            # env.envs[i] = deepcopy(envs_in_progress[i])
+            set_env(env.envs, i, envs_in_progress[i], apply_deepcopy=True)
+            obs[i] = deepcopy(initial_obs_in_progress[i])
+
+        # Collect episodes
+        while True:
+            action, extra = self.agent_act(obs)
+            next_obs, reward, terminated, truncated, info = env.step(action)
+            done = terminated | truncated
+
+            for i in range(env.num_envs):
+
+                if extra[i]["generation_failed"]:
+                    num_generation_failed += 1
+                    if self.args.keep_generation_failed:
+                        episodes[i][-1].reward += reward[i]
+                        episodes[i][-1].done = True
+                        finished_episodes_groups[ids_in_progress[i]].append(deepcopy(episodes[i]))
+                        num_finished_episodes += 1
+                        finished_groups_num_transitions += move_finished_group(ids_in_progress[i])
+                        max_ep_length = max(max_ep_length, len(episodes[i]))
+                        update_metrics(info[i], done[i])
+                        top_up_queue(env.envs[i])
+                        envs_in_progress[i] = env_queue.popleft()
+                        ids_in_progress[i] = id_queue.popleft()
+                        initial_obs_in_progress[i] = initial_obs_queue.popleft()
+                    episodes[i].clear()
+                    # env.envs[i] = deepcopy(envs_in_progress[i])
+                    set_env(env.envs, i, envs_in_progress[i], apply_deepcopy=True)
+                    next_obs[i] = deepcopy(initial_obs_in_progress[i])
+
+                else:
+                    transition = Transition(
+                        obs=obs[i],
+                        action=action[i],
+                        reward=reward[i],
+                        done=done[i],
+                        prompt=extra[i]["formatted_observation"],
+                        prompt_ids=extra[i]["prompt_ids"],
+                        response=extra[i]["response"],
+                        response_ids=extra[i]["response_ids"],
+                        response_logprobs=extra[i]["response_logprobs"],
+                        response_is_truncated=extra[i]["response_is_truncated"],
+                        action_is_formatted=extra[i]["action_is_formatted"],
+                    )
+                    episodes[i].append(transition)
+                    if done[i]:
+                        finished_episodes_groups[ids_in_progress[i]].append(deepcopy(episodes[i]))
+                        num_finished_episodes += 1
+                        finished_groups_num_transitions += move_finished_group(ids_in_progress[i])
+                        max_ep_length = max(max_ep_length, len(episodes[i]))
+                        update_metrics(info[i], done[i])
+                        top_up_queue(env.envs[i])
+                        envs_in_progress[i] = env_queue.popleft()
+                        ids_in_progress[i] = id_queue.popleft()
+                        initial_obs_in_progress[i] = initial_obs_queue.popleft()
+                        episodes[i].clear()
+                        # env.envs[i] = deepcopy(envs_in_progress[i])
+                        set_env(env.envs, i, envs_in_progress[i], apply_deepcopy=True)
+                        next_obs[i] = deepcopy(initial_obs_in_progress[i])
+
+                if finished_groups_num_transitions >= min_steps:
+                    break
+            if finished_groups_num_transitions >= min_steps:
+                    break
+
+            #     print(f"{x=}, {i=}, {finished_groups_num_transitions=}")
+            # x += 1
+            # assert x <= 30, f"{x=}, {finished_groups_num_transitions=}, {min_steps=}"
+
+            obs = next_obs
+            
+
+        info = {
+            "actor/num_generation_failed": num_generation_failed,
+            "actor/prop_generation_failed": (
+                num_generation_failed / num_finished_episodes
+                if self.args.keep_generation_failed
+                else num_generation_failed
+                / (num_finished_episodes + num_generation_failed)
+            ),
+            "actor/num_tool_uses": np.mean(finished_episodes_tool_uses),
+            "actor/num_tool_success": np.mean(finished_episodes_tool_success),
+            "actor/num_groups": len(finished_groups),
+        }
+        if self.step_count % self.args.dump_experience_every == 0:
+            _to_dump = {}
+            for n, group in enumerate(finished_groups):
+                for i, ep in enumerate(group):
+                    key = f"group{n}_episode{i}"
+                    _to_dump[key] = []
+                    for transition in ep:
+                        _to_dump[key].append(transition.format())
+            with open(
+                os.path.join(
+                    self.game_state_save_path,
+                    f"actor{self.actor_id}_step{self.step_count}.json",
+                ),
+                "w",
+            ) as f:
+                json.dump(
+                    _to_dump,
+                    f,
+                    indent=4,
+                )
+
+        return finished_groups, info
 
     def agent_act(self, vec_observation: List[str]) -> Tuple[str, dict]:
         """Use the current LLM as a policy to act.
@@ -405,59 +623,133 @@ class Actor(PPOActor):
                 sub_i += 1
         return executable_actions, extras  # type: ignore
 
-    def prepare_trajectories(
-        self, episode: Sequence[Transition]
+    def prepare_group_of_episodes(
+        self, group: Sequence[Transition]
     ) -> List[TransitionData]:
         """
-        Prepare language trajectories (transitions of episode).
+        Prepare language transitions (sequence of tokens to sequence of tokens).
 
         Args:
-            episode: A complete episode of the agent environment interaction.
+            group: List of episodes in the group
 
         Returns:
-            List of trajectory data
+            List of transitions
         """
-        trajectory_data = []
-        rewards = [t.rewards for t in episode]
+        if self.args.critic_type2 in ["grpo", "drgrpo", "rloo", "ep_level"]:
+            return self.prepare_group_of_episodes_episode_level(group)
+        elif self.args.critic_type2 in ["none"]:
+            return self.prepare_group_of_episodes_transition_level(group)
+        else:
+            raise NotImplementedError(f"Unknown arg: {self.args.critic_type2=}")
 
-        # Compute returns
-        returns = np.zeros_like(rewards, dtype=np.float32)
-        cur = 0.0
-        for i in reversed(range(len(rewards))):
-            cur = rewards[i] + self.args.gamma * cur
-            returns[i] = cur
+    def prepare_group_of_episodes_episode_level(
+        self, group: Sequence[Transition]
+    ) -> List[TransitionData]:
+        if self.args.critic_type2 in ["grpo", "drgrpo", "rloo"]:
+            assert self.args.num_samples > 1, f"{self.args.critic_type2=} requires num_samples > 1, got {self.args.num_samples=}"
+        group_rewards_ep_level = [sum(t.reward for t in episode) for episode in group]
+        # Normalize at episode level
+        if self.args.critic_type2 == "grpo":
+            mean = np.mean(group_rewards_ep_level)
+            std = np.std(group_rewards_ep_level) + 1e-9
+            group_returns_ep_level_normalized = [(r - mean) / std for r in group_rewards_ep_level]
+        elif self.args.critic_type2 == "drgrpo":
+            mean = np.mean(group_rewards_ep_level)
+            group_returns_ep_level_normalized = [r - mean for r in group_rewards_ep_level]
+        elif self.args.critic_type2 == "rloo":
+            group_returns_ep_level_normalized = []
+            for i, r in enumerate(group_rewards_ep_level):
+                leave_one_out = [group_rewards_ep_level[j] for j in range(len(group_rewards_ep_level)) if j != i]
+                group_returns_ep_level_normalized.append(r - np.mean(leave_one_out))
+        elif self.args.critic_type2 == "ep_level":
+            group_returns_ep_level_normalized = group_rewards_ep_level
+        else:
+            raise NotImplementedError(f"Unknown arg: {self.args.critic_type2=}")
 
-        # Distribute turn-based returns to token-level returns
-        for i, step_data in enumerate(episode):
-            dense_rewards = self.compute_token_level_rewards(
-                step_data.response_ids, returns[i]
-            )
-            # Add trajectory data
-            trajectory_data.append(
-                TransitionData(
-                    prompt=step_data.prompt,
-                    prompt_ids=step_data.prompt_ids,
-                    response=step_data.response,
-                    response_ids=step_data.response_ids,
-                    response_logprobs=step_data.response_logprobs,
-                    rewards=dense_rewards,
-                    loss_mask=(
-                        not step_data.response_is_truncated
-                        if self.args.ignore_no_eos
-                        else True
-                    ),
-                    info={
-                        "actor/action_is_formatted": step_data.action_is_formatted,
-                        "actor/step_reward": rewards[i],
-                        "actor/discount_factor": self.args.gamma,
-                        "actor/discounted_step_return": returns[i],
-                        "actor/response_is_truncated": step_data.response_is_truncated,
-                        "actor/timestamp": time.time_ns(),
-                    },
+        # Collect tranisitions
+        transitions = []
+        for episode, ep_reward in zip(group, group_returns_ep_level_normalized):
+            # Distribute turn-based returns to token-level returns
+            for i, step_data in enumerate(episode):
+                dense_rewards = self.compute_token_level_rewards(
+                    step_data.response_ids, ep_reward
                 )
-            )
+                # Add transition data
+                transitions.append(
+                    TransitionData(
+                        prompt=step_data.prompt,
+                        prompt_ids=step_data.prompt_ids,
+                        response=step_data.response,
+                        response_ids=step_data.response_ids,
+                        # response_logprobs=None,  # Re-calculated on learner side.
+                        response_logprobs=step_data.response_logprobs,
+                        rewards=dense_rewards,
+                        loss_mask=(
+                            not step_data.response_is_truncated
+                            if self.args.ignore_no_eos
+                            else True
+                        ),
+                        info={
+                            "actor/action_is_formatted": step_data.action_is_formatted,
+                            "actor/step_reward": step_data.reward,
+                            "actor/discount_factor": self.args.gamma,
+                            "actor/discounted_step_return": ep_reward,
+                            "actor/response_is_truncated": step_data.response_is_truncated,
+                            "actor/timestamp": time.time_ns(),
+                        },
+                    )
+                )
+        return transitions
 
-        return trajectory_data
+    def prepare_group_of_episodes_transition_level(
+        self, group: Sequence[Transition]
+    ) -> List[TransitionData]:
+            
+        # Compute the returns
+        group_returns = [] # List (episodes) of arrays (return per transition in episode)
+        for episode in group:
+            rewards = [t.reward for t in episode]
+            returns = np.zeros_like(rewards, dtype=np.float32)
+            cur = 0.0
+            for i in reversed(range(len(rewards))):
+                cur = rewards[i] + self.args.gamma * cur
+                returns[i] = cur
+            group_returns.append(returns)
+
+        # Collect tranisitions
+        transitions = []
+        for episode, returns in zip(group, group_returns):
+            # Distribute turn-based returns to token-level returns
+            for i, step_data in enumerate(episode):
+                dense_rewards = self.compute_token_level_rewards(
+                    step_data.response_ids, returns[i]
+                )
+                # Add transition data
+                transitions.append(
+                    TransitionData(
+                        prompt=step_data.prompt,
+                        prompt_ids=step_data.prompt_ids,
+                        response=step_data.response,
+                        response_ids=step_data.response_ids,
+                        # response_logprobs=None,  # Re-calculated on learner side.
+                        response_logprobs=step_data.response_logprobs,
+                        rewards=dense_rewards,
+                        loss_mask=(
+                            not step_data.response_is_truncated
+                            if self.args.ignore_no_eos
+                            else True
+                        ),
+                        info={
+                            "actor/action_is_formatted": step_data.action_is_formatted,
+                            "actor/step_reward": step_data.reward,
+                            "actor/discount_factor": self.args.gamma,
+                            "actor/discounted_step_return": returns[i],
+                            "actor/response_is_truncated": step_data.response_is_truncated,
+                            "actor/timestamp": time.time_ns(),
+                        },
+                    )
+                )
+        return transitions
 
     def compute_token_level_rewards(
         self, token_ids: List[int], discounted_reward: float
@@ -543,9 +835,10 @@ class Learner(PPOLearner):
 
         # Masked sum is the correct implementation!
         # Oat by default uses Dr.GRPO: https://arxiv.org/pdf/2503.20783
-        self.masked_aggregator = functools.partial(
-            masked_sum,
-            constant_normalizer=args.length_norm_constant or args.generate_max_length,
+        self.masked_aggregator = (
+            functools.partial(masked_sum, constant_normalizer=args.generate_max_length)
+            if args.critic_type == "drgrpo"
+            else masked_mean
         )
 
     def prepare_data(self, strategy, tokenizer):

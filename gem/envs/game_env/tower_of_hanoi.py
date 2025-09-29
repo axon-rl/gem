@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import random
 import re
 from typing import Any, Dict, Optional, Tuple
 
@@ -24,6 +25,7 @@ class TowerofHanoiEnv(Env):
         super().__init__()
         self.num_disks = num_disks
         self.max_turns = max_turns
+        self._is_random = num_disks is None or max_turns is None
         self.reset()
 
     def _get_instructions(self) -> str:
@@ -44,6 +46,9 @@ class TowerofHanoiEnv(Env):
 
     def reset(self, seed: Optional[int] = None) -> Tuple[str, Dict[str, Any]]:
         super().reset(seed)
+        if self._is_random:
+            candidates = [(3, 10), (4, 20), (5, 35)]
+            self.num_disks, self.max_turns = random.choice(candidates)
         self.board = self._generate_board()
         self.turn_count = 0
         return (self._get_instructions(), {"suffix": self.get_task_suffix()})

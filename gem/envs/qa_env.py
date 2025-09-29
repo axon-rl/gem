@@ -134,6 +134,16 @@ class QaEnv(Env):
         """Sample a random action."""
         return "<answer>Hello World!</answer>"
 
+    def get_state(self) -> dict[str, Any]:
+        return {
+            "first_obs": self.first_obs,
+            "answer": self.answer,
+        }
+    
+    def set_state(self, state: dict[str, Any]) -> None:
+        self.first_obs = state["first_obs"]
+        self.answer = state["answer"]
+
 
 if __name__ == "__main__":
     print("--- Testing QaEnv.check_correct (which uses em_check) ---")

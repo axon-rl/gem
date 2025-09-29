@@ -14,19 +14,25 @@
 
 """Env for math datasets."""
 
+import functools
 import logging
 import multiprocessing
 import random
 from typing import Any, Optional, SupportsFloat, Tuple
 
 from datasets import Dataset, DatasetDict, load_dataset
-from math_verify import parse, verify
 
 from gem.core import Env
 from gem.utils.constants import TERMINAL_STATE
-from gem.utils.parsing import extract_last_boxed_answer
+from gem.utils.math_grader import boxed_reward_fn
 
 logger = logging.getLogger(__name__)
+verify_fn = functools.partial(
+    boxed_reward_fn,
+    fast=False,
+    correct_reward=1,
+    incorrect_reward=0,
+)
 
 
 class MathEnv(Env):
@@ -40,7 +46,7 @@ class MathEnv(Env):
         question_key: str = "problem",
         answer_key: str = "answer",
         seed: int = 0,
-        **_,
+        **kwargs: Any,
     ):
         super().__init__()
         self.seed = seed
@@ -48,7 +54,6 @@ class MathEnv(Env):
         self.answer_key = answer_key
         if dataset is None:
             dataset = load_dataset(dataset_name)
-            logger.info(f"Loaded: {dataset=}")
         if isinstance(dataset, DatasetDict):
             if split is not None:
                 dataset = dataset[split]
@@ -60,7 +65,10 @@ class MathEnv(Env):
                     f"Please specify a split: {list(dataset.keys())}"
                 )
         assert isinstance(dataset, Dataset), f"Expected a Dataset, got {type(dataset)}"
-        self.dataset = dataset.shuffle(seed=self.seed)
+        self.dataset = dataset
+        eval = kwargs.get("eval", False)
+        if not eval:
+            self.dataset = dataset.shuffle(seed=self.seed)
         self.idx = 0
         self.epoch = 0
         # Process pool is used to enable the timeout mechanism for answer grading in a potential distributed training setup
@@ -69,24 +77,26 @@ class MathEnv(Env):
     def step(
         self, action: str
     ) -> Tuple[str, SupportsFloat, bool, bool, dict[str, Any]]:
-        model_answer = extract_last_boxed_answer(action)
-        if model_answer is None:
-            reward = 0
-        else:
-            res = self.mp_pool.apply_async(
-                self.check_correct, (model_answer, self.answer)
-            )
-            try:
-                is_correct = res.get(timeout=1)
-            except multiprocessing.context.TimeoutError:
-                is_correct = False
-            reward = 1.0 if is_correct else 0
+        res = self.mp_pool.apply_async(self.check_correct, (action, self.answer))
+        try:
+            is_correct = res.get(timeout=1)
+        except multiprocessing.context.TimeoutError:
+            is_correct = False
+        reward = 1.0 if is_correct else 0
         return TERMINAL_STATE, reward, True, True, {}
 
-    def reset(self, seed: Optional[None] = None) -> Tuple[str, dict[str, Any]]:
+    def reset(
+        self, seed: Optional[None] = None, idx: Optional[int] = None
+    ) -> Tuple[str, dict[str, Any]]:
         """Sample a question from the dataset."""
         super().reset(seed)
-        if seed is not None:
+        if idx is not None:
+            assert 0 <= idx < len(self.dataset)
+            logging.info(
+                f"Reset env with a specific idx {idx}. This is only recommended for testing only!!!"
+            )
+            self.idx = idx
+        elif seed is not None:
             self.idx = random.randint(0, len(self.dataset) - 1)
         else:
             if self.idx == len(self.dataset):
@@ -103,9 +113,6 @@ class MathEnv(Env):
     @staticmethod
     def check_correct(model_answer: str, gt_answer: str) -> bool:
         """Check if the action is correct."""
-        # parse with math_verify
-        model_answer = parse(model_answer)
-
         # get correct answers from the dataset entry
         if isinstance(gt_answer, (str, float, int)):
             correct_answers = [str(gt_answer)]
@@ -115,12 +122,10 @@ class MathEnv(Env):
             raise ValueError(f"Unexpected answer type: {type(gt_answer)}")
 
         # check against all possible correct answers
-        # (math_verify.parse handles extraction e.g. from \\boxed{...})
         is_correct = False
         for correct_answer in correct_answers:
-            correct_answer = parse(str(correct_answer))
-            if verify(correct_answer, model_answer):
-                is_correct = True
+            _, is_correct = verify_fn(model_answer, correct_answer)
+            if is_correct:
                 break
         return is_correct
 
@@ -131,28 +136,25 @@ class MathEnv(Env):
     def close(self):
         self.mp_pool.close()
 
+    def get_state(self) -> dict[str, Any]:
+        return {
+            "first_obs": self.first_obs,
+            "answer": self.answer,
+        }
+
+    def set_state(self, state: dict[str, Any]) -> None:
+        self.first_obs = state["first_obs"]
+        self.answer = state["answer"]
+
 
 if __name__ == "__main__":
-    ans1 = parse("${1,2,3,4}$")
-    ans2 = parse("${1,3} \\cup {2,4}$")
-    ans3 = parse("\\boxed{1,2,3,4}")
-    ans4 = parse("none")
-    ans5 = parse(None)
-    ans6 = parse({1, 2, 3, 4})
-    ans7 = parse(str({1, 2, 3, 4}))
+    ans1 = "\\boxed{${1,2,3,4}$}"
+    ans2 = "${1,3} \\cup {2,4}$"
+    ans3 = "1,2,3,4"
+    ans4 = "none"
+    ans7 = str({1, 2, 3, 4})
 
-    print(f"{ans1} == {ans2}: {verify(ans1, ans2)}")  # >> True
-    print(f"{ans2} == {ans1}: {verify(ans2, ans1)}")  # >> True
-    print(f"{ans1} == {ans3}: {verify(ans1, ans3)}")  # >> True
-    print(f"{ans3} == {ans1}: {verify(ans3, ans1)}")  # >> True
-    print(f"{ans2} == {ans3}: {verify(ans2, ans3)}")  # >> True
-    print(f"{ans3} == {ans2}: {verify(ans3, ans2)}")  # >> True
-    print(f"{ans1} == {ans4}: {verify(ans1, ans4)}")  # >> False
-    print(f"{ans1} == {ans5}: {verify(ans1, ans5)}")  # >> False
-    print(f"{ans1} == {ans6}: {verify(ans1, ans6)}")  # >> False
-    print(f"{ans1} == {ans7}: {verify(ans1, ans7)}")  # >> False
-
-    ans1 = parse("1")
-    # ans2 = parse(2) # >> `TypeError: expected string or bytes-like object`
-    ans3 = parse("2k+2")
-    ans4 = parse("\\frac9{19}")
+    print(f"{ans1} == {ans2}: {verify_fn(ans1, ans2)}")  # >> True
+    print(f"{ans1} == {ans3}: {verify_fn(ans1, ans3)}")  # >> True
+    print(f"{ans1} == {ans4}: {verify_fn(ans1, ans4)}")  # >> False
+    print(f"{ans1} == {ans7}: {verify_fn(ans1, ans7)}")  # >> False

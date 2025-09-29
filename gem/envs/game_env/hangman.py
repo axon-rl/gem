@@ -38,7 +38,7 @@ class HangmanEnv(Env):
         self.word_length = word_length
         self.hardcore = hardcore
         self.max_turns = max_turns
-        self.is_random = word_length is None
+        self._is_random = word_length is None or max_turns is None
         self.all_words = words.words("en") if hardcore else words.words("en-basic")
         self.reset()
 
@@ -64,8 +64,9 @@ class HangmanEnv(Env):
 
     def reset(self, seed: Optional[int] = None) -> Tuple[str, Dict[str, Any]]:
         super().reset(seed)
-        if self.is_random:
-            self.word_length = random.randint(3, 6)
+        if self._is_random:
+            candidates = [(3, 10), (5, 15), (7, 20)]
+            self.word_length, self.max_turns = random.choice(candidates)
         _board = self._generate_board()
         self.board = ["_" for _ in _board]
         self.guessed_letters = set()

@@ -36,7 +36,9 @@ class MastermindEnv(Env):
         self.num_numbers = num_numbers
         self.duplicate_numbers = duplicate_numbers
         self.max_turns = max_turns
-        self.is_random = code_length is None or num_numbers is None
+        self._is_random = (
+            code_length is None or num_numbers is None or max_turns is None
+        )
         self.reset()
 
     def _get_instructions(self) -> str:
@@ -57,9 +59,11 @@ class MastermindEnv(Env):
 
     def reset(self, seed: Optional[int] = None) -> Tuple[str, dict[str, Any]]:
         super().reset(seed)
-        if self.is_random:
-            self.code_length = random.randint(2, 6)
-            self.num_numbers = random.randint(self.code_length, 12)
+        if self._is_random:
+            candidates = [(2, 4, 10), (4, 6, 20), (4, 8, 30)]
+            self.code_length, self.num_numbers, self.max_turns = random.choice(
+                candidates
+            )
         available_numbers = list(range(1, self.num_numbers + 1))
         sample_fn = random.choices if self.duplicate_numbers else random.sample
         self.game_code = sample_fn(available_numbers, k=self.code_length)

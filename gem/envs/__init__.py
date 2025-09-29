@@ -19,20 +19,6 @@ from gem.envs.registration import register
 # Register games from our implementation of TextArena and beyond.
 # GuessTheNumber
 register(
-    "game:GuessTheNumber-v0",
-    "gem.envs.game_env.guess_the_number:GuessTheNumberEnv",
-    min_number=1,
-    max_number=20,
-    max_turns=10,
-)
-register(
-    "game:GuessTheNumber-v0-hard-no-max-turn",
-    "gem.envs.game_env.guess_the_number:GuessTheNumberEnv",
-    min_number=1,
-    max_number=50,
-    max_turns=50,
-)
-register(
     "game:GuessTheNumber-v0-hard",
     "gem.envs.game_env.guess_the_number:GuessTheNumberEnv",
     min_number=1,
@@ -55,14 +41,6 @@ register(
 )
 # Mastermind
 register(
-    "game:Mastermind-v0",
-    "gem.envs.game_env.mastermind:MastermindEnv",
-    code_length=4,
-    num_numbers=6,
-    max_turns=20,
-    duplicate_numbers=False,
-)
-register(
     "game:Mastermind-v0-hard",
     "gem.envs.game_env.mastermind:MastermindEnv",
     code_length=4,
@@ -75,7 +53,7 @@ register(
     "gem.envs.game_env.mastermind:MastermindEnv",
     code_length=None,
     num_numbers=None,
-    max_turns=50,
+    max_turns=None,
     duplicate_numbers=False,
 )
 register(
@@ -83,41 +61,25 @@ register(
     "gem.envs.game_env.mastermind:MastermindEnv",
     code_length=2,
     num_numbers=6,
-    max_turns=6,
+    max_turns=10,
     duplicate_numbers=False,
 )
 # Minesweeper
-register(
-    "game:Minesweeper-v0",
-    "gem.envs.game_env.minesweeper:MinesweeperEnv",
-    rows=8,
-    cols=8,
-    num_mines=10,
-    max_turns=100,
-)
-register(
-    "game:Minesweeper-v0-very-easy",
-    "gem.envs.game_env.minesweeper:MinesweeperEnv",
-    rows=3,
-    cols=3,
-    num_mines=1,
-    max_turns=10,
-)
 register(
     "game:Minesweeper-v0-easy",
     "gem.envs.game_env.minesweeper:MinesweeperEnv",
     rows=5,
     cols=5,
-    num_mines=3,
-    max_turns=10,
+    num_mines=5,
+    max_turns=25,
 )
 register(
     "game:Minesweeper-v0-hard",
     "gem.envs.game_env.minesweeper:MinesweeperEnv",
-    rows=12,
-    cols=12,
-    num_mines=30,
-    max_turns=100,
+    rows=8,
+    cols=8,
+    num_mines=12,
+    max_turns=64,
 )
 register(
     "game:Minesweeper-v0-random",
@@ -129,11 +91,11 @@ register(
 )
 # Wordle
 register(
-    "game:Wordle-v0",
+    "game:Wordle-v0-hard",
     "gem.envs.game_env.wordle:WordleEnv",
     word_length=5,
     only_real_words=True,
-    max_turns=15,
+    max_turns=25,
 )
 register(
     "game:Wordle-v0-easy",
@@ -143,10 +105,18 @@ register(
     max_turns=15,
 )
 register(
-    "game:FifteenPuzzle-v0",
+    "game:Wordle-v0-random",
+    "gem.envs.game_env.wordle:WordleEnv",
+    word_length=None,
+    only_real_words=True,
+    max_turns=None,
+)
+# FifteenPuzzle
+register(
+    "game:FifteenPuzzle-v0-random",
     "gem.envs.game_env.fifteen_puzzle:FifteenPuzzleEnv",
-    num_rows=3,
-    max_turns=20,
+    num_rows=None,
+    max_turns=None,
 )
 register(
     "game:FifteenPuzzle-v0-easy",
@@ -160,20 +130,20 @@ register(
     num_rows=4,
     max_turns=50,
 )
-
+# Hangman
 register(
-    "game:Hangman-v0",
+    "game:Hangman-v0-random",
     "gem.envs.game_env.hangman:HangmanEnv",
-    word_length=5,
+    word_length=None,
     hardcore=False,
-    max_turns=15,
+    max_turns=None,
 )
 register(
     "game:Hangman-v0-easy",
     "gem.envs.game_env.hangman:HangmanEnv",
     word_length=3,
     hardcore=False,
-    max_turns=15,
+    max_turns=10,
 )
 register(
     "game:Hangman-v0-hard",
@@ -182,6 +152,7 @@ register(
     hardcore=False,
     max_turns=20,
 )
+# Sudoku
 register(
     "game:Sudoku-v0-easy",
     "gem.envs.game_env.sudoku:SudokuEnv",
@@ -190,20 +161,20 @@ register(
     scale=4,
 )
 register(
-    "game:Sudoku-v0-easy-v2",
-    "gem.envs.game_env.sudoku:SudokuEnv",
-    clues=10,
-    max_turns=15,
-    scale=4,
-    invalid_action_reward_type="v2",
-)
-register(
-    "game:Sudoku-v0",
+    "game:Sudoku-v0-hard",
     "gem.envs.game_env.sudoku:SudokuEnv",
     clues=50,
     max_turns=50,
     scale=9,
 )
+register(
+    "game:Sudoku-v0-random",
+    "gem.envs.game_env.sudoku:SudokuEnv",
+    clues=None,
+    max_turns=None,
+    scale=None,
+)
+# Tower of Hanoi
 register(
     "game:TowerofHanoi-v0-easy",
     "gem.envs.game_env.tower_of_hanoi:TowerofHanoiEnv",
@@ -211,16 +182,107 @@ register(
     max_turns=10,
 )
 register(
-    "game:TowerofHanoi-v0",
-    "gem.envs.game_env.tower_of_hanoi:TowerofHanoiEnv",
-    num_disks=4,
-    max_turns=20,
-)
-register(
     "game:TowerofHanoi-v0-hard",
     "gem.envs.game_env.tower_of_hanoi:TowerofHanoiEnv",
     num_disks=5,
+    max_turns=35,
+)
+register(
+    "game:TowerofHanoi-v0-random",
+    "gem.envs.game_env.tower_of_hanoi:TowerofHanoiEnv",
+    num_disks=None,
+    max_turns=None,
+)
+# Game2048
+register(
+    "game:Game2048-v0-easy",
+    "gem.envs.game_env.game_2048:Game2048Env",
+    target_tile=64,
     max_turns=50,
+)
+register(
+    "game:Game2048-v0-hard",
+    "gem.envs.game_env.game_2048:Game2048Env",
+    target_tile=512,
+    max_turns=50,
+)
+register(
+    "game:Game2048-v0-extreme-hard",
+    "gem.envs.game_env.game_2048:Game2048Env",
+    target_tile=2048,
+    max_turns=100,
+)
+register(
+    "game:Game2048-v0-random",
+    "gem.envs.game_env.game_2048:Game2048Env",
+    target_tile=None,
+    max_turns=None,
+)
+# Sokoban
+register(
+    "game:Sokoban-v0-easy",
+    "gem.envs.game_env.sokoban:SokobanEnv",
+    dim_room=(6, 6),
+    num_boxes=2,
+    max_turns=20,
+)
+register(
+    "game:Sokoban-v0-hard",
+    "gem.envs.game_env.sokoban:SokobanEnv",
+    dim_room=(8, 8),
+    num_boxes=4,
+    max_turns=50,
+)
+register(
+    "game:Sokoban-v0-random",
+    "gem.envs.game_env.sokoban:SokobanEnv",
+    room_size=None,
+    num_boxes=None,
+    max_turns=None,
+)
+# crosswords
+register(
+    "game:Crosswords-v0-easy",
+    "gem.envs.game_env.crosswords:CrosswordsEnv",
+    hardcore=False,
+    max_turns=30,
+    num_words=3,
+)
+register(
+    "game:Crosswords-v0-hard",
+    "gem.envs.game_env.crosswords:CrosswordsEnv",
+    hardcore=True,
+    max_turns=40,
+    num_words=3,
+)
+register(
+    "game:Crosswords-v0-random",
+    "gem.envs.game_env.crosswords:CrosswordsEnv",
+    hardcore=None,
+    max_turns=None,
+    num_words=None,
+)
+# wordsearch
+register(
+    "game:WordSearch-v0-easy",
+    "gem.envs.game_env.word_search:WordSearchEnv",
+    num_words=5,
+    max_turns=20,
+    hardcore=False,
+)
+register(
+    "game:WordSearch-v0-hard",
+    "gem.envs.game_env.word_search:WordSearchEnv",
+    num_words=5,
+    max_turns=20,
+    hardcore=True,
+)
+register(
+    "game:WordSearch-v0-random",
+    "gem.envs.game_env.word_search:WordSearchEnv",
+    num_words=None,
+    max_turns=None,
+    hardcore=None,
 )
 
 # Register math dataset environments

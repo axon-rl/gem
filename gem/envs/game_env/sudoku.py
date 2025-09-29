@@ -35,6 +35,7 @@ class SudokuEnv(Env):
         self.clues = clues
         self.max_turns = max_turns
         self.scale = scale
+        self._is_random = scale is None or clues is None or max_turns is None
         self.reset()
 
     def _get_instructions(self) -> str:
@@ -66,6 +67,9 @@ class SudokuEnv(Env):
 
     def reset(self, seed: Optional[int] = None) -> Tuple[str, dict[str, Any]]:
         super().reset(seed)
+        if self._is_random:
+            candidates = [(4, 10, 15), (9, 50, 50)]
+            self.scale, self.clues, self.max_turns = random.choice(candidates)
         self.full_grid, self.board = self._generate_board()
         self.init_num_empty = sum([row.count(0) for row in self.board])
         self.turn_count = 0
@@ -141,13 +145,13 @@ class SudokuEnv(Env):
         sub_scale = int(self.scale**0.5)
         header = "   " + " ".join(
             [
-                f"C{j+1}" + ("  " if (j + 1) % sub_scale == 0 else "")
+                f"C{j + 1}" + ("  " if (j + 1) % sub_scale == 0 else "")
                 for j in range(self.scale)
             ]
         )  # Column headers
         lines = [header]
         for i, row in enumerate(game_board):
-            row_str = f"R{i+1} "  # Row header
+            row_str = f"R{i + 1} "  # Row header
             for j, num in enumerate(row):
                 cell = str(num) if num != 0 else "."
                 row_str += f" {cell} "

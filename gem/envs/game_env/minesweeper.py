@@ -41,7 +41,7 @@ class MinesweeperEnv(Env):
         self.cols = cols
         self.num_mines = num_mines
         self.max_turns = max_turns
-        self.is_random = (
+        self._is_random = (
             rows is None or cols is None or num_mines is None or max_turns is None
         )
         self.reset()
@@ -78,11 +78,11 @@ class MinesweeperEnv(Env):
 
     def reset(self, seed: Optional[int] = None) -> Tuple[str, dict[str, Any]]:
         super().reset(seed)
-        if self.is_random:
-            num_grid = random.randint(5, 12)
+        if self._is_random:
+            num_grid = random.randint(5, 8)
             self.rows = self.cols = num_grid
             self.num_mines = num_grid**2 // 5
-            self.max_turns = 100
+            self.max_turns = num_grid**2
 
         self.grid = [[0 for _ in range(self.cols)] for _ in range(self.rows)]
         self.revealed = [[False for _ in range(self.cols)] for _ in range(self.rows)]
