@@ -13,237 +13,246 @@
 # limitations under the License.
 
 import abc
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple
 
 from gem.core import Env
-from gem.multiagent.utils import AgentSelector
 
 
 class MultiAgentEnv(Env):
-    
-    def __init__(self, simultaneous: bool = True):
+
+    def __init__(self):
         super().__init__()
-        
-        self.agents: List[str] = []
+
         self.possible_agents: List[str] = []
-        
-        self.simultaneous = simultaneous
-        
+        self.agents: List[str] = []
+
         self.terminations: Dict[str, bool] = {}
         self.truncations: Dict[str, bool] = {}
         self.rewards: Dict[str, float] = {}
         self.infos: Dict[str, dict] = {}
         self._cumulative_rewards: Dict[str, float] = {}
-        
-        self._agent_selector: Optional[AgentSelector] = None
-        self.agent_selection: Optional[str] = None
-        
-        self.shared_memory: List[str] = []
-        self.global_context: str = ""
-        
-    @property
-    def num_agents(self) -> int:
-        return len(self.agents)
-    
-    @property
-    def max_num_agents(self) -> int:
-        return len(self.possible_agents)
-    
-    @property
-    def current_agent(self) -> Optional[str]:
-        if not self.simultaneous and self._agent_selector:
-            return self._agent_selector.selected
-        return None
-    
-    def step(self, action: Union[str, Dict[str, str]]) -> Tuple:
-        if self.simultaneous:
-            if not isinstance(action, dict):
-                raise ValueError(f"Simultaneous mode requires dict of actions, got {type(action)}")
-            return self._step_simultaneous(action)
-        else:
-            if isinstance(action, dict):
-                raise ValueError(f"Sequential mode requires single action, got dict")
-            return self._step_sequential(action)
-    
-    @abc.abstractmethod
-    def _step_simultaneous(self, actions: Dict[str, str]) -> Tuple[
+
+        self.agent_selector: Optional["AgentSelector"] = None
+
+        self.shared_memory = []
+        self.global_context = ""
+
+    def step(self, actions: Dict[str, str]) -> Tuple[
         Dict[str, str],
-        Dict[str, float], 
+        Dict[str, float],
         Dict[str, bool],
         Dict[str, bool],
-        Dict[str, dict]
+        Dict[str, dict],
     ]:
-        self._validate_actions(actions)
-        raise NotImplementedError
-    
+        if not isinstance(actions, dict):
+            raise ValueError(f"Actions must be a dict, got {type(actions)}")
+
+        active_agents = (
+            self.agent_selector.get_active_agents()
+            if self.agent_selector
+            else self.agents
+        )
+
+        self._validate_actions(actions, active_agents)
+
+        observations, rewards, terminations, truncations, infos = self._process_actions(
+            actions
+        )
+
+        for agent in self.agents:
+            if agent in rewards:
+                self._cumulative_rewards[agent] = (
+                    self._cumulative_rewards.get(agent, 0.0) + rewards[agent]
+                )
+
+        self._remove_dead_agents()
+
+        if self.agent_selector:
+            self.agent_selector.next()
+
+        return observations, rewards, terminations, truncations, infos
+
+    def _validate_actions(self, actions: Dict[str, str], active_agents: List[str]):
+        for agent in active_agents:
+            if agent not in self.terminations or self.terminations[agent]:
+                continue
+            if agent not in self.truncations or self.truncations[agent]:
+                continue
+            if agent not in actions:
+                raise ValueError(f"Missing action for active agent {agent}")
+
+        for agent in actions:
+            if agent not in active_agents:
+                raise ValueError(f"Agent {agent} provided action but is not active")
+
     @abc.abstractmethod
-    def _step_sequential(self, action: str) -> Tuple[str, float, bool, bool, dict]:
-        if self.current_agent is None:
-            raise ValueError("No agent selected for sequential step")
+    def _process_actions(self, actions: Dict[str, str]) -> Tuple[
+        Dict[str, str],
+        Dict[str, float],
+        Dict[str, bool],
+        Dict[str, bool],
+        Dict[str, dict],
+    ]:
         raise NotImplementedError
-    
-    def reset(self, seed: Optional[int] = None) -> Tuple:
-        super().reset(seed)
-        
+
+    def reset(
+        self, seed: Optional[int] = None
+    ) -> Tuple[Dict[str, str], Dict[str, Any]]:
+        if seed is not None:
+            self._np_random = self._make_np_random(seed)
+
         self.agents = self.possible_agents.copy()
-        
+
         self.terminations = {agent: False for agent in self.agents}
         self.truncations = {agent: False for agent in self.agents}
         self.rewards = {agent: 0.0 for agent in self.agents}
         self.infos = {agent: {} for agent in self.agents}
         self._cumulative_rewards = {agent: 0.0 for agent in self.agents}
-        
+
         self.shared_memory = []
         self.global_context = ""
-        
-        if not self.simultaneous:
-            self._agent_selector = AgentSelector(self.agents)
-            self.agent_selection = self._agent_selector.selected
-        
-        if self.simultaneous:
-            observations = {agent: self.observe(agent) for agent in self.agents}
-            infos = {agent: {} for agent in self.agents}
-            return observations, infos
-        else:
-            return self.observe(self.current_agent), {}
-    
+
+        if self.agent_selector:
+            self.agent_selector.reinit(self.agents)
+
+        observations = {agent: self.observe(agent) for agent in self.agents}
+        infos = {agent: {} for agent in self.agents}
+
+        return observations, infos
+
     @abc.abstractmethod
     def observe(self, agent: str) -> str:
         raise NotImplementedError
-    
-    def agent_iter(self, max_iter: int = 2**63):
-        if self.simultaneous:
-            raise ValueError("agent_iter is only for sequential mode")
-        
-        return AECIterator(self, max_iter)
-    
-    def last(self, observe: bool = True) -> Tuple[str, float, bool, bool, dict]:
-        if self.simultaneous:
-            raise ValueError("last() is only for sequential mode")
-        
-        if self.current_agent is None:
-            raise ValueError("No agent selected")
-        
-        agent = self.current_agent
-        
-        obs = self.observe(agent) if observe else None
-        reward = self._cumulative_rewards.get(agent, 0.0)
-        terminated = self.terminations.get(agent, False)
-        truncated = self.truncations.get(agent, False)
-        info = self.infos.get(agent, {})
-        
-        return obs, reward, terminated, truncated, info
-    
-    def add_agent(self, agent_id: str, role: str = "participant"):
-        if agent_id not in self.possible_agents:
-            self.possible_agents.append(agent_id)
-        if agent_id not in self.agents:
-            self.agents.append(agent_id)
-            self.terminations[agent_id] = False
-            self.truncations[agent_id] = False
-            self.rewards[agent_id] = 0.0
-            self._cumulative_rewards[agent_id] = 0.0
-            self.infos[agent_id] = {"role": role}
-            
-            if not self.simultaneous and self._agent_selector:
-                self._agent_selector.reinit(self.agents)
-    
-    def remove_agent(self, agent_id: str):
+
+    def get_state(self, agent: str) -> Tuple[str, float, bool, bool, dict]:
+        if agent not in self.agents:
+            raise ValueError(f"Agent {agent} not in environment")
+
+        return (
+            self.observe(agent),
+            self._cumulative_rewards.get(agent, 0.0),
+            self.terminations.get(agent, False),
+            self.truncations.get(agent, False),
+            self.infos.get(agent, {}),
+        )
+
+    def get_active_states(self) -> Dict[str, Tuple[str, float, bool, bool, dict]]:
+        active_agents = (
+            self.agent_selector.get_active_agents()
+            if self.agent_selector
+            else self.agents
+        )
+
+        return {
+            agent: self.get_state(agent)
+            for agent in active_agents
+            if agent in self.agents
+        }
+
+    def add_agent(self, agent_id: str):
         if agent_id in self.agents:
-            self.agents.remove(agent_id)
-            self.terminations[agent_id] = True
-            
-            if not self.simultaneous and self._agent_selector:
-                self._agent_selector.remove_agent(agent_id)
-    
-    def _validate_actions(self, actions: Dict[str, str]) -> None:
-        action_agents = set(actions.keys())
-        active_agents = set(self.agents)
-        
-        if action_agents != active_agents:
-            missing = active_agents - action_agents
-            extra = action_agents - active_agents
-            
-            error_parts = []
-            if missing:
-                error_parts.append(f"Missing actions for agents: {sorted(missing)}")
-            if extra:
-                error_parts.append(f"Actions provided for non-active agents: {sorted(extra)}")
-            
-            raise ValueError(". ".join(error_parts))
-    
-    def _accumulate_rewards(self):
-        for agent in self.agents:
-            if agent in self.rewards:
-                self._cumulative_rewards[agent] += self.rewards[agent]
-    
-    def _clear_rewards(self):
-        for agent in self.agents:
-            self.rewards[agent] = 0.0
-    
-    def _was_dead_step(self, action: Optional[str]) -> bool:
-        return action is None
-    
+            return
+
+        self.agents.append(agent_id)
+        self.terminations[agent_id] = False
+        self.truncations[agent_id] = False
+        self.rewards[agent_id] = 0.0
+        self.infos[agent_id] = {}
+        self._cumulative_rewards[agent_id] = 0.0
+
+        if self.agent_selector:
+            self.agent_selector.add_agent(agent_id)
+
+    def remove_agent(self, agent_id: str):
+        if agent_id not in self.agents:
+            return
+
+        self.agents.remove(agent_id)
+        del self.terminations[agent_id]
+        del self.truncations[agent_id]
+        del self.rewards[agent_id]
+        del self.infos[agent_id]
+        del self._cumulative_rewards[agent_id]
+
+        if self.agent_selector:
+            self.agent_selector.remove_agent(agent_id)
+
     def _remove_dead_agents(self):
-        self.agents = [
-            agent for agent in self.agents
-            if not (self.terminations.get(agent, False) or self.truncations.get(agent, False))
+        dead_agents = [
+            agent
+            for agent in self.agents
+            if self.terminations.get(agent, False) or self.truncations.get(agent, False)
         ]
-        
-        if not self.simultaneous and self._agent_selector and self.agents:
-            self._agent_selector.reinit(self.agents)
-            self.agent_selection = self._agent_selector.selected
-        elif not self.agents:
-            self.agent_selection = None
-    
-    def observation_space(self, agent: str) -> Any:
-        return getattr(self, "observation_spaces", {}).get(agent)
-    
-    def action_space(self, agent: str) -> Any:
-        return getattr(self, "action_spaces", {}).get(agent)
-    
-    def state(self) -> Any:
-        raise NotImplementedError
-    
+        for agent in dead_agents:
+            self.remove_agent(agent)
+
     def send_message(self, from_agent: str, to_agent: str, message: str):
-        if not hasattr(self, "message_buffer"):
-            self.message_buffer = {}
-        if to_agent not in self.message_buffer:
-            self.message_buffer[to_agent] = []
-        self.message_buffer[to_agent].append({
-            "from": from_agent,
-            "message": message
-        })
-    
-    def get_messages(self, agent: str) -> List[Dict]:
-        if not hasattr(self, "message_buffer"):
-            return []
-        messages = self.message_buffer.get(agent, [])
-        if agent in self.message_buffer:
-            self.message_buffer[agent] = []
-        return messages
+        if from_agent not in self.agents:
+            raise ValueError(f"Sender {from_agent} not in environment")
+        if to_agent not in self.agents:
+            raise ValueError(f"Receiver {to_agent} not in environment")
+
+        self.shared_memory.append(
+            {"from": from_agent, "to": to_agent, "message": message}
+        )
+
+    def broadcast_message(self, from_agent: str, message: str):
+        if from_agent not in self.agents:
+            raise ValueError(f"Sender {from_agent} not in environment")
+
+        for agent in self.agents:
+            if agent != from_agent:
+                self.shared_memory.append(
+                    {"from": from_agent, "to": agent, "message": message}
+                )
 
 
-class AECIterator:
-    
-    def __init__(self, env: MultiAgentEnv, max_iter: int):
-        self.env = env
-        self.max_iter = max_iter
-        self._current_iter = 0
-    
-    def __iter__(self):
-        return self
-    
-    def __next__(self) -> str:
-        if self._current_iter >= self.max_iter:
-            raise StopIteration
-        
-        if not self.env.agents:
-            raise StopIteration
-        
-        if all(self.env.terminations.get(a, False) or self.env.truncations.get(a, False) 
-               for a in self.env.agents):
-            raise StopIteration
-        
-        self._current_iter += 1
-        return self.env.current_agent
+class AgentSelector:
+
+    def __init__(self, agents: List[str], mode: str = "sequential"):
+        self.mode = mode
+        self._agents = agents.copy()
+        self._current_idx = 0
+        self.selected = self._agents[0] if self._agents else None
+
+    def get_active_agents(self) -> List[str]:
+        if self.mode == "sequential":
+            return [self.selected] if self.selected else []
+        elif self.mode == "parallel":
+            return self._agents.copy()
+        else:
+            raise ValueError(f"Unknown mode: {self.mode}")
+
+    def next(self):
+        if self.mode == "sequential" and self._agents:
+            self._current_idx = (self._current_idx + 1) % len(self._agents)
+            self.selected = self._agents[self._current_idx]
+
+    def is_first(self) -> bool:
+        return self._current_idx == 0
+
+    def is_last(self) -> bool:
+        return self._current_idx == len(self._agents) - 1
+
+    def reinit(self, agents: List[str]):
+        self._agents = agents.copy()
+        self._current_idx = 0
+        self.selected = self._agents[0] if self._agents else None
+
+    def add_agent(self, agent: str):
+        if agent not in self._agents:
+            self._agents.append(agent)
+
+    def remove_agent(self, agent: str):
+        if agent in self._agents:
+            idx = self._agents.index(agent)
+            self._agents.remove(agent)
+
+            if self._agents:
+                if idx <= self._current_idx:
+                    self._current_idx = max(0, self._current_idx - 1)
+                self._current_idx = self._current_idx % len(self._agents)
+                self.selected = self._agents[self._current_idx]
+            else:
+                self._current_idx = 0
+                self.selected = None
