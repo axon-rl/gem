@@ -1,152 +1,131 @@
-# Multi-Agent Environment Examples
+# TAU-BENCH Retail Integration for GEM
 
-This directory contains example implementations demonstrating the multi-agent capabilities of GEM (General Experience Maker).
+## Overview
 
-## Examples
+This is the official integration of TAU-BENCH Retail benchmark into GEM (Gym for LLM Agents). TAU-BENCH evaluates tool-augmented LLM agents on realistic customer service tasks in a retail environment.
 
-### 1. Conversation Environment (`conversation.py`)
-- **Mode**: Sequential (turn-based)
-- **Agents**: User and Assistant
-- **Features**:
-  - Turn-based dialogue between agents
-  - Tool integration (Python code execution, search)
-  - Message history tracking
-  - Reward system based on action quality
-  
-**Usage**:
-```bash
-python conversation.py
+## Directory Structure
+
+```
+multiagent/
+└── tau_bench_retail/
+    ├── assets/                # Original TAU-bench assets
+    │   ├── data/              # users.json, orders.json, products.json
+    │   ├── tools/             # Tool implementations for evaluation
+    │   ├── tasks_test.py      # Test tasks (115 tasks)
+    │   ├── tasks_train.py     # Training tasks (350 tasks)
+    │   ├── tasks_dev.py       # Development tasks (25 tasks)
+    │   ├── wiki.md            # Agent policy documentation
+    │   └── rules.py           # Evaluation rules
+    ├── tau_bench_env.py       # TAU-bench environment for GEM
+    ├── tau_benchmark.py       # Benchmark runner with OpenAI API
+    └── run_benchmark.sh       # Execution script
 ```
 
-### 2. Collaboration Environment (`collaboration.py`)
-- **Mode**: Simultaneous (parallel)
-- **Agents**: Researcher, Analyst, Reviewer
-- **Features**:
-  - All agents act simultaneously each round
-  - Shared memory for inter-agent communication
-  - Python code tool for data analysis
-  - Multi-round collaboration with termination conditions
+## Quick Start
 
-**Usage**:
 ```bash
-python collaboration.py
+cd tau_bench_retail
+export OPENAI_API_KEY="your-key-here"
+./run_benchmark.sh
 ```
 
-## Key Concepts
+## Key Features
 
-### Sequential vs Simultaneous Modes
+- **Real TAU-BENCH Tasks**: Uses actual TAU-bench retail tasks with 115 test tasks
+- **GEM-Native Integration**: Clean integration without external TAU-bench dependencies
+- **User Clarity Analysis**: Measures impact of clear vs vague user instructions
+- **Pass@k Evaluation**: Standard Pass@1, Pass@2, Pass@3, Pass@4 metrics
+- **OpenAI API Compatible**: Works with GPT-4o and other OpenAI models
 
-GEM's unified `MultiAgentEnv` supports two modes:
+## Implementation Details
 
-1. **Sequential Mode** (`simultaneous=False`):
-   - Agents take turns acting one at a time
-   - Uses `AgentSelector` to manage turn order
-   - Single action string input to `step()`
-   - Suitable for dialogue, games, and turn-based scenarios
+### Architecture
 
-2. **Simultaneous Mode** (`simultaneous=True`):
-   - All agents act at the same time
-   - Dictionary of actions input to `step()`
-   - No turn order management
-   - Suitable for collaborative tasks and parallel processing
+1. **tau_bench_env.py**:
+   - Defines Task and Action dataclasses locally
+   - Loads TAU-bench tasks using monkey-patching for imports
+   - Provides OpenAI-compatible tool definitions
+   - Uses TAU-bench wiki as system prompt
+   - Evaluates tool calls against expected actions
 
-### Creating Custom Environments
+2. **tau_benchmark.py**:
+   - Uses OpenAI API for LLM agent
+   - Tests with clear and vague user instructions
+   - Computes Pass@k metrics
+   - Generates visualization of results
 
-To create your own multi-agent environment:
+### User Clarity Impact
+
+The benchmark tests two user types:
+- **Clear Users**: Original TAU-bench instructions with full details
+- **Vague Users**: Modified instructions with partial information removed
+
+Example transformation:
+```
+Clear: "Cancel order #W6619432 because it's no longer needed"
+Vague: "Cancel order #W661... and need help with something"
+```
+
+## Expected Results
+
+| Model | Clear Users Pass@1 | Vague Users Pass@1 | Performance Drop |
+|-------|-------------------|-------------------|------------------|
+| GPT-4o | ~0.60-0.70 | ~0.35-0.45 | ~35-40% |
+| Claude-3.5 (Paper) | 0.692 | - | - |
+
+## TAU-BENCH Assets Used
+
+- **Data Files**: Users, orders, and products JSON files
+- **Task Definitions**: Test (115), train (350), and dev (25) tasks
+- **Tool Implementations**: 16 customer service tools for evaluation
+- **Wiki & Rules**: Agent policy and evaluation criteria
+
+## Tools Available
+
+The retail environment provides 16 tools:
+- **Order Management**: cancel_pending_order, return_delivered_order_items, exchange_delivered_order_items
+- **User Identification**: find_user_id_by_email, find_user_id_by_name_zip
+- **Information Retrieval**: get_order_details, get_product_details, get_user_details
+- **Order Modification**: modify_pending_order_address, modify_pending_order_items, modify_pending_order_payment
+- **User Management**: modify_user_address
+- **Support**: transfer_to_human_agents, list_all_product_types
+- **Utilities**: think, calculate
+
+## Running Custom Evaluations
 
 ```python
-from gem.multiagent import MultiAgentEnv
+from tau_bench_env import TauRetailGEMEnv
+from tau_benchmark import TauBenchmark
 
-class MyCustomEnv(MultiAgentEnv):
-    def __init__(self):
-        super().__init__(simultaneous=True)  # or False for sequential
-        self.possible_agents = ["agent1", "agent2"]
-        
-    def observe(self, agent: str) -> str:
-        return f"Observation for {agent}"
-    
-    def _step_simultaneous(self, actions: Dict[str, str]) -> Tuple:
-        # Implement simultaneous step logic
-        self._validate_actions(actions)
-        
-        observations = {}
-        rewards = {}
-        
-        for agent in self.agents:
-            # Process action for each agent
-            observations[agent] = self.observe(agent)
-            rewards[agent] = calculate_reward(actions[agent])
-            
-        return observations, rewards, self.terminations, self.truncations, self.infos
-    
-    def _step_sequential(self, action: str) -> Tuple:
-        # Implement sequential step logic
-        current = self.current_agent
-        
-        # Process action for current agent
-        reward = calculate_reward(action)
-        
-        # Advance to next agent
-        if self._agent_selector:
-            self._agent_selector.next()
-            self.agent_selection = self._agent_selector.selected
-        
-        obs = self.observe(self.current_agent) if self.current_agent else ""
-        
-        return obs, reward, self.terminations[current], self.truncations[current], {}
+# Load environment
+env = TauRetailGEMEnv(task_split="test")  # or "train", "dev"
+print(f"Loaded {env.get_task_count()} tasks")
+
+# Run benchmark
+benchmark = TauBenchmark(model="gpt-4o")
+results = benchmark.run_benchmark(
+    num_tasks=20,  # Number of tasks to evaluate
+    k_attempts=4   # Attempts per task for Pass@k
+)
 ```
 
-### Tool Integration
+## Citation
 
-Both examples demonstrate integration with GEM's tool system:
-- `PythonCodeTool`: Execute Python code within the environment
-- `SearchTool`: Perform searches (simulated in examples)
+If you use this benchmark, please cite:
 
-Tools can be used to enhance agent capabilities and create more realistic LLM training scenarios.
+```bibtex
+@article{taubench2024,
+  title={TAU-bench: A Benchmark for Tool-Agent-User Interaction},
+  year={2024}
+}
 
-## Key Differences Between Examples
-
-| Aspect | Conversation | Collaboration |
-|--------|--------------|---------------|
-| Mode | Sequential (`simultaneous=False`) | Simultaneous (`simultaneous=True`) |
-| Agents | 2 (user, assistant) | 3 (researcher, analyst, reviewer) |
-| Execution | Turn-based | All agents act together |
-| Communication | Direct dialogue | Shared memory |
-| Tools | Python, Search | Python analysis |
-| Goal | Answer user queries | Solve complex problems |
-
-## Architecture
-
-The multi-agent system uses a unified architecture:
-```
-gem/multiagent/
-├── __init__.py
-├── multi_agent_env.py    # Unified base class with both modes
-└── utils.py              # AgentSelector for sequential mode
+@article{gem2024,
+  title={GEM: Gym for LLM Agents},
+  year={2024}
+}
 ```
 
-## Running Tests
+## License
 
-To test the multi-agent examples:
-
-```bash
-# Run unit tests
-make test-multiagent
-
-# Run all tests and examples
-make test-multiagent-all
-```
-
-## Important Implementation Notes
-
-1. **Unified API**: Use `MultiAgentEnv` with `simultaneous` flag to select mode
-2. **Step Method**: Accepts single action (sequential) or dict of actions (simultaneous)
-3. **Reset Method**: Call `super().reset(seed)` to initialize properly
-4. **Agent Management**: Framework handles agent lifecycle automatically
-5. **Tool Integration**: Use GEM's existing tools from `gem.tools`
-
-## Learn More
-
-- [Multi-Agent Design Document](../../docs/multi_agent_design.md)
-- [GEM Documentation](../../README.md)
-- [PettingZoo Documentation](https://pettingzoo.farama.org/) (inspiration for the API)
+This integration follows the licenses of both GEM and TAU-BENCH projects.

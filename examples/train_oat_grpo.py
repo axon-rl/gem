@@ -21,11 +21,11 @@ import logging
 import os
 import re
 import time
+import uuid
+from collections import deque
 from copy import deepcopy
 from dataclasses import dataclass
 from typing import List, Literal, Optional, Sequence, Tuple
-from collections import deque
-import uuid
 
 import numpy as np
 import torch
@@ -46,11 +46,7 @@ from gem.wrappers.wrapper_factory import get_wrapper_fns
 """ 1. Defining constants used in our training. """
 """ +=========================================+ """
 
-from examples.train_oat import (
-    INVALID_ACTION,
-    TEMPLATE_FACTORY,
-)
-
+from examples.train_oat import INVALID_ACTION, TEMPLATE_FACTORY
 
 """ +=================================================+ """
 """ 2. Defining extra arguments/structure for training. """
@@ -227,7 +223,9 @@ class Actor(PPOActor):
             episodes, info = self.collect_experience_single(env, min_steps)
             episode_groups = [[ep] for ep in episodes]
         else:
-            episode_groups, info = self.collect_experience_multiple(env, min_steps, self.args.num_samples)
+            episode_groups, info = self.collect_experience_multiple(
+                env, min_steps, self.args.num_samples
+            )
         return episode_groups, info
 
     def collect_experience_single(self, env, min_steps: int):
@@ -328,12 +326,10 @@ class Actor(PPOActor):
     def collect_experience_multiple(self, env, min_steps: int, num_samples: int):
         start_time = time.time()
         # If env has get_state and set_state methods then use these, otherwise deepcopy the env
-        env_has_getset_state =(
-            hasattr(env.envs[0], "get_state") and hasattr(env.envs[0], "set_state")
+        env_has_getset_state = hasattr(env.envs[0], "get_state") and hasattr(
+            env.envs[0], "set_state"
         )
-        logging.info(
-            f"Actor-{self.actor_id}: {env_has_getset_state=}"
-        )
+        logging.info(f"Actor-{self.actor_id}: {env_has_getset_state=}")
 
         # for in-progress episodes
         episodes = [[] for _ in range(env.num_envs)]
@@ -346,7 +342,7 @@ class Actor(PPOActor):
         env_queue = deque()
         id_queue = deque()
         initial_obs_queue = deque()
-        
+
         # for finished groups
         finished_groups = []
         finished_groups_ids = []
@@ -366,7 +362,7 @@ class Actor(PPOActor):
             else:
                 state = env_i
             return deepcopy(state) if apply_deepcopy else state
-        
+
         def set_env(envs, i, state, apply_deepcopy=True):
             state_ = deepcopy(state) if apply_deepcopy else state
             if env_has_getset_state:
@@ -392,16 +388,20 @@ class Actor(PPOActor):
                         and (env_to_use not in finished_groups_envs)
                     ):
                         break
-                        
+
                 finished_episodes_groups[id] = []
                 for j in range(num_samples):
                     # env_queue.append(deepcopy(env_to_use))
-                    env_queue.append(get_env_for_storing(env_to_use, apply_deepcopy=True))
+                    env_queue.append(
+                        get_env_for_storing(env_to_use, apply_deepcopy=True)
+                    )
                     id_queue.append(id)
                     initial_obs_queue.append(initial_obs)
 
         def move_finished_group(id):
-            assert len(finished_episodes_groups[id]) <= num_samples, f"{num_samples=}\n{len(finished_episodes_groups[id])=}\n{id=}\n{finished_episodes_groups=}"
+            assert (
+                len(finished_episodes_groups[id]) <= num_samples
+            ), f"{num_samples=}\n{len(finished_episodes_groups[id])=}\n{id=}\n{finished_episodes_groups=}"
             if len(finished_episodes_groups[id]) == num_samples:
                 finished_group = finished_episodes_groups.pop(id)
                 finished_groups.append(finished_group)
@@ -447,9 +447,13 @@ class Actor(PPOActor):
                     if self.args.keep_generation_failed:
                         episodes[i][-1].reward += reward[i]
                         episodes[i][-1].done = True
-                        finished_episodes_groups[ids_in_progress[i]].append(deepcopy(episodes[i]))
+                        finished_episodes_groups[ids_in_progress[i]].append(
+                            deepcopy(episodes[i])
+                        )
                         num_finished_episodes += 1
-                        finished_groups_num_transitions += move_finished_group(ids_in_progress[i])
+                        finished_groups_num_transitions += move_finished_group(
+                            ids_in_progress[i]
+                        )
                         max_ep_length = max(max_ep_length, len(episodes[i]))
                         update_metrics(info[i], done[i])
                         top_up_queue(env.envs[i])
@@ -477,9 +481,13 @@ class Actor(PPOActor):
                     )
                     episodes[i].append(transition)
                     if done[i]:
-                        finished_episodes_groups[ids_in_progress[i]].append(deepcopy(episodes[i]))
+                        finished_episodes_groups[ids_in_progress[i]].append(
+                            deepcopy(episodes[i])
+                        )
                         num_finished_episodes += 1
-                        finished_groups_num_transitions += move_finished_group(ids_in_progress[i])
+                        finished_groups_num_transitions += move_finished_group(
+                            ids_in_progress[i]
+                        )
                         max_ep_length = max(max_ep_length, len(episodes[i]))
                         update_metrics(info[i], done[i])
                         top_up_queue(env.envs[i])
@@ -494,14 +502,13 @@ class Actor(PPOActor):
                 if finished_groups_num_transitions >= min_steps:
                     break
             if finished_groups_num_transitions >= min_steps:
-                    break
+                break
 
             #     print(f"{x=}, {i=}, {finished_groups_num_transitions=}")
             # x += 1
             # assert x <= 30, f"{x=}, {finished_groups_num_transitions=}, {min_steps=}"
 
             obs = next_obs
-            
 
         info = {
             "actor/num_generation_failed": num_generation_failed,
@@ -646,20 +653,30 @@ class Actor(PPOActor):
         self, group: Sequence[Transition]
     ) -> List[TransitionData]:
         if self.args.critic_type2 in ["grpo", "drgrpo", "rloo"]:
-            assert self.args.num_samples > 1, f"{self.args.critic_type2=} requires num_samples > 1, got {self.args.num_samples=}"
+            assert (
+                self.args.num_samples > 1
+            ), f"{self.args.critic_type2=} requires num_samples > 1, got {self.args.num_samples=}"
         group_rewards_ep_level = [sum(t.reward for t in episode) for episode in group]
         # Normalize at episode level
         if self.args.critic_type2 == "grpo":
             mean = np.mean(group_rewards_ep_level)
             std = np.std(group_rewards_ep_level) + 1e-9
-            group_returns_ep_level_normalized = [(r - mean) / std for r in group_rewards_ep_level]
+            group_returns_ep_level_normalized = [
+                (r - mean) / std for r in group_rewards_ep_level
+            ]
         elif self.args.critic_type2 == "drgrpo":
             mean = np.mean(group_rewards_ep_level)
-            group_returns_ep_level_normalized = [r - mean for r in group_rewards_ep_level]
+            group_returns_ep_level_normalized = [
+                r - mean for r in group_rewards_ep_level
+            ]
         elif self.args.critic_type2 == "rloo":
             group_returns_ep_level_normalized = []
             for i, r in enumerate(group_rewards_ep_level):
-                leave_one_out = [group_rewards_ep_level[j] for j in range(len(group_rewards_ep_level)) if j != i]
+                leave_one_out = [
+                    group_rewards_ep_level[j]
+                    for j in range(len(group_rewards_ep_level))
+                    if j != i
+                ]
                 group_returns_ep_level_normalized.append(r - np.mean(leave_one_out))
         elif self.args.critic_type2 == "ep_level":
             group_returns_ep_level_normalized = group_rewards_ep_level
@@ -704,9 +721,11 @@ class Actor(PPOActor):
     def prepare_group_of_episodes_transition_level(
         self, group: Sequence[Transition]
     ) -> List[TransitionData]:
-            
+
         # Compute the returns
-        group_returns = [] # List (episodes) of arrays (return per transition in episode)
+        group_returns = (
+            []
+        )  # List (episodes) of arrays (return per transition in episode)
         for episode in group:
             rewards = [t.reward for t in episode]
             returns = np.zeros_like(rewards, dtype=np.float32)

@@ -109,4 +109,3 @@ class ToolEnvWrapper(EnvWrapper):
         self.env.set_state(state)
         self.tool_use_counter = state.get("tool_use_counter", 0)
         self.tool_success_counter = state.get("tool_success_counter", 0)
-

@@ -139,7 +139,7 @@ class QaEnv(Env):
             "first_obs": self.first_obs,
             "answer": self.answer,
         }
-    
+
     def set_state(self, state: dict[str, Any]) -> None:
         self.first_obs = state["first_obs"]
         self.answer = state["answer"]
