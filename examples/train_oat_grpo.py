@@ -46,7 +46,10 @@ from gem.wrappers.wrapper_factory import get_wrapper_fns
 """ 1. Defining constants used in our training. """
 """ +=========================================+ """
 
-from examples.train_oat import INVALID_ACTION, TEMPLATE_FACTORY
+from examples.train_oat import (
+    INVALID_ACTION,
+    TEMPLATE_FACTORY,
+)
 
 """ +=================================================+ """
 """ 2. Defining extra arguments/structure for training. """
