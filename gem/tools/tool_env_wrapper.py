@@ -98,3 +98,14 @@ class ToolEnvWrapper(EnvWrapper):
         info["tool_success_counter"] = self.tool_success_counter
         info["use_tool"] = True
         return observation, reward, terminated, truncated, info
+
+    def get_state(self) -> dict[str, Any]:
+        state = self.env.get_state()
+        state["tool_use_counter"] = self.tool_use_counter
+        state["tool_success_counter"] = self.tool_success_counter
+        return state
+
+    def set_state(self, state: dict[str, Any]) -> None:
+        self.env.set_state(state)
+        self.tool_use_counter = state.get("tool_use_counter", 0)
+        self.tool_success_counter = state.get("tool_success_counter", 0)

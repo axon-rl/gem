@@ -47,6 +47,16 @@ pip install -U 'gem-llm[search]'
 conda install -c pytorch -c nvidia faiss-gpu=1.8.0
 ```
 
+To use the `mcp` tool and [MCPMark](https://mcpmark.ai/) environment, run the following to install extra dependencies: 
+```bash
+pip install -U `gem-llm[mcp]`
+
+# install MCPMark
+git clone git@github.com:axon-rl/mcpmark.git; cd mcpmark
+pip install -e .
+playwright install # If you'll use browser-based tasks, install Playwright browsers first
+```
+
 ## Interface
 GEM's interface closely follows Gym's API. Here's an example using the "game:GuessTheNumber-v0" environment: 
 

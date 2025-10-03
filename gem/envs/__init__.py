@@ -346,6 +346,16 @@ register(
     answer_key="answer",
 )
 
+register(
+    "math:Geometry3K",
+    "gem.envs.math_visual_env:MathVisualEnv",
+    dataset_name="axon-rl/geometry3k",
+    split="train",
+    image_key="images",
+    question_key="problem",
+    answer_key="answer",
+)
+
 
 # Register code dataset environments
 

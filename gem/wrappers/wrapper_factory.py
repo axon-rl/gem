@@ -24,7 +24,7 @@ from gem.wrappers.observation_wrapper import ObservationWrapper
 
 ### Note: Order is important!
 WRAPPER_FACTORY = {
-    ### 1. Frist, optionlly add the tool wrapper
+    ### 1. First, optionlly add the tool wrapper
     "python_tool": partial(
         ToolEnvWrapper,
         tools=[PythonCodeTool(timeout=5)],

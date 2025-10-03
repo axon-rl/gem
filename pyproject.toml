@@ -47,6 +47,11 @@ search = [
   "wikipedia"
 ]
 
+mcp = [
+  "fastmcp",
+  "pyyaml>=6.0.0",
+]
+
 [project.urls]
 Documentation = "https://axon-rl.github.io/gem/"
 Issues = "https://github.com/axon-rl/gem/issues"

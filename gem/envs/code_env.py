@@ -72,6 +72,7 @@ class CodeEnv(Env):
         self.dataset_iter = iter(self.dataset)
         self.epoch = 0
 
+        self.max_workers = max_workers
         self.thread_pool_executer = ThreadPoolExecutor(max_workers=max_workers)
         self.max_tests = max_tests
         self.verbose = verbose
@@ -169,3 +170,13 @@ class CodeEnv(Env):
             if gt.strip() != pred.strip():
                 return False
         return True
+
+    def get_state(self) -> dict[str, Any]:
+        return {
+            "first_obs": self.first_obs,
+            "tests": self.tests,
+        }
+
+    def set_state(self, state: dict[str, Any]) -> None:
+        self.first_obs = state["first_obs"]
+        self.tests = state["tests"]
