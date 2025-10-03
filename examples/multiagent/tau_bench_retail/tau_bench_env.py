@@ -8,14 +8,19 @@ from typing import Any, Dict, List, Optional, Tuple
 from litellm import completion
 from pydantic import BaseModel
 
-GEM_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../"))
-if GEM_PATH not in sys.path:
-    sys.path.insert(0, GEM_PATH)
-
 from gem.envs.multiagent import MultiAgentEnv
 from gem.envs.multiagent.multi_agent_env import AgentSelector
 
-ASSETS_PATH = os.path.join(os.path.dirname(__file__), "assets")
+TAU_BENCH_PATH = os.environ.get("TAU_BENCH_PATH", os.path.join(os.path.dirname(__file__), "tau-bench"))
+ASSETS_PATH = os.path.join(TAU_BENCH_PATH, "tau_bench/envs/retail")
+
+if not os.path.exists(ASSETS_PATH):
+    raise FileNotFoundError(
+        f"TAU-bench repository not found. Please either:\n"
+        f"1. Clone https://github.com/sierra-research/tau-bench to {TAU_BENCH_PATH}\n"
+        f"2. Set TAU_BENCH_PATH environment variable to the cloned repository path"
+    )
+
 if ASSETS_PATH not in sys.path:
     sys.path.insert(0, ASSETS_PATH)
 
