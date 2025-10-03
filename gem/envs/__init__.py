@@ -12,14 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Export MultiAgentEnv for easy import
-
-try:
-    import reasoning_gym as rg
-
-    HAS_REASONING_GYM = True
-except ImportError:
-    HAS_REASONING_GYM = False
+import reasoning_gym as rg
 
 from gem.envs.registration import register
 
@@ -415,15 +408,14 @@ register(
 
 # Register datasets from ReasoningGym
 
-if HAS_REASONING_GYM:
-    for name in rg.factory.DATASETS.keys():
-        register(
-            f"rg:{name}",
-            "gem.envs.reasoning_gym:ReasoningGymEnv",
-            name=name,
-            size=500,
-            seed=42,
-        )
+for name in rg.factory.DATASETS.keys():
+    register(
+        f"rg:{name}",
+        "gem.envs.reasoning_gym:ReasoningGymEnv",
+        name=name,
+        size=500,
+        seed=42,
+    )
 
 # Register evaluation datasets
 
