@@ -11,7 +11,9 @@ from pydantic import BaseModel
 from gem.envs.multiagent import MultiAgentEnv
 from gem.envs.multiagent.multi_agent_env import AgentSelector
 
-TAU_BENCH_PATH = os.environ.get("TAU_BENCH_PATH", os.path.join(os.path.dirname(__file__), "tau-bench"))
+TAU_BENCH_PATH = os.environ.get(
+    "TAU_BENCH_PATH", os.path.join(os.path.dirname(__file__), "tau-bench")
+)
 ASSETS_PATH = os.path.join(TAU_BENCH_PATH, "tau_bench/envs/retail")
 
 if not os.path.exists(ASSETS_PATH):
