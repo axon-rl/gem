@@ -78,6 +78,7 @@ class GemEnvGroupBuilder(EnvGroupBuilder):
     pool: list[gem.Env]
     renderer: renderers.Renderer
     group_size: int
+    groups_per_batch: int
     env_id: str
     convo_prefix: list[renderers.Message] | None = None
     group_index: int = -1  # which env in the pool to use for this
@@ -85,13 +86,21 @@ class GemEnvGroupBuilder(EnvGroupBuilder):
     async def make_envs(self) -> Sequence[Env]:
         # duplicate the env for the group size
         assert (
-            0 <= self.group_index < len(self.pool)
+            0 <= self.group_index < len(self.pool) // self.group_size
         ), "group_index must be within the range of the pool size"
-        env_gem = self.pool[self.group_index]
-        return [
-            GemTinkerEnv(deepcopy(env_gem), self.renderer, self.convo_prefix)
-            for _ in range(self.group_size)
-        ]
+        assert hasattr(
+            self.pool[0], "get_state"
+        ), "env must support get_state() to run in GemEnvGroupBuilder"
+
+        env_0 = self.pool[self.group_index]
+        env_0.reset()
+        envs = [GemTinkerEnv(env_0, self.renderer, self.convo_prefix)]
+        for i in range(1, self.group_size):
+            env_i = self.pool[self.groups_per_batch * i + self.group_index]
+            env_state = deepcopy(env_0.get_state())
+            env_i.set_state(env_state)
+            envs.append(GemTinkerEnv(env_i, self.renderer, self.convo_prefix))
+        return envs
 
     def logging_tags(self) -> list[str]:
         return self.env_id.split(":")
@@ -130,7 +139,8 @@ class GemDatasetBuilder(RLDatasetBuilder):
     async def __call__(self) -> tuple[RLDataset, RLDataset | None]:
         env_kwargs = json.loads(self.env_kwargs_json) if self.env_kwargs_json else {}
         pool = [
-            gem.make(self.env_id, **env_kwargs) for _ in range(self.groups_per_batch)
+            gem.make(self.env_id, **env_kwargs)
+            for _ in range(self.groups_per_batch * self.group_size)
         ]
         tokenizer = get_tokenizer(self.model_name_for_tokenizer)
         renderer = renderers.get_renderer(self.renderer_name, tokenizer=tokenizer)
@@ -138,6 +148,7 @@ class GemDatasetBuilder(RLDatasetBuilder):
             "pool": pool,
             "renderer": renderer,
             "group_size": self.group_size,
+            "groups_per_batch": self.groups_per_batch,
             "env_id": self.env_id,
             "convo_prefix": self.convo_prefix,
         }
