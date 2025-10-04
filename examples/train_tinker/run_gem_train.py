@@ -20,7 +20,7 @@ class CLIConfig:
     env_kwargs_json: str | None = None  # e.g., '{"max_turns": 4}'
 
     # Training
-    prompt_type: str = 'general'
+    prompt_type: str = "general"
     group_size: int = 4
     groups_per_batch: int = 64
     n_batches: int = 200
