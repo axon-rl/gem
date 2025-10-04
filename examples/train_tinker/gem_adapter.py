@@ -22,15 +22,33 @@ from tinker_cookbook.tokenizer_utils import get_tokenizer
 from tinker_cookbook.completers import StopCondition
 
 
+def apply_general_prompt(init_obs: str) -> str:
+    return (
+        f"Question: {init_obs}"
+        "\nPlease reason step by step, and put your final answer within \\boxed{}."
+    )
+
+def apply_no_template(init_obs: str) -> str:
+    return init_obs
+
+PROMPT_FACTORY = {
+    'no': apply_no_template,
+    'general': apply_general_prompt
+}
+
 class GemTinkerEnv(Env):
     def __init__(
         self,
         env_gem: gem.Env,
+        init_obs: Observation,
         renderer: renderers.Renderer,
+        prompt_type: str = 'general',
         convo_prefix: list[renderers.Message] | None = None,
     ):
         self.env_gem = env_gem
+        self.init_obs = init_obs
         self.renderer = renderer
+        self.prompt_type = prompt_type
         self.convo: list[renderers.Message] = list(convo_prefix or [])
 
     @property
@@ -38,8 +56,7 @@ class GemTinkerEnv(Env):
         return self.renderer.get_stop_sequences()
 
     async def initial_observation(self) -> tuple[Observation, StopCondition]:
-        obs, _ = self.env_gem.reset()
-        self.convo.append({"role": "user", "content": obs})
+        self.convo.append({"role": "user", "content": PROMPT_FACTORY[self.prompt_type](self.init_obs)})
         return self.renderer.build_generation_prompt(self.convo), self.stop_condition
 
     async def step(self, action: Action) -> StepResult:
@@ -76,30 +93,11 @@ class GemTinkerEnv(Env):
 class GemEnvGroupBuilder(EnvGroupBuilder):
     pool: list[gem.Env]
     renderer: renderers.Renderer
+    prompt_type: str
     group_size: int
-    groups_per_batch: int # TODO: may not need this
     env_id: str
     convo_prefix: list[renderers.Message] | None = None
     group_index: int = -1  # which env in the pool to use for this
-
-    # async def make_envs(self) -> Sequence[Env]:
-    #     # duplicate the env for the group size
-    #     assert (
-    #         0 <= self.group_index < len(self.pool) // self.group_size
-    #     ), "group_index must be within the range of the pool size"
-    #     assert hasattr(
-    #         self.pool[0], "get_state"
-    #     ), "env must support get_state() to run in GemEnvGroupBuilder"
-
-    #     env_0 = self.pool[self.group_index]
-    #     env_0.reset()
-    #     envs = [GemTinkerEnv(env_0, self.renderer, self.convo_prefix)]
-    #     for i in range(1, self.group_size):
-    #         env_i = self.pool[self.groups_per_batch * i + self.group_index]
-    #         env_state = deepcopy(env_0.get_state())
-    #         env_i.set_state(env_state)
-    #         envs.append(GemTinkerEnv(env_i, self.renderer, self.convo_prefix))
-    #     return envs
 
     async def make_envs(self) -> Sequence[Env]:
         assert (
@@ -111,9 +109,9 @@ class GemEnvGroupBuilder(EnvGroupBuilder):
 
         # duplicate the env for the group size
         env_parent = self.pool[self.group_index]
-        env_parent.reset()
+        init_obs, _ = env_parent.reset()
         return [
-            GemTinkerEnv(env_parent.spawn(same_state=True), self.renderer, self.convo_prefix)
+            GemTinkerEnv(env_parent.spawn(same_state=True), init_obs, self.renderer, self.prompt_type, self.convo_prefix)
             for _ in range(self.group_size)
         ]
 
@@ -125,6 +123,9 @@ class GemDataset(RLDataset):
     def __init__(
         self, builder_config: dict[str, Any], groups_per_batch: int, n_batches: int
     ):
+        pool = builder_config['pool']
+        assert len(set(env.seed for env in pool)) == len(pool), "All envs in the pool must have different seeds."
+
         self.builder_config = builder_config
         self.groups_per_batch = groups_per_batch
         self.n_batches = n_batches
@@ -144,26 +145,27 @@ class GemDatasetBuilder(RLDatasetBuilder):
     env_id: str
     model_name_for_tokenizer: str
     renderer_name: str
+    prompt_type: str = 'general'
     group_size: int
     groups_per_batch: int
     n_batches: int = 100
     env_kwargs_json: str | None = None
     convo_prefix: list[renderers.Message] | None = None
-    gem_path: str | None = None
 
     async def __call__(self) -> tuple[RLDataset, RLDataset | None]:
         env_kwargs = json.loads(self.env_kwargs_json) if self.env_kwargs_json else {}
         env_parent = gem.make(self.env_id, **env_kwargs)
+        seed_parent = env_parent.seed
         pool = [
-            env_parent.spawn() for _ in range(self.groups_per_batch)
+            env_parent.spawn(seed=i+seed_parent) for i in range(self.groups_per_batch)
         ]
         tokenizer = get_tokenizer(self.model_name_for_tokenizer)
         renderer = renderers.get_renderer(self.renderer_name, tokenizer=tokenizer)
         builder_config = {
             "pool": pool,
             "renderer": renderer,
+            "prompt_type": self.prompt_type,
             "group_size": self.group_size,
-            "groups_per_batch": self.groups_per_batch,
             "env_id": self.env_id,
             "convo_prefix": self.convo_prefix,
         }

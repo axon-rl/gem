@@ -18,9 +18,9 @@ class CLIConfig:
     # GEM env
     env_id: str = "game:GuessTheNumber-v0"
     env_kwargs_json: str | None = None  # e.g., '{"max_turns": 4}'
-    gem_path: str | None = None
 
     # Training
+    prompt_type: str = 'general'
     group_size: int = 4
     groups_per_batch: int = 64
     n_batches: int = 200
@@ -55,18 +55,18 @@ async def cli_main(cli_config: CLIConfig):
         f"lr{cli_config.learning_rate}-g{cli_config.group_size}-b{cli_config.groups_per_batch}-"
         f"{datetime.now().strftime('%Y-%m-%d-%H-%M')}"
     )
-    log_path = cli_config.log_path or f"/tmp/tinker-examples/gem/{run_name}"
+    log_path = cli_config.log_path or f"./outputs-tinker/gem/{run_name}"
     wandb_name = cli_config.wandb_name or run_name
 
     dataset_builder = GemDatasetBuilder(
         env_id=cli_config.env_id,
         model_name_for_tokenizer=cli_config.model_name,
         renderer_name=renderer_name,
+        prompt_type=cli_config.prompt_type,
         group_size=cli_config.group_size,
         groups_per_batch=cli_config.groups_per_batch,
         n_batches=cli_config.n_batches,
         env_kwargs_json=cli_config.env_kwargs_json,
-        gem_path=cli_config.gem_path,
     )
 
     cfg = Config(

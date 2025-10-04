@@ -18,6 +18,7 @@ import functools
 import logging
 import multiprocessing
 import random
+import warnings
 from typing import Any, Optional, SupportsFloat, Tuple
 
 from datasets import Dataset, DatasetDict, load_dataset
@@ -171,15 +172,26 @@ class MathEnv(Env):
         self.answer = state["answer"]
 
     def spawn(self, same_state: bool=False, **kwargs) -> Env:
-        child = MathEnv(
-            dataset=self.dataset,
-            question_key=self.question_key,
-            answer_key=self.answer_key,
-            seed=self.seed,
-            **kwargs,
-        )
         if same_state:
+            child = MathEnv(
+                dataset=self.dataset,
+                question_key=self.question_key,
+                answer_key=self.answer_key,
+                seed=self.seed,
+                **kwargs,
+            )
             child.set_state(self.get_state())
+        else:
+            child = MathEnv(
+                dataset=self.dataset,
+                question_key=self.question_key,
+                answer_key=self.answer_key,
+                **kwargs,
+            )
+            if child.seed == self.seed: 
+                warnings.warn(
+                    "same_state is False but the seed is not changed, which may lead to the same sequence of questions."
+                )
         return child
 
 
