@@ -86,7 +86,7 @@ class MathEnv(Env):
         except multiprocessing.context.TimeoutError:
             is_correct = False
         reward = 1.0 if is_correct else 0
-        return TERMINAL_STATE, reward, True, True, {}
+        return TERMINAL_STATE, reward, True, True, {'correct': is_correct}
 
     def _local_step(
         self, action: str
