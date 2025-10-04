@@ -170,6 +170,18 @@ class MathEnv(Env):
         self.first_obs = state["first_obs"]
         self.answer = state["answer"]
 
+    def spawn(self, same_state: bool=False, **kwargs) -> Env:
+        child = MathEnv(
+            dataset=self.dataset,
+            question_key=self.question_key,
+            answer_key=self.answer_key,
+            seed=self.seed,
+            **kwargs,
+        )
+        if same_state:
+            child.set_state(self.get_state())
+        return child
+
 
 if __name__ == "__main__":
     ans1 = "\\boxed{${1,2,3,4}$}"
