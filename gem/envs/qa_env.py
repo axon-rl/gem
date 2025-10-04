@@ -97,7 +97,7 @@ class QaEnv(Env):
         else:
             is_correct = self.check_correct(model_answer, self.answer)
             reward = 1.0 if is_correct else 0.0
-        return TERMINAL_STATE, reward, True, True, {}
+        return TERMINAL_STATE, reward, True, True, {'correct': bool(is_correct)}
 
     def reset(self, seed: Optional[None] = None) -> Tuple[str, dict[str, Any]]:
         """Sample a question from the dataset."""
