@@ -157,3 +157,28 @@ We welcome all forms of contribution — from adding new environments to integra
 * This work is supported by [Sea AI Lab](https://sail.sea.com/) for computing resources.
 * Our code learns from and builds on several awesome projects such as [gym](https://github.com/openai/gym), [rllm](https://github.com/rllm-org/rllm), [TextArena](https://github.com/LeonGuertler/TextArena), [Search-R1](https://github.com/PeterGriffinJin/Search-R1), [ReasoningGym](https://github.com/open-thought/reasoning-gym).
 * The training example code is built on [Oat](https://github.com/sail-sg/oat), [Tinker](https://github.com/thinking-machines-lab/tinker), [Verl](https://github.com/volcengine/verl), [RL2](https://github.com/ChenmienTan/RL2), [ROLL](https://github.com/alibaba/ROLL), [OpenRLHF](https://github.com/OpenRLHF/OpenRLHF).
+
+
+## Citation
+If you find our works useful for your research, please consider citing:
+
+* GEM paper:
+  ```bibtex
+  @article{liu2025gem,
+    title={GEM: A Gym for Agentic LLMs},
+    author={Liu, Zichen and Sims, Anya and Duan, Keyu and Chen, Changyu and Yu, Simon and Zhou, Xiangxin and Xu, Haotian and Xiong, Shaopan and Liu, Bo and Tan, Chenmien and others},
+    journal={arXiv preprint arXiv:2510.01051},
+    year={2025}
+  }
+  ```
+
+* GEM blog:
+  ```bibtex
+  @misc{liu2025gemblog,
+    title={GEM: A Gym for Generalist LLMs},
+    author={Liu, Zichen and Sims, Anya and Duan, Keyu and Chen, Changyu and Yang, Diyi and Lee, Wee Sun and Lin, Min},
+    year={2025},
+    howpublished={\url{https://axon-rl.notion.site/gem}},
+    note={Notion Blog},
+  }
+  ```
