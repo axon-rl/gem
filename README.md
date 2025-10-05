@@ -162,7 +162,7 @@ We welcome all forms of contribution — from adding new environments to integra
 ## Citation
 If you find our works useful for your research, please consider citing:
 
-* GEM paper:
+* GEM paper (please prioritize citing the paper unless you believe the blog is a better fit):
   ```bibtex
   @article{liu2025gem,
     title={GEM: A Gym for Agentic LLMs},
