@@ -1,6 +1,6 @@
 <div align="center">
 
-# GEM: A Gym for Generalist LLMs
+# GEM: A Gym for Agentic LLMs
 
 
 [![Notion blog](https://img.shields.io/badge/Notion-000000?style=for-the-badge&logo=notion&logoColor=white)](https://axon-rl.notion.site/gem) 
@@ -28,9 +28,9 @@ Like OpenAI [Gym](https://github.com/openai/gym) for traditional RL, GEM is a de
 
 
 ## Links
-* **GEM: Gym for Generalist LLMs**
-  * 📜 [Blog](https://axon-rl.notion.site/gem)
-  * 🚀 [Release tweet](https://x.com/zzlccc/status/1951358948587741295)
+  * 📜 [Initial Blog](https://axon-rl.notion.site/gem)
+  * 🚀 [Blog release tweet](https://x.com/zzlccc/status/1951358948587741295)
+  * 📄 [Paper](https://arxiv.org/pdf/2510.01051)
   * 📄 [Documentation](https://axon-rl.github.io/gem/)
 
 ## Installation

@@ -24,7 +24,7 @@ from datasets import Dataset, DatasetDict, load_dataset
 
 from gem.core import Env
 from gem.utils.constants import TERMINAL_STATE
-from gem.utils.math_grader import boxed_reward_fn
+from gem.utils.math_grader import boxed_reward_fn, run_with_timeout_signal
 
 logger = logging.getLogger(__name__)
 verify_fn = functools.partial(
@@ -46,12 +46,14 @@ class MathEnv(Env):
         question_key: str = "problem",
         answer_key: str = "answer",
         seed: int = 0,
+        use_mp: bool = True,
         **kwargs: Any,
     ):
         super().__init__()
         self.seed = seed
         self.question_key = question_key
         self.answer_key = answer_key
+        self.use_mp = use_mp
         if dataset is None:
             dataset = load_dataset(dataset_name)
         if isinstance(dataset, DatasetDict):
@@ -71,10 +73,11 @@ class MathEnv(Env):
             self.dataset = dataset.shuffle(seed=self.seed)
         self.idx = 0
         self.epoch = 0
-        # Process pool is used to enable the timeout mechanism for answer grading in a potential distributed training setup
-        self.mp_pool = multiprocessing.Pool(1)
+        if self.use_mp:
+            # Process pool is used to enable the timeout mechanism for answer grading in a potential distributed training setup
+            self.mp_pool = multiprocessing.Pool(1)
 
-    def step(
+    def _mp_step(
         self, action: str
     ) -> Tuple[str, SupportsFloat, bool, bool, dict[str, Any]]:
         res = self.mp_pool.apply_async(self.check_correct, (action, self.answer))
@@ -84,6 +87,27 @@ class MathEnv(Env):
             is_correct = False
         reward = 1.0 if is_correct else 0
         return TERMINAL_STATE, reward, True, True, {}
+
+    def _local_step(
+        self, action: str
+    ) -> Tuple[str, SupportsFloat, bool, bool, dict[str, Any]]:
+        res = run_with_timeout_signal(
+            self.check_correct, args=(action, self.answer), timeout_seconds=1
+        )
+        is_correct = False
+        if res is None:
+            is_correct = False
+        else:
+            is_correct = res
+        reward = 1.0 if is_correct else 0
+        return TERMINAL_STATE, reward, True, True, {}
+
+    def step(
+        self, action: str
+    ) -> Tuple[str, SupportsFloat, bool, bool, dict[str, Any]]:
+        if self.use_mp:
+            return self._mp_step(action)
+        return self._local_step(action)
 
     def reset(
         self, seed: Optional[None] = None, idx: Optional[int] = None
