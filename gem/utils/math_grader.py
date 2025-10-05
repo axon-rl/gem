@@ -14,11 +14,13 @@
 
 """Reference: https://github.com/sail-sg/understand-r1-zero."""
 
+import logging
 import re
 import signal
+import types
 from itertools import islice, zip_longest
 from math import isclose
-from typing import Optional
+from typing import Any, Callable, Dict, Optional, Tuple
 
 import sympy
 from latex2sympy2_extended import latex2sympy
@@ -28,6 +30,8 @@ from sympy import N, simplify
 from sympy.parsing import sympy_parser
 from sympy.parsing.latex import parse_latex
 from sympy.parsing.sympy_parser import parse_expr
+
+logger = logging.getLogger(__name__)
 
 
 # Dan Hendrycks' code
@@ -1098,3 +1102,54 @@ def answer_tag_reward_fn_for_orz(
             )  # Formatted but wrong answer; no format reward to avoid hacking.
     else:
         return {"formatted": False}, incorrect_reward  # Unformatted.
+
+
+# Reference to tinker_cookbook
+class TimeoutException(Exception):
+    pass
+
+
+# The handler function that raises the exception
+def _timeout_handler(signum: int, frame: types.FrameType | None) -> None:
+    raise TimeoutException("Function call timed out")
+
+
+def run_with_timeout_signal(
+    func: Callable[..., Any],
+    args: Tuple[Any, ...] = (),
+    kwargs: Dict[str, Any] = {},
+    timeout_seconds: int = 5,
+) -> Optional[Any]:
+    """
+    Runs a function with a timeout using signal.alarm (Unix only).
+
+    Args:
+        func: The function to execute.
+        args: Positional arguments for the function.
+        kwargs: Keyword arguments for the function.
+        timeout_seconds: Maximum time allowed in seconds.
+
+    Returns:
+        The result of the function call, or None if it times out.
+    """
+    # Set the signal handler for SIGALRM
+    old_handler = signal.signal(signal.SIGALRM, _timeout_handler)
+    # Schedule the alarm
+    signal.alarm(timeout_seconds)
+
+    try:
+        result = func(*args, **kwargs)
+    except TimeoutException:
+        logger.warning(f"Function timed out after {timeout_seconds} seconds.")
+        result = None
+    except Exception as e:
+        # Handle other exceptions from the function if needed
+        logger.warning(f"Function raised an exception: {e}")
+        result = None  # Or re-raise
+    finally:
+        # Disable the alarm
+        signal.alarm(0)
+        # Restore the original signal handler
+        signal.signal(signal.SIGALRM, old_handler)
+
+    return result

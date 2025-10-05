@@ -32,12 +32,14 @@ class MathVisualEnv(MathEnv):
         question_key: str = "problem",
         answer_key: str = "answer",
         seed: int = 0,
+        use_mp: bool = True,
         **kwargs: Any,
     ):
         self.seed = seed
         self.image_key = image_key
         self.question_key = question_key
         self.answer_key = answer_key
+        self.use_mp = use_mp
         if dataset is None:
             dataset = load_dataset(dataset_name)
         if isinstance(dataset, DatasetDict):
@@ -57,8 +59,9 @@ class MathVisualEnv(MathEnv):
             self.dataset = dataset.shuffle(seed=self.seed)
         self.idx = 0
         self.epoch = 0
-        # Process pool is used to enable the timeout mechanism for answer grading in a potential distributed training setup
-        self.mp_pool = multiprocessing.Pool(1)
+        if self.use_mp:
+            # Process pool is used to enable the timeout mechanism for answer grading in a potential distributed training setup
+            self.mp_pool = multiprocessing.Pool(1)
 
     def reset(
         self, seed: Optional[None] = None, idx: Optional[int] = None
