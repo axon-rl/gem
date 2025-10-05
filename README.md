@@ -111,7 +111,6 @@ while True:
 | -------------------------- | ------------------------------------------------ |
 | **Python**                         | Python code executor that parses code blocks, executes them, and returns outputs   |
 | **Search**                | Calls a search engine to retrieve documents for any query
-MCP	 |
 | **MCP**            | Calls the general MCP API to train tool-use agents |
 
 </div>
