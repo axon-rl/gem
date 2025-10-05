@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import json
-import gem
+import time
 from dataclasses import dataclass
 from typing import Any, Sequence
 
 import chz
 import tinker
 from tinker_cookbook import renderers
+from tinker_cookbook.completers import StopCondition
 from tinker_cookbook.rl.types import (
     Action,
     Env,
@@ -19,9 +20,8 @@ from tinker_cookbook.rl.types import (
     StepResult,
 )
 from tinker_cookbook.tokenizer_utils import get_tokenizer
-from tinker_cookbook.completers import StopCondition
 
-import time
+import gem
 
 
 def apply_general_prompt(init_obs: str) -> str:
@@ -169,7 +169,8 @@ class GemDatasetBuilder(RLDatasetBuilder):
         env_parent = gem.make(self.env_id, seed=int(time.time_ns()), **env_kwargs)
         seed_parent = env_parent.seed
         pool = [
-            env_parent.spawn(seed=i + seed_parent + 1) for i in range(self.groups_per_batch)
+            env_parent.spawn(seed=i + seed_parent + 1)
+            for i in range(self.groups_per_batch)
         ]
         tokenizer = get_tokenizer(self.model_name_for_tokenizer)
         renderer = renderers.get_renderer(self.renderer_name, tokenizer=tokenizer)

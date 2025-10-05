@@ -50,7 +50,7 @@ class MCPMarkEnv(Env):
             reward = 0.0
 
         self._cleanup()
-        return TERMINAL_STATE, reward, True, True, {'correct': bool(result.success)}
+        return TERMINAL_STATE, reward, True, True, {"correct": bool(result.success)}
 
     def reset(self, seed: Optional[int] = None) -> Tuple[str, dict[str, Any]]:
         super().reset(seed)

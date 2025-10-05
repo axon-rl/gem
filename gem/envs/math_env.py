@@ -87,7 +87,7 @@ class MathEnv(Env):
         except multiprocessing.context.TimeoutError:
             is_correct = False
         reward = 1.0 if is_correct else 0
-        return TERMINAL_STATE, reward, True, True, {'correct': is_correct}
+        return TERMINAL_STATE, reward, True, True, {"correct": is_correct}
 
     def _local_step(
         self, action: str
@@ -101,7 +101,7 @@ class MathEnv(Env):
         else:
             is_correct = res
         reward = 1.0 if is_correct else 0
-        return TERMINAL_STATE, reward, True, True, {'correct': is_correct}
+        return TERMINAL_STATE, reward, True, True, {"correct": is_correct}
 
     def step(
         self, action: str
@@ -171,7 +171,7 @@ class MathEnv(Env):
         self.first_obs = state["first_obs"]
         self.answer = state["answer"]
 
-    def spawn(self, same_state: bool=False, **kwargs) -> Env:
+    def spawn(self, same_state: bool = False, **kwargs) -> Env:
         if same_state:
             child = MathEnv(
                 dataset=self.dataset,
@@ -190,7 +190,7 @@ class MathEnv(Env):
                 use_mp=self.use_mp,
                 **kwargs,
             )
-            if child.seed == self.seed: 
+            if child.seed == self.seed:
                 warnings.warn(
                     "same_state is False but the seed is not changed, which may lead to the same sequence of questions."
                 )
