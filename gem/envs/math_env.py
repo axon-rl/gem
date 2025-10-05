@@ -101,7 +101,7 @@ class MathEnv(Env):
         else:
             is_correct = res
         reward = 1.0 if is_correct else 0
-        return TERMINAL_STATE, reward, True, True, {}
+        return TERMINAL_STATE, reward, True, True, {'correct': is_correct}
 
     def step(
         self, action: str
@@ -178,6 +178,7 @@ class MathEnv(Env):
                 question_key=self.question_key,
                 answer_key=self.answer_key,
                 seed=self.seed,
+                use_mp=self.use_mp,
                 **kwargs,
             )
             child.set_state(self.get_state())
@@ -186,6 +187,7 @@ class MathEnv(Env):
                 dataset=self.dataset,
                 question_key=self.question_key,
                 answer_key=self.answer_key,
+                use_mp=self.use_mp,
                 **kwargs,
             )
             if child.seed == self.seed: 
