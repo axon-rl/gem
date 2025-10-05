@@ -24,7 +24,7 @@ from gem.utils.constants import TERMINAL_STATE
 
 
 class MCPMarkEnv(Env):
-    def __init__(self, mcp_service: str, tasks: str = "all", seed: int = 42):
+    def __init__(self, mcp_service: str, tasks: str = "all", seed: int = 42, **_: Any):
         """
         Args:
             mcp_service: The MCP service to use.

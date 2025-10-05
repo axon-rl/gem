@@ -28,15 +28,15 @@ from gem.utils.parsing import extract_last_boxed_answer
 class ReasoningGymEnv(Env):
     """Built upon a dataset, serving as a single-turn env (contextual bandits)."""
 
-    def __init__(self, name: str, size: int = 500, seed: int = 42) -> None:
+    def __init__(self, name: str, size: int = 500, seed: int = 42, **_: Any) -> None:
         super().__init__()
         self.idx = 0
         self.name = name
         self.size = size
         self.seed = seed
-        self.dataset = rg.create_dataset(name, size=size, seed=seed)
-        self.dataset_iter = iter(self.dataset)
-        self.reward_fn = self.dataset.score_answer
+        self.ds = rg.create_dataset(name, size=size, seed=seed)
+        self.ds_iter = iter(self.ds)
+        self.reward_fn = self.ds.score_answer
 
     def step(
         self, action: str
@@ -49,21 +49,21 @@ class ReasoningGymEnv(Env):
         """Sample a question from the dataset."""
         super().reset(seed)
         if seed is not None:
-            data = random.choice(self.dataset)
+            data = random.choice(self.ds)
             if (self.idx + 1) % self.size == 0:
-                self.dataset = rg.create_dataset(
+                self.ds = rg.create_dataset(
                     self.name, size=self.size, seed=self.seed + self.idx
                 )
         else:
             try:
-                data = next(self.dataset_iter)
+                data = next(self.ds_iter)
             except StopIteration:
                 # reset dataset with a new but deterministic seed
-                self.dataset = rg.create_dataset(
+                self.ds = rg.create_dataset(
                     self.name, size=self.size, seed=self.seed + self.idx
                 )
-                self.dataset_iter = iter(self.dataset)
-                data = next(self.dataset_iter)
+                self.ds_iter = iter(self.ds)
+                data = next(self.ds_iter)
 
         question = data["question"]
         self.idx += 1
