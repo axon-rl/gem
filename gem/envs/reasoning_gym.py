@@ -19,6 +19,7 @@ from typing import Any, Optional, SupportsFloat, Tuple
 
 import reasoning_gym as rg
 
+import warnings
 from gem.core import Env
 from gem.utils.constants import TERMINAL_STATE
 from gem.utils.parsing import extract_last_boxed_answer
@@ -68,3 +69,22 @@ class ReasoningGymEnv(Env):
         self.idx += 1
         self.data = data
         return question, {}
+
+    def get_state(self) -> dict[str, Any]:
+        return {"idx": self.idx, "data": self.data}
+
+    def set_state(self, state: dict[str, Any]) -> None:
+        self.idx = state["idx"]
+        self.data = state["data"]
+
+    def spawn(self, same_state: bool = False, **kwargs) -> Env:
+        if same_state:
+            child = ReasoningGymEnv(name=self.name, size=self.size, seed=self.seed)
+            child.set_state(self.get_state())
+        else:
+            child = ReasoningGymEnv(name=self.name, size=self.size, **kwargs)
+            if child.seed == self.seed:
+                warnings.warn(
+                    "same_state is False but the seed is not changed, which may lead to the same sequence of questions."
+                )
+        return child
