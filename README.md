@@ -7,7 +7,7 @@
 [![Hugging Face Collection](https://img.shields.io/badge/AxonRL-fcd022?style=for-the-badge&logo=huggingface&logoColor=000&labelColor)](https://huggingface.co/axon-rl)
 [![🌐 Axon-RL](https://img.shields.io/badge/-AxonRL%20project-5865F2?style=for-the-badge)](https://axon-rl.github.io/) 
 [![Documentation](https://img.shields.io/badge/Documentation-blue?style=for-the-badge&logo=readthedocs&logoColor=white)](https://axon-rl.github.io/gem/)
-[![PyPI - Version](https://img.shields.io/pypi/v/oat-llm.svg?style=for-the-badge)](https://pypi.org/project/oat-llm)
+[![PyPI - Version](https://img.shields.io/pypi/v/gem-llm.svg?style=for-the-badge)](https://pypi.org/project/gem-llm)
 
 ## Overview
 
