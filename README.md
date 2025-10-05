@@ -85,9 +85,9 @@ while True:
 
 ## Features
 
-1. Environments consist of tasks and (optional) tools. Tool-calling is achieved by environment wrapper as demonstrated [here](./GETTING_STARTED.md#tool-integration-examples).
-2. GEM is training framework-agnostic so we demonstrate its integration with six popular RL training frameworks.
-3. We provide implementation and benchmarking results for different algorithms on a diverse set of environments.
+1. Environments consist of tasks and (optional) tools. Tool-calling is achieved via an environment wrapper, as demonstrated [here](./GETTING_STARTED.md#tool-integration-examples).
+2. GEM is training framework-agnostic, and we demonstrate its integration with six popular RL training frameworks.
+3. We provide implementations and benchmarking results for different algorithms across a diverse set of environments.
 
 ### Supported Tasks
 
@@ -109,9 +109,10 @@ while True:
 
 | Tool                            | Description                                      |
 | -------------------------- | ------------------------------------------------ |
-| **Python**                         | Python code executor that parses code blocks to execute and return the outputs   |
-| **Search**                | Call the search engine to retrieve documents for any query |
-| **MCP**            | Call general MCP API to train tool-use agents |
+| **Python**                         | Python code executor that parses code blocks, executes them, and returns outputs   |
+| **Search**                | Calls a search engine to retrieve documents for any query
+MCP	 |
+| **MCP**            | Calls the general MCP API to train tool-use agents |
 
 </div>
 
@@ -123,11 +124,11 @@ while True:
 | Framework                            | Description                                      |
 | -------------------------- | ------------------------------------------------ |
 | **[Oat](https://github.com/sail-sg/oat)**                         | vLLM + DeepSpeed, modular, no ray   |
-| **[Tinker](https://github.com/thinking-machines-lab/tinker)**                | SDK provided by Thinking Machines, free you from infra issues |
-| **[Verl](https://github.com/volcengine/verl)**            | support diverse backends, models, and algorithms |
-| **[RL2](https://github.com/ChenmienTan/RL2)**            | SGLang + FSDP, no ray, easy-to-hack |
-| **[ROLL](https://github.com/alibaba/ROLL)**            | support diverse backends, models, and algorithms |
-| **[OpenRLHF](https://github.com/alibaba/ROLL)**            | support diverse backends, models, and algorithms |
+| **[Tinker](https://github.com/thinking-machines-lab/tinker)**                | SDK provided by Thinking Machines, frees you from infra issues |
+| **[Verl](https://github.com/volcengine/verl)**            | Support diverse backends, models, and algorithms |
+| **[RL2](https://github.com/ChenmienTan/RL2)**            | SGLang + FSDP, no ray, easy to hack |
+| **[ROLL](https://github.com/alibaba/ROLL)**            | Support diverse backends, models, and algorithms |
+| **[OpenRLHF](https://github.com/alibaba/ROLL)**            | Support diverse backends, models, and algorithms |
 
 </div>
 
@@ -140,14 +141,14 @@ Examples of training agents on GEM environments with all above frameworks can be
 
 | Algorithm                            | Description                                      |
 | -------------------------- | ------------------------------------------------ |
-| **REINFORCE**                         | a general policy gradient algorithm that can be applied to single- and multi-turn envs |
-| **GRPO**                | mainly for bandit (single-turn), using group advantage normalization |
-| **PPO**            | learning a turn-level critic to compute general advantage estimation (GAE) |
+| **REINFORCE**                         | A general policy gradient algorithm that can be applied to single- and multi-turn environments |
+| **GRPO**                | Mainly for bandits (single-turn), using group advantage normalization |
+| **PPO**            | Learns a turn-level critic to compute generalized advantage estimation (GAE) |
 | **REINFORCE + ReBN**            | REINFORCE with return batch normalization as introduced in our paper |
 
 </div>
 
-Please check out [our paper](https://arxiv.org/pdf/2510.01051) for a more detailed description for each algorithm and empirical results to show their tradeoffs.
+Please check out [our paper](https://arxiv.org/pdf/2510.01051) for a more detailed description for each algorithm and empirical results showing their tradeoffs.
 
 ## Contributing
 
