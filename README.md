@@ -1,64 +1,55 @@
 <div align="center">
 
-# GEM: A Gym for Agentic LLMs
+# 🌍 GEM: A Gym for Agentic LLMs
 
 
-[![Notion blog](https://img.shields.io/badge/Notion-000000?style=for-the-badge&logo=notion&logoColor=white)](https://axon-rl.notion.site/gem) 
+[![Paper](https://img.shields.io/badge/paper-A42C25?style=for-the-badge&logo=arxiv&logoColor=white)](https://arxiv.org/pdf/2510.01051) [![Notion blog](https://img.shields.io/badge/Notion-000000?style=for-the-badge&logo=notion&logoColor=white)](https://axon-rl.notion.site/gem) 
 [![🌐 Axon-RL](https://img.shields.io/badge/-AxonRL%20project-5865F2?style=for-the-badge)](https://axon-rl.github.io/) 
 [![Hugging Face Collection](https://img.shields.io/badge/AxonRL-fcd022?style=for-the-badge&logo=huggingface&logoColor=000&labelColor)](https://huggingface.co/axon-rl) 
 [![Documentation](https://img.shields.io/badge/Documentation-blue?style=for-the-badge&logo=readthedocs&logoColor=white)](https://axon-rl.github.io/gem/)
 
-<div align="center" style="font-family: Arial, sans-serif;">
-  <p>
-    <a href="#links" style="text-decoration: none; font-weight: bold;">Links</a> •
-    <a href="#installation" style="text-decoration: none; font-weight: bold;">Installation</a> •
-    <a href="#interface" style="text-decoration: none; font-weight: bold;">Interface</a> •
-    <a href="#integration-examples" style="text-decoration: none; font-weight: bold;">Integration Examples</a> •
-    <a href="#roadmap" style="text-decoration: none; font-weight: bold;">Roadmap</a> •
-    <a href="#contributing" style="text-decoration: none; font-weight: bold;">Contributing</a> •
-    <a href="#acknowledgement" style="text-decoration: none; font-weight: bold;">Acknowledgement</a>
-  </p>
 </div>
 
-</div>
+## Overview
 
-We’re entering the era of experience, where LLM training moves beyond static datasets, towards LLM agents learning from experience gathered in complex, expressive environments. As a step towards this we introduce **GEM**, our open-source **G**eneral **E**xperience **M**aker.
+We’re entering the **era of experience**, where large language models (LLMs) learn not just from static datasets, but from *interactive experience* gathered in complex, expressive environments.
 
-Like OpenAI [Gym](https://github.com/openai/gym) for traditional RL, GEM is a dedicated environment simulator for the age of LLMs. GEM offers a diverse range of environments with clean, standardized interfaces, making it easy to integrate with existing RL training frameworks (Oat, Verl, etc.). In addition, GEM features tool integration, flexible and easy-to-modify wrappers, async vectorized environment execution to maximize throughput, multi-environment training, and more … everything you need to make LLM agent RL training simple.
+As a step toward this, we introduce **GEM** — a **G**eneral **E**xperience **M**aker for LLMs — an open-source environment suite designed for training *agentic LLMs* via online reinforcement learning.
 
+Like [OpenAI Gym](https://github.com/openai/gym) for traditional RL, GEM provides a standardized API and a growing collection of diverse environments. It is **training framework-agnostic** and supports seamless integration with six popular RL training frameworks including [Oat](https://github.com/sail-sg/oat) and [Tinker](https://github.com/thinking-machines-lab/tinker), offering:
+
+* 🧩 Clean, composable environment APIs
+* ⚙️ Async vectorized execution for high-throughput simulation
+* 🔧 Tool integration & custom wrappers
+* 🧠 Multi-environment training
+* 🎈 Ready-to-use benchmark environments and algorithms
 
 ## Links
   * 📜 [Initial Blog](https://axon-rl.notion.site/gem)
   * 🚀 [Blog release tweet](https://x.com/zzlccc/status/1951358948587741295)
   * 📄 [Paper](https://arxiv.org/pdf/2510.01051)
-  * 📄 [Documentation](https://axon-rl.github.io/gem/)
+  * 📘 [Documentation](https://axon-rl.github.io/gem/)
 
 ## Installation
-
-Install `GEM` from PyPI:
 
 ```bash
 pip install -U gem-llm
 ```
 
-To use the `search` tool, run the following to install extra dependencies: 
-```bash
-pip install -U 'gem-llm[search]'
-conda install -c pytorch -c nvidia faiss-gpu=1.8.0
-```
+Or install from source for the latest version:
 
-To use the `mcp` tool and [MCPMark](https://mcpmark.ai/) environment, run the following to install extra dependencies: 
 ```bash
-pip install -U `gem-llm[mcp]`
-
-# install MCPMark
-git clone git@github.com:axon-rl/mcpmark.git; cd mcpmark
+git clone https://github.com/axon-rl/gem.git
+cd gem
 pip install -e .
-playwright install # If you'll use browser-based tasks, install Playwright browsers first
 ```
+
+Please check [Getting Started](./GETTING_STARTED.md) for more setup details.
+
+🔥 You can jump into [examples](./examples/) to quickly start your agentic RL training with GEM & your favorite training framework.
 
 ## Interface
-GEM's interface closely follows Gym's API. Here's an example using the "game:GuessTheNumber-v0" environment: 
+GEM's interface closely follows OpenAI-Gym's API. Here's an example using the `game:GuessTheNumber-v0` environment: 
 
 ```python 
 import gem
@@ -92,148 +83,71 @@ while True:
         break
 ```
 
-### Tool Integration Examples
+## Features
 
-Below are examples for enabling tools within environments.
+1. Environments consist of tasks and (optional) tools. Tool-calling is achieved by environment wrapper as demonstrated [here](./GETTING_STARTED.md#tool-integration-examples).
+2. GEM is training framework-agnostic so we demonstrate its integration with six popular RL training frameworks.
+3. We provide implementation and benchmarking results for different algorithms on a diverse set of environments.
 
-**Example using the Python tool:**
-```python
-from transformers import AutoTokenizer
+### Supported Tasks
 
-import gem
-from gem.tools.python_code_tool import PythonCodeTool
-from gem.tools.tool_env_wrapper import ToolEnvWrapper
-from gem.wrappers.wrapper_factory import WRAPPER_FACTORY
+<div align="center">
 
-env = gem.make("math:GSM8K")
-tool = PythonCodeTool()
-wrapped_env = ToolEnvWrapper(env, tools=[tool])
-wrapped_env = WRAPPER_FACTORY["concat_chat"](
-    wrapped_env, tokenizer=AutoTokenizer.from_pretrained("Qwen/Qwen3-0.6B")
-)
-obs, info = wrapped_env.reset()
+| Category                   | Example Environments                              | Description                                      |
+| -------------------------- | ------------------------------------------------- | ------------------------------------------------ |
+| **Games**                  | `game:GuessTheNumber-v0-hard`, `game:Sudoku-v0-easy`        | Classic language games   |
+| **Math**           | `math:Math12K`, `math:DeepScaleR40K`        | Mathematical reasoning |
+| **Code**           | `code:CodeContest`, `code:Taco8k`        | Competitive coding |
+| **QA**           | `qa:NaturalQuestions`, `qa:HotpotQA`            | Knowledge-intensive question answering             |
+| **ReasoningGym**   | `rg:arc_1d`, `rg:letter_counting`           | Diverse synthetic reasoning tasks       |
 
-# we ignore the obs and use a dummy action
-dummy_action = "<think>Let me compare 9.9 and 9.11 using python.</think><python>print('9.9 > 9.11?', 9.9 > 9.11)</python>"
-obs, reward, terminated, truncated, info = wrapped_env.step(dummy_action)
-print(obs)
-# continue to sample the next response given the tool results ...
+</div>
 
-wrapped_env.close()
-```
+### Supported Tools
 
-**Example using the search tool:**
-```python
-# assume you have search server running
+<div align="center">
 
-env = gem.make("game:GuessTheNumber-v0", max_turns=2)
-tool = SearchTool(search_url="http://localhost:8000/retrieve", topk=2)
-wrapped_env = ToolEnvWrapper(env, tools=[tool], max_tool_uses=1)
-wrapped_env = WRAPPER_FACTORY['concat_chat'](wrapped_env, tokenizer=AutoTokenizer.from_pretrained("Qwen/Qwen3-0.6B"))
-wrapped_env.reset()
+| Tool                            | Description                                      |
+| -------------------------- | ------------------------------------------------ |
+| **Python**                         | Python code executor that parses code blocks to execute and return the outputs   |
+| **Search**                | Call the search engine to retrieve documents for any query |
+| **MCP**            | Call general MCP API to train tool-use agents |
 
-dummy_action = "<think>I need to search for Python list comprehension examples</think><search>Python list comprehension examples</search>"
-obs, reward, terminated, truncated, info = wrapped_env.step(dummy_action)
-print(obs)
-```
-
-<details>
-<summary>Click to get the complete runnable code</summary>
-
-```python
-import subprocess
-import time
-
-from transformers import AutoTokenizer
-
-import gem
-from gem.tools.search_tool import SearchTool
-from gem.tools.tool_env_wrapper import ToolEnvWrapper
-from gem.wrappers.wrapper_factory import WRAPPER_FACTORY
-
-# start the search server
-serp_api_key = "add you api key" # get api at https://serpapi.com/manage-api-key
-server_process = subprocess.Popen([
-    'python', '-m', 'gem.tools.search_engine.serp_search_server',
-    '--search_url', 'https://serpapi.com/search',
-    '--topk', '2', '--serp_api_key', serp_api_key
-])
-time.sleep(5)
-
-# interact using search tool
-env = gem.make("game:GuessTheNumber-v0", max_turns=2)
-tool = SearchTool(search_url="http://localhost:8000/retrieve", topk=2)
-wrapped_env = ToolEnvWrapper(env, tools=[tool], max_tool_uses=1)
-wrapped_env = WRAPPER_FACTORY['concat_chat'](wrapped_env, tokenizer=AutoTokenizer.from_pretrained("Qwen/Qwen3-0.6B"))
-wrapped_env.reset()
-
-dummy_action = "<think>I need to search for Python list comprehension examples</think><search>Python list comprehension examples</search>"
-obs, reward, terminated, truncated, info = wrapped_env.step(dummy_action)
-print(obs)
-```
-</details>
-
-## Integration Examples
-
-We demonstrate how to leverage existing LLM RL infrastructure to train agents with GEM. First, we show how to train game agents using [Oat](https://github.com/sail-sg/oat). 
-
-Before running the training, ensure you set up the development environment by following the [instructions](https://github.com/axon-rl/gem/tree/main/examples#training-with-oat). 
-
-Run the following command to train an agent for the game environment `game:GuessTheNumber-v0`: 
-
-```python 
-python train.py \
-    --env_id game:GuessTheNumber-v0 \
-    --wrappers concat \
-    --gamma 0.9 \
-    --norm_adv \
-    --gpus 8 \
-    --gradient-checkpointing \
-    --num_samples 1 \
-    --rollout_batch_size 128 \
-    --num_envs 2 \
-    --rollout_batch_size_per_device 16 \
-    --pi_buffer_maxlen_per_device 16 \
-    --pretrain Qwen/Qwen3-1.7B-Base \
-    --enable_prefix_caching \
-    --collocate \
-    --vllm_sleep \
-    --vllm_gpu_ratio 0.45 \
-    --rnd-seed \
-    --learning_rate 0.000001 \
-    --lr_scheduler constant \
-    --lr_warmup_ratio 0 \
-    --num_ppo_epochs 2 \
-    --train_batch_size 128 \
-    --train_batch_size_per_device 1 \
-    --beta 0 \
-    --max_model_len 12800 \
-    --generate_max_length 4096 \
-    --temperature 1.0 \
-    --top_p 1 \
-    --eval_steps -1 \
-    --save_steps -1 \
-    --eval_temperature 0.6 \
-    --eval_top_p 0.95 \
-    --eval_generate_max_length 4096 \
-    --max_train 65000 \
-    --max_save_num 30 \
-    --use-wb \
-    --wb-run-name oat-qwen3-1.7b-base-game:GuessTheNumber-v0 \
-    --wb_project gem \
-    --debug
-```
+</div>
 
 
-We also provide sample code for math, code, and general QA in the [examples](https://github.com/axon-rl/gem/tree/main/examples) directory. In addition to Oat integration, you can find examples of RL training with Verl [here](https://github.com/axon-rl/gem/tree/main/examples#training-with-verl). 
+### Supported Frameworks
 
-## Roadmap
+<div align="center">
 
-As our next step, we plan to integrate the following environments (among others):
-- [ ] Terminal-Bench
-- [ ] SWE-Gym
-- [ ] Multi-Agent Systems
-- [ ] ...
+| Framework                            | Description                                      |
+| -------------------------- | ------------------------------------------------ |
+| **[Oat](https://github.com/sail-sg/oat)**                         | vLLM + DeepSpeed, modular, no ray   |
+| **[Tinker](https://github.com/thinking-machines-lab/tinker)**                | SDK provided by Thinking Machines, free you from infra issues |
+| **[Verl](https://github.com/volcengine/verl)**            | support diverse backends, models, and algorithms |
+| **[RL2](https://github.com/ChenmienTan/RL2)**            | SGLang + FSDP, no ray, easy-to-hack |
+| **[ROLL](https://github.com/alibaba/ROLL)**            | support diverse backends, models, and algorithms |
+| **[OpenRLHF](https://github.com/alibaba/ROLL)**            | support diverse backends, models, and algorithms |
+
+</div>
+
+Examples of training agents on GEM environments with all above frameworks can be found in [here](./examples/)!
+
+
+### Supported Algorithms
+
+<div align="center">
+
+| Algorithm                            | Description                                      |
+| -------------------------- | ------------------------------------------------ |
+| **REINFORCE**                         | a general policy gradient algorithm that can be applied to single- and multi-turn envs |
+| **GRPO**                | mainly for bandit (single-turn), using group advantage normalization |
+| **PPO**            | learning a turn-level critic to compute general advantage estimation (GAE) |
+| **REINFORCE + ReBN**            | REINFORCE with return batch normalization as introduced in our paper |
+
+</div>
+
+Please check out [our paper](https://arxiv.org/pdf/2510.01051) for a more detailed description for each algorithm and empirical results to show their tradeoffs.
 
 ## Contributing
 
@@ -242,4 +156,4 @@ We welcome all forms of contribution — from adding new environments to integra
 ## Acknowledgement
 * This work is supported by [Sea AI Lab](https://sail.sea.com/) for computing resources.
 * Our code learns from and builds on several awesome projects such as [gym](https://github.com/openai/gym), [rllm](https://github.com/rllm-org/rllm), [TextArena](https://github.com/LeonGuertler/TextArena), [Search-R1](https://github.com/PeterGriffinJin/Search-R1), [ReasoningGym](https://github.com/open-thought/reasoning-gym).
-* The training example code is built on [Oat](https://github.com/sail-sg/oat) and [Verl](https://github.com/volcengine/verl).
+* The training example code is built on [Oat](https://github.com/sail-sg/oat), [Tinker](https://github.com/thinking-machines-lab/tinker), [Verl](https://github.com/volcengine/verl), [RL2](https://github.com/ChenmienTan/RL2), [ROLL](https://github.com/alibaba/ROLL), [OpenRLHF](https://github.com/OpenRLHF/OpenRLHF).
