@@ -27,7 +27,6 @@ class FifteenPuzzleEnv(Env):
         super().__init__()
         self.max_turns = max_turns
         self.num_rows = num_rows
-        self.greatest_num = num_rows**2 - 1
         self._is_random = num_rows is None or max_turns is None
         self.reset()
 
@@ -58,6 +57,7 @@ class FifteenPuzzleEnv(Env):
             self.num_rows, self.max_turns = random.choice(candidates)
             self.greatest_num = self.num_rows**2 - 1
 
+        self.greatest_num = self.num_rows**2 - 1
         self.board = self._generate_board()
         self.turn_count = 0
         return self._get_instructions(), {"suffix": self.get_task_suffix()}
