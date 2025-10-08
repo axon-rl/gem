@@ -55,7 +55,6 @@ class FifteenPuzzleEnv(Env):
         if self._is_random:
             candidates = [(2, 10), (3, 20), (4, 50)]
             self.num_rows, self.max_turns = random.choice(candidates)
-            self.greatest_num = self.num_rows**2 - 1
 
         self.greatest_num = self.num_rows**2 - 1
         self.board = self._generate_board()
