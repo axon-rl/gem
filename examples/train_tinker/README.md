@@ -19,6 +19,9 @@ pip install -U gem-llm
 # install tinker
 pip install tinker
 
+# install util libs
+pip install transformers wandb termcolor chz
+
 # export tinker api key
 export TINKER_API_KEY=<your-tinker-api-key>
 

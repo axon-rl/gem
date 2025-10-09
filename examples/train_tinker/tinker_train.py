@@ -18,10 +18,13 @@ A basic RL implementation to train agents on GEM environments using Tinker backe
 """
 
 import asyncio
+import json
 import logging
+import os
 import pprint
 import time
-from typing import Literal
+from datetime import datetime
+from typing import Any, Literal
 
 import chz
 import numpy as np
@@ -50,6 +53,7 @@ class Config:
     max_tokens: int = 2048
     seed: int = 0
     max_steps: int = 200
+    save_every: int = -1
 
     env_id: str = "rg:simple_equations"
     num_env: int = 4  # number of parallel environments
@@ -109,11 +113,72 @@ def get_tokenizer(model_name: str) -> PreTrainedTokenizer:
     return AutoTokenizer.from_pretrained(model_name, use_fast=True)
 
 
+async def save_checkpoint_async(
+    training_client: tinker.TrainingClient,
+    name: str,
+    log_path: str,
+    loop_state: dict[str, Any],
+    kind: Literal["state", "sampler", "both"] = "state",
+) -> dict[str, str]:
+    """Save model checkpoint.
+    Args:
+        training_client: Training client to save from
+        name: Name for the checkpoint
+        log_path: Path to the log directory, where we can find checkpoints.jsonl file
+    Returns:
+        Path to the saved checkpoint
+    """
+    futures = {}
+    if kind in ["state", "both"]:
+        futures["state"] = await training_client.save_state_async(name)
+    if kind in ["sampler", "both"]:
+        futures["sampler"] = await training_client.save_weights_for_sampler_async(name)
+
+    results = {k: await v.result_async() for k, v in futures.items()}
+    paths = {k + "_path": v.path for k, v in results.items()}
+    logger.info(f"Saved checkpoints: {paths}")
+    full_dict = {"name": name, **loop_state, **paths}
+    with open(os.path.join(log_path, "checkpoints.jsonl"), "a") as f:
+        f.write(json.dumps(full_dict) + "\n")
+
+    return paths
+
+
+def save_checkpoint(
+    training_client: tinker.TrainingClient,
+    name: str,
+    log_path: str,
+    loop_state: dict[str, Any],
+    kind: Literal["state", "sampler", "both"] = "state",
+) -> dict[str, str]:
+    """Save model checkpoint.
+    Args:
+        training_client: Training client to save from
+        name: Name for the checkpoint
+        log_path: Path to the log directory, where we can find checkpoints.jsonl file
+    Returns:
+        Path to the saved checkpoint
+    """
+    return asyncio.run(
+        save_checkpoint_async(
+            training_client,
+            name=name,
+            log_path=log_path,
+            kind=kind,
+            loop_state=loop_state,
+        )
+    )
+
+
 async def main(config: Config):
     # Setup logging
     wandb_name = (
         config.wandb_name or config.model_name.split("/")[-1] + f"_{config.env_id}"
     )
+    wandb_name += "_" + datetime.now().strftime("%m%dT%H:%M:%S")
+    save_path = os.path.join("./tinker_output", wandb_name)
+    os.makedirs(save_path, exist_ok=True)
+
     wandb.init(
         project=config.wandb_project,
         config=chz.asdict(config),
@@ -202,6 +267,20 @@ async def main(config: Config):
     for policy_iteration_step in range(config.max_steps):
         print("=" * 10 + f" Step {policy_iteration_step} " + "=" * 10)
         metrics = {"step": policy_iteration_step}
+
+        # save model
+        if (
+            config.save_every > 0
+            and policy_iteration_step > 0
+            and policy_iteration_step % config.save_every == 0
+        ):
+            await save_checkpoint_async(
+                training_client,
+                f"{policy_iteration_step:06d}",
+                log_path=save_path,
+                kind="state",
+                loop_state={"policy_iteration_step": policy_iteration_step},
+            )
 
         sampling_path = (
             training_client.save_weights_for_sampler(
