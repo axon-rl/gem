@@ -144,32 +144,6 @@ async def save_checkpoint_async(
     return paths
 
 
-def save_checkpoint(
-    training_client: tinker.TrainingClient,
-    name: str,
-    log_path: str,
-    loop_state: dict[str, Any],
-    kind: Literal["state", "sampler", "both"] = "state",
-) -> dict[str, str]:
-    """Save model checkpoint.
-    Args:
-        training_client: Training client to save from
-        name: Name for the checkpoint
-        log_path: Path to the log directory, where we can find checkpoints.jsonl file
-    Returns:
-        Path to the saved checkpoint
-    """
-    return asyncio.run(
-        save_checkpoint_async(
-            training_client,
-            name=name,
-            log_path=log_path,
-            kind=kind,
-            loop_state=loop_state,
-        )
-    )
-
-
 async def main(config: Config):
     # Setup logging
     wandb_name = (
