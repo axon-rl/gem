@@ -16,7 +16,7 @@
 
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
-from typing import Any, Dict, Optional, Sequence, Tuple, Union
+from typing import Any, Dict, Sequence, Tuple, Union
 
 import numpy as np
 
@@ -57,6 +57,11 @@ class AsyncVectorEnv(VectorEnv):
             actions = {i: action for i, action in enumerate(actions)}
 
         active_env_indices = list(actions.keys())
+        if isinstance(actions, Sequence):
+            assert len(actions) == self.num_envs
+            actions = {i: action for i, action in enumerate(actions)}
+
+        active_env_indices = list(actions.keys())
         results = list(
             self.thread_pool_executer.map(
                 lambda args: step_reset_env(*args),
@@ -87,23 +92,3 @@ class AsyncVectorEnv(VectorEnv):
             np.copy(self._truncations)[active_env_indices],
             [deepcopy(self._env_infos[i]) for i in actions.keys()],
         )
-
-    def reset(
-        self, seed: Optional[Union[int, Sequence[int]]] = None
-    ) -> Tuple[Sequence[ObsType], dict[str, Any]]:
-        if seed is None:
-            seed = [None for _ in range(self.num_envs)]
-        elif isinstance(seed, int):
-            seed = [seed + i for i in range(self.num_envs)]
-        assert (
-            len(seed) == self.num_envs
-        ), f"If seeds are passed as a list the length must match num_envs={self.num_envs} but got length={len(seed)}."
-
-        for i, (env, single_seed) in enumerate(zip(self.envs, seed)):
-            self._env_obs[i], self._env_infos[i] = env.reset(seed=single_seed)
-
-        self._terminations = np.zeros((self.num_envs,), dtype=np.bool_)
-        self._truncations = np.zeros((self.num_envs,), dtype=np.bool_)
-        self._autoreset_envs = np.zeros((self.num_envs,), dtype=np.bool_)
-
-        return deepcopy(self._env_obs), deepcopy(self._env_infos)

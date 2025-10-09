@@ -25,7 +25,11 @@ from datasets import Dataset, DatasetDict, load_dataset
 
 from gem.core import Env
 from gem.utils.constants import TERMINAL_STATE
-from gem.utils.math_grader import boxed_reward_fn, run_with_timeout_signal
+from gem.utils.math_grader import (
+    boxed_reward_fn,
+    extract_answer,
+    run_with_timeout_signal,
+)
 
 logger = logging.getLogger(__name__)
 verify_fn = functools.partial(
@@ -34,6 +38,7 @@ verify_fn = functools.partial(
     correct_reward=1,
     incorrect_reward=0,
 )
+FORMAT_ERROR_REWARD = -0.1
 
 
 class MathEnv(Env):
@@ -46,6 +51,7 @@ class MathEnv(Env):
         dataset: Optional[Dataset] = None,
         question_key: str = "problem",
         answer_key: str = "answer",
+        use_format_error_reward: bool = False,
         seed: int = 0,
         use_mp: bool = True,
         **kwargs: Any,
@@ -54,6 +60,7 @@ class MathEnv(Env):
         self.seed = seed
         self.question_key = question_key
         self.answer_key = answer_key
+        self.use_format_error_reward = use_format_error_reward
         self.use_mp = use_mp
         if dataset is None:
             dataset = load_dataset(dataset_name)
@@ -81,6 +88,10 @@ class MathEnv(Env):
     def _mp_step(
         self, action: str
     ) -> Tuple[str, SupportsFloat, bool, bool, dict[str, Any]]:
+        if self.use_format_error_reward:
+            extracted_answer = extract_answer(action)
+            if extracted_answer is None:
+                return TERMINAL_STATE, FORMAT_ERROR_REWARD, True, True, {}
         res = self.mp_pool.apply_async(self.check_correct, (action, self.answer))
         try:
             is_correct = res.get(timeout=1)
@@ -117,9 +128,6 @@ class MathEnv(Env):
         super().reset(seed)
         if idx is not None:
             assert 0 <= idx < len(self.dataset)
-            logging.info(
-                f"Reset env with a specific idx {idx}. This is only recommended for testing only!!!"
-            )
             self.idx = idx
         elif seed is not None:
             self.idx = random.randint(0, len(self.dataset) - 1)
