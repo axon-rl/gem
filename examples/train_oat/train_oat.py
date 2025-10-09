@@ -829,7 +829,6 @@ if __name__ == "__main__":
 
     # Customization
     args.algo = "PPO"
-    args.eval_batch_size = 32
 
     # CRITICAL: Disable oracle and dataset loading
     args.oracle = ""  # Empty string for no external oracle

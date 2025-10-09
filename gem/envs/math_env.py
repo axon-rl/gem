@@ -103,6 +103,10 @@ class MathEnv(Env):
     def _local_step(
         self, action: str
     ) -> Tuple[str, SupportsFloat, bool, bool, dict[str, Any]]:
+        if self.use_format_error_reward:
+            extracted_answer = extract_answer(action)
+            if extracted_answer is None:
+                return TERMINAL_STATE, FORMAT_ERROR_REWARD, True, True, {}
         res = run_with_timeout_signal(
             self.check_correct, args=(action, self.answer), timeout_seconds=1
         )
