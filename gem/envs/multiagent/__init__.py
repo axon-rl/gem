@@ -12,9 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from gem.multiagent.multi_agent_env import AgentSelector, MultiAgentEnv
+from gem.envs.multiagent.multi_agent_env import MultiAgentEnv
 
 __all__ = [
     "MultiAgentEnv",
-    "AgentSelector",
 ]
