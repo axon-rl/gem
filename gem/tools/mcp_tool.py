@@ -777,7 +777,7 @@ class MCPTool(BaseTool):
             response = self._execute_mcp_tool(tool_name, parameters)
             ERROR_PREFIXES = ("[Tool execution error", "[Tool execution failed")
             has_error = response.startswith(ERROR_PREFIXES)
-            observation = f"\n<tool_response>\n{response}\n</tool_response>\n"
+            observation = response
             return True, has_error, observation, parsed_action
 
         except Exception as e:
