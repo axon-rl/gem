@@ -72,6 +72,18 @@ class Env(abc.ABC):
         """
         return self
 
+    def spawn(self, same_state: bool = False, **kwargs) -> "Env":
+        """Spawns a new instance of the environment with the same configuration, optionally overriding parameters.
+
+        Args:
+            same_state (bool, optional): If True, the spawned environment will have the same internal state as the current environment. Defaults to False.
+            **kwargs: Optional keyword arguments to override environment configuration.
+
+        Returns:
+            Env: The newly spawned :class:`gem.Env` instance
+        """
+        raise NotImplementedError
+
 
 class EnvWrapper(Env):
     def __init__(self, env: Env):
