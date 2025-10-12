@@ -21,7 +21,18 @@ git clone https://github.com/sierra-research/tau-bench.git /path/to/tau-bench
 export TAU_BENCH_PATH=/path/to/tau-bench
 ```
 
-### 2. Set API Keys
+### 2. Install Dependencies
+```bash
+# Install GEM
+cd /path/to/gem/
+pip install -e .
+
+# Install TAU-bench
+cd /path/to/gem/examples/multiagent/tau_bench_retail/tau-bench
+pip install -e .
+```
+
+### 3. Set API Keys
 
 ```bash
 # Required for OpenAI models
@@ -31,7 +42,7 @@ export OPENAI_API_KEY="your-key"
 export OPENROUTER_API_KEY="your-key"
 ```
 
-### 3. Run Evaluation
+### 4. Run Evaluation
 
 ```bash
 python run_eval.py
