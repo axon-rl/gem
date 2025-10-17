@@ -47,7 +47,7 @@ def test_correct_termination_behavior(backend: Literal["mw", "kiwix"] = "kiwix")
 
 def test():
     print("TESTING IF WIKIGAME TERMINATES CORRECTLY")
-    for _ in range(10):
+    for _ in range(50):
         test_correct_termination_behavior(backend = "mw")
         test_correct_termination_behavior(backend = "kiwix")
 

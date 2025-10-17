@@ -63,7 +63,7 @@ class BaseWikiTrawler(ABC):
                 if missing:
                     raise QueryPageNotFoundException(result['pages'][0]['title'])
 
-                page_object =  result['pages'][0]
+                page_object = result['pages'][0]
                 result = WikipediaPage(
                     page_id = page_object['pageid'],
                     title = page_object['title'],
@@ -75,13 +75,22 @@ class BaseWikiTrawler(ABC):
                 # Prevent LLM cheesing the challenge by going to disambiguation pages
                 # which don't quite reflect its world knowledge.
                 # Subclass to remove this behavior.
-                page_object = self._direct_query(e.options[0])['pages'][0]
-                result = WikipediaPage(
-                    page_id = page_object['pageid'],
-                    title = page_object['title'],
-                    content = page_object['extract'],
-                    links = [d['title'] for d in page_object['links']]
-                )
+                page_object = None
+                # bugfix (171025): Sometimes we still get a red linked page.
+                #                  Fixed by checking out all possible options.
+                for option in e.options:
+                    page_object = self._direct_query(option)['pages'][0]
+                    if 'missing' not in page_object:
+                        result = WikipediaPage(
+                            page_id = page_object['pageid'],
+                            title = page_object['title'],
+                            content = page_object['extract'],
+                            links = [d['title'] for d in page_object['links']]
+                        )
+                        break
+                else:
+                    result = None
+
             except QueryPageNotFoundException as e:
                 # Use search as a fallback
                 result = self._search_query(e.title)
