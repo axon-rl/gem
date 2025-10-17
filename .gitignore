@@ -200,4 +200,4 @@ scripts
 experiments/
 
 # Ignore data-heavy directories
-tests/test_env/wikigame/kiwix_volume
+tests/test_env/kiwix_server/kiwix_volume
