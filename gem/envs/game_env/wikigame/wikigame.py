@@ -95,7 +95,7 @@ class WikiGameEnv(Env):
         # # Trivial rate-limiting in order to not get blocked by Wikimedia
         # wikipedia.set_rate_limiting(True, min_wait = datetime.timedelta(seconds = WIKIPEDIA_DELAY_SECONDS))
         self.max_turns = max_turns
-        self._resolve_page_cache = {}
+
         try:
             self.trawler: BaseWikiTrawler = self.VALID_BACKENDS[backend](**(trawler_kwargs or {}))
         except KeyError:
@@ -185,7 +185,7 @@ class WikiGameEnv(Env):
 
         self.current_page: WikipediaPage = self.start_page
         self.turn_count: int = 0
-        self._resolve_page_cache = {}
+        self.trawler.empty_cache()
         return (self._get_instructions(), {"suffix": self.get_task_suffix()})
 
     def step(self, action: str) -> Tuple[str, float, bool, bool, Dict[str, Any]]:

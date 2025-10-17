@@ -40,6 +40,14 @@ class BaseWikiTrawler(ABC):
     def random(self) -> Optional[WikipediaPage]:
         pass
 
+    def empty_cache(self) -> None:
+        '''
+        Empties the internal page cache.
+        '''
+        if self.query_use_cache:
+            self._page_cache = {}
+    
+
     # Error handling behavior is adapted from ARENA 3.0, Chapter 3, Part 4.
     # Source: https://github.com/callummcdougall/ARENA_3.0/blob/main/chapter3_llm_evals/exercises/part4_llm_agents/3.4_LLM_Agents_solutions.ipynb
     def get_page(self, page_name: str) -> Optional[WikipediaPage]:
@@ -176,7 +184,12 @@ class MediaWikiTrawler(BaseWikiTrawler):
         ))
         if not result['random']:
             return None
-        return self.get_page(result['random'][0]['title'])
+        page = self.get_page(result['random'][0]['title'])
+
+        # bugfix (171025): Sometimes the random page throws us a dead-end page.
+        if page is None or not page.links:
+            return self.random()
+        return page
         
 class KiwixWikiTrawler(BaseWikiTrawler):
     '''
@@ -245,7 +258,19 @@ class KiwixWikiTrawler(BaseWikiTrawler):
 
         # Use BS4 to extract the HTML content
         soup = BeautifulSoup(raw_html, 'html.parser')
-        title = soup.select('h1.firstHeading')[0].text
+        # bugfix (171025): If there is a meta header with http-equiv="refresh",
+        #                  it indicates that the page is a redirect.
+        #                  That redirect is NOT followed by requests library, so no choice...
+        meta_refresh = soup.select('meta', attrs={'http-equiv': 'refresh'})
+        if (
+            meta_refresh 
+            and 'content' in meta_refresh[0].attrs 
+            and meta_refresh[0]['content'].startswith("0;URL=")
+        ):
+            redirect_target = soup.select('a')[0]['href'].split('/')[-1]
+            return self._direct_query(redirect_target)
+
+        title = soup.select('h1#firstHeading')[0].text
 
         content_paras = soup.select('div.mw-content-ltr.mw-parser-output')[0]
 
@@ -260,10 +285,19 @@ class KiwixWikiTrawler(BaseWikiTrawler):
             ):
                 tag.decompose()
 
-        links = set(map(
+        # bugfix: Apparently THIS page exists in the 2025-09 simple English dump:
+        # Myalgic_encephalomyelitis/chronic_fatigue_syndrome
+        # which somehow creates a new folder in Kiwix
+        # and all of its hyperlinks are in the outer folder.
+        link_list = map(
             lambda lnk: lnk.get('href', None),
             content_paras.select('a')
-        ))
+        )
+        link_list = map(
+            lambda lnk: lnk.replace('../', '') if lnk is not None else None,
+            link_list
+        )
+        links = set(link_list)
 
         # Delete all textual content from first body para after references.
         ref_header = content_paras.find(id='References')
@@ -339,15 +373,19 @@ class KiwixWikiTrawler(BaseWikiTrawler):
                     allow_redirects = True,
                     timeout = 5
                 )
-                print(f'{self.url}/random?content={self.zimfile}: {response.status_code}')
             except Timeout as e:
                 warn("Timeout occurred while querying Kiwix endpoint.")
                 continue
             except Exception as e:
-                print(f"Unexpected exception {e} occurred while querying for a random page.")
+                warn(f"Unexpected exception {e} occurred while querying for a random page.")
                 continue
             if response.status_code == 200:
                 break
         else:
             return None
-        return self.get_page(response.url.split('/')[-1])
+        page = self.get_page(response.url.split('/')[-1])
+
+        # bugfix (171025): Sometimes the random page throws us a dead-end page.
+        if page is None or not page.links:
+            return self.random()
+        return page

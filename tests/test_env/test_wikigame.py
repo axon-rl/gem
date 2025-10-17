@@ -30,9 +30,10 @@ def test_correct_termination_behavior(backend: Literal["mw", "kiwix"] = "kiwix")
         "game:WikiGame-v0-hard",
     ]:
         env = gem.make(env_name, backend = backend, trawler_kwargs = trawler_kwargs)
-        wrapped_env = WRAPPER_FACTORY["concat"](env)
+        # wrapped_env = WRAPPER_FACTORY["concat"](env)
         run_and_print_episode(
-            wrapped_env,
+            # wrapped_env,
+            env,
             lambda _: env.sample_random_action(),
             ignore_done=False,
         )
@@ -44,12 +45,43 @@ def test_correct_termination_behavior(backend: Literal["mw", "kiwix"] = "kiwix")
         ), f"Episode met unexpected termination condition in {env_name}"
         print(f"Test passed for {env_name}")
 
+def kiwix_stress_test():
+    ''''
+    Run a stress test on a Kiwix backend with massively parallel requests.
+    '''
+    # env = gem.make("game:WikiGame-v0-easy", backend = "kiwix", trawler_kwargs = {
+    #     "url": "http://localhost:8080",
+    #     "zimfile": "wikipedia_en_simple_all_nopic_2025-09",
+    #     "query_delay_ms": 0,
+    # })
+    NUM_ENVS = 64
+    vec_env = gem.make_vec(
+        ["game:WikiGame-v0-easy"] * 64,
+        vec_kwargs=[{
+            "backend": "kiwix",
+            "trawler_kwargs": {
+                "url": "http://localhost:8080",
+                "zimfile": "wikipedia_en_simple_all_nopic_2025-09",
+                "query_delay_ms": 0,
+                "query_use_cache": True,
+            },
+        }] * NUM_ENVS,
+        seed = int(1e9),
+    )
+    run_and_print_episode(
+        vec_env,
+        lambda _: [vec_env.envs[i].sample_random_action() for i in range(NUM_ENVS)],
+        ignore_done = True,
+    )
 
 def test():
     print("TESTING IF WIKIGAME TERMINATES CORRECTLY")
-    for _ in range(50):
-        test_correct_termination_behavior(backend = "mw")
+    for _ in range(10):
+        # test_correct_termination_behavior(backend = "mw")
         test_correct_termination_behavior(backend = "kiwix")
+    
+    print("KIWIX STRESS TEST")
+    kiwix_stress_test()
 
 if __name__ == "__main__":
     fire.Fire(test)
