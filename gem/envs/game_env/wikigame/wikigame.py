@@ -13,20 +13,21 @@
 # limitations under the License.
 
 import random
-from time import sleep
-import datetime
 import re
-import wikipedia
-from wikipedia import WikipediaPage, PageError, DisambiguationError, HTTPTimeoutError
-from dataclasses import dataclass
 from typing import Any, Dict, Optional, Tuple
 
 from gem.core import Env
 from gem.utils.constants import LanguageGameReward
 
-WIKIPEDIA_DELAY_SECONDS = 0.01
+from .backend import BaseWikiTrawler, MediaWikiTrawler, KiwixWikiTrawler
+from .wikipage import WikipediaPage
 
 class WikiGameEnv(Env):
+    VALID_BACKENDS = {
+        "mw": MediaWikiTrawler,
+        "kiwix": KiwixWikiTrawler
+    }
+
     '''
     Implements a fully text-based Wikipedia Game environment.
 
@@ -35,20 +36,33 @@ class WikiGameEnv(Env):
     full history of observations and actions to the current observation.
     You can do so by wrapping this environment with the `ObservationWrapper`
     in `gem.wrappers.observation_wrapper`.
-    2. This environment makes live API calls to Wikipedia.
-        a. Excessive usage may get your IP address rate-limited or blocked by Wikimedia.
+    2. This environment CAN use a local Kiwix server (if backend = 'kiwix') or 
+        MediaWiki API (if backend = 'mw') to fetch Wikipedia pages.
+    3. Alternatively, this environment MAY make live API calls to Wikipedia 
+        (if provided URL leads to 'wikipedia.org')
+        a. Excessive usage may get your IP address rate-limited or blocked 
+            by Wikimedia.
         b. The environment may be slow due to network latency.
-        c. The environment may use a wide range of characters which may exceed some models' vocabularies.
+        c. The environment may use a wide range of characters which may 
+            exceed some models' vocabularies.
 
     Environment Description:
 
-    The Wikipedia Game is a fully observable, static, (almost) deterministic, single-agent environment
-    where the agent's objective is to navigate from a starting Wikipedia page to a target Wikipedia page
-    within a limited number of hyperlink visits (turns).
+    The Wikipedia Game is a fully observable, static, (almost) deterministic, 
+        single-agent environment where the agent's objective is to navigate 
+        from a starting Wikipedia page to a target Wikipedia page.
+
+    There exists many variations of the Wikipedia Game. In light of this,
+        this environment is designed to be extensible to different rule-sets.
+        For simplicity, however, this environment by default implements a 
+        "least-clicks, no-regrets" variant, where the agent must reach the target 
+        page within a limited number of hyperlink visits (turns), and is not 
+        allowed to backtrack to previously visited pages.
 
     State: (p_current, p_target, step_ct):
-        - (p_current) The title and plain-text body of the current Wikipedia page, with the exception of hyperlinks,
-            whose HTML tags are retained to identify neighboring pages.
+        - (p_current) The title and plain-text body of the current 
+            Wikipedia page, with the exception of hyperlinks, whose HTML tags 
+            are retained to identify neighboring pages.
         - (p_target) The title of the target Wikipedia page.
         - (step_ct) The current turn count, starting from 0.
 
@@ -57,26 +71,39 @@ class WikiGameEnv(Env):
         - (p_target) A random Wikipedia page as the target page
 
     Action & Transition: 
-        - The title of a neighboring Wikipedia page, specified within \\boxed{} tags.
+        - The title of a neighboring Wikipedia page, specified within \\boxed{} 
+            tags.
         - p_current <- any Wikipedia page whose title matches that of the action.
-        - If the action does not correspond to a valid neighboring page, p_current remains unchanged.
+        - If the action does not correspond to a valid neighboring page, p_current 
+            remains unchanged.
         - Regardless of the validity of the action, step_ct increments by 1.
 
     Terminal State:
-        - The game **terminates** when the agent reaches the target page (p_current == p_target).
-        - The game **truncates** when the agent exhausts the maximum number of allowed turns without reaching the target page
+        - The game **terminates** when the agent reaches the target page 
+            (p_current == p_target), or when the agent reaches a "dead-end" page
+            (with no outgoing hyperlinks).
+        - The game **truncates** when the agent exhausts the maximum number of 
+            allowed turns without reaching the target page.
     
     Reward Function:
         - +1 if the agent reaches the target page (success)
         - -0.01 if the action was not parseable (format error)
         - 0 otherwise.
     '''
-    def __init__(self, max_turns: int = 10, **_):
+    def __init__(self, max_turns: int = 10, backend = 'mw', trawler_kwargs = None, **_):
         super().__init__()
-        # Trivial rate-limiting in order to not get blocked by Wikimedia
-        wikipedia.set_rate_limiting(True, min_wait = datetime.timedelta(seconds = WIKIPEDIA_DELAY_SECONDS))
+        # # Trivial rate-limiting in order to not get blocked by Wikimedia
+        # wikipedia.set_rate_limiting(True, min_wait = datetime.timedelta(seconds = WIKIPEDIA_DELAY_SECONDS))
         self.max_turns = max_turns
         self._resolve_page_cache = {}
+        try:
+            self.trawler: BaseWikiTrawler = self.VALID_BACKENDS[backend](**(trawler_kwargs or {}))
+        except KeyError:
+            raise ValueError(f"Invalid backend '{backend}'. Valid options are: {list(self.VALID_BACKENDS.keys())}")
+        
+        if not isinstance(self.trawler, BaseWikiTrawler):
+            raise ValueError(f"Backend '{backend}' has to subclass BaseWikiTrawler.")
+
         self.reset()
 
     def _get_instructions(self) -> str:
@@ -130,49 +157,22 @@ class WikiGameEnv(Env):
             "Enter the title of the neighboring page you want to navigate to."
         )
 
-    def _try_resolve_page(self, page_name: str) -> Optional[WikipediaPage]:
-        '''
-        Tries to resolve a page title to a WikipediaPage object.
-        Returns None if the page cannot be resolved.
-        '''
-        if page_name in self._resolve_page_cache:
-            return self._resolve_page_cache[page_name]
-
-        next_page = None
-        attempts = 0
-        while next_page is None and attempts < 5:
-            try:
-                next_page = wikipedia.page(page_name, auto_suggest = False, redirect = True)
-            except DisambiguationError as e:
-                # This is unlikely to happen since most Wikipedia links should be well-formed.
-                # But we handle it just in case.
-                next_page = wikipedia.page(e.options[0], auto_suggest = False, redirect = True)
-            except PageError:
-                # Unfortunately Wikipedia articles get renamed or deleted over time.
-                # In these cases, try to resolve the page via search.
-                potential_pages = wikipedia.search(page_name, results = 1)
-                if len(potential_pages) and potential_pages[0] not in self._resolve_page_cache:
-                    next_page = self._try_resolve_page(potential_pages[0])
-                else:
-                    next_page = None
-            except HTTPTimeoutError:
-                # Try again
-                pass
-            # Pokemon Exception Handling :( 
-            # But this keeps the environment from crashing which is arguably more annoying.
-            except Exception:
-                next_page = None
-            attempts += 1
-        
-        self._resolve_page_cache[page_name] = next_page
-
-        return next_page
-
     def _random_page(self) -> WikipediaPage:
         '''
-        Returns a random Wikipedia page.
+        Returns a random, non-disambiguated Wikipedia page.
         '''
-        return self._try_resolve_page(wikipedia.random(1))
+        page: WikipediaPage = None
+        for _ in range(5):
+            page = self.trawler.random()
+            if page and 'disambiguation' not in page.title.lower():
+                break
+
+        if not isinstance(page, WikipediaPage):
+            raise ValueError(
+                "Failed to fetch a valid Wikipedia page, "
+                "perhaps due to repeated backend failures."
+            )
+        return page
 
     def reset(self, seed: Optional[int] = None) -> Tuple[str, Dict[str, Any]]:
         super().reset(seed)
@@ -221,9 +221,7 @@ class WikiGameEnv(Env):
             reward = LanguageGameReward.invalid_action_reward
         
         # Step 2: Try to load the page
-        # As a default, error handling behavior is taken from ARENA 3.0, Chapter 3, Part 4.
-        # Source: https://github.com/callummcdougall/ARENA_3.0/blob/main/chapter3_llm_evals/exercises/part4_llm_agents/3.4_LLM_Agents_solutions.ipynb
-        next_page = self._try_resolve_page(next_page_title)
+        next_page = self.trawler.get_page(next_page_title)
         
         # Step 3a: Check for maximum turns reached
         if self.turn_count >= self.max_turns:
@@ -246,6 +244,18 @@ class WikiGameEnv(Env):
             self.current_page = next_page
             terminate_obs = f"Congratulations! You have reached the target page '{self.target_page.title}' in {self.turn_count} turns."
             reward = LanguageGameReward.success_reward
+            return (
+                terminate_obs,
+                reward,
+                True,
+                False,
+                {"suffix": self.get_task_suffix()},
+            )
+        # Step 3d: Valid action, but dead-end page.
+        elif not next_page.links:
+            self.current_page = next_page
+            terminate_obs = f"At turn {self.turn_count}, you navigated to the '{self.current_page.title}' page, which is a dead-end page with no neighboring pages."
+            reward = LanguageGameReward.fail_reward
             return (
                 terminate_obs,
                 reward,

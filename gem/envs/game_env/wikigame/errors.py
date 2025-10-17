@@ -1,0 +1,20 @@
+'''
+Some nifty exceptions with reference from https://github.com/goldsmith/Wikipedia
+'''
+
+class DisambiguationException(Exception):
+    def __init__(self, title, options):
+        self.title = title
+        self.options = options
+        super().__init__(
+            f"{self.title} points to a disambiguation page. "
+            f"It may refer to: {'\n'.join(self.options)}"
+        )
+
+class QueryPageNotFoundException(Exception):
+    def __init__(self, title):
+        self.title = title
+        super().__init__(
+            f"'{self.title}' does not correspond to a real Wikipedia page. "
+            "Consider using the search tool if available."
+        )

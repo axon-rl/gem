@@ -198,3 +198,6 @@ scripts
 # misc
 .DS_Store
 experiments/
+
+# Ignore data-heavy directories
+tests/test_env/wikigame/kiwix_volume
