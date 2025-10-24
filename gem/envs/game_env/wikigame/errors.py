@@ -6,9 +6,10 @@ class DisambiguationException(Exception):
     def __init__(self, title, options):
         self.title = title
         self.options = options
+        option_string = '\n'.join(self.options)
         super().__init__(
             f"{self.title} points to a disambiguation page. "
-            f"It may refer to: {'\n'.join(self.options)}"
+            f"It may refer to: {option_string}"
         )
 
 class QueryPageNotFoundException(Exception):
