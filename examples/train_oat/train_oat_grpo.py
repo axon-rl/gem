@@ -111,7 +111,7 @@ class Args(PPOArgs):
 
     # Reward settings
     gamma: float = 1.0  # Discount factor for Monte Carlo returns
-    norm_return: bool = True
+    norm_return: bool = False  # Should be False to avoid double normalization
 
     # online evaluation settings
     eval_envs: str = None  # 'eval:AIME24|eval:MATH500'. See gem.envs
@@ -126,7 +126,7 @@ class Args(PPOArgs):
     # Episode collection logic
     keep_generation_failed: bool = False  # Keep episodes with generation failures
 
-    critic_type2: Literal["grpo", "drgrpo", "rloo", "ep_level", "none"] = "none"
+    critic_type2: Literal["grpo", "drgrpo", "rloo", "ep_level", "none"] = "grpo"
 
 
 """ +=======================================+ """
