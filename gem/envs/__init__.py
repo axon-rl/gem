@@ -504,8 +504,21 @@ for name, env_name in data_names:
     register(
         f"eval:{env_name}",
         "gem.envs.qa_env:QaEnv",
-        dataset_name=f"axon-rl/search-eval",
+        dataset_name="axon-rl/search-eval",
         split=name,
         question_key="question",
         answer_key="answer",
     )
+
+# Webshop
+for obs_mode in ["html", "text", "text_rich"]:
+    for split in ["train", "test"]:
+        register(
+            f"webshop:{split}-{obs_mode}",
+            "gem.envs.webshop.webshop:WebshopEnv",
+            observation_mode=obs_mode,
+            max_turns=15,
+            split=split,
+            error_tolerance=15,
+            format_error_reward=-0.1,
+        )
