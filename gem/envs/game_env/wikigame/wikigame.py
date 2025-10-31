@@ -157,7 +157,7 @@ class WikiGameEnv(Env):
         
         elif self.page_summary_length_unit == 'sentences':
             summ_length = min(self.page_summary_length, len(page.content.split('.')))
-            return '.'.join(page.content.split('.')[:summ_length])
+            return '. '.join(page.content.split('. ')[:summ_length])
 
     # aesthetic fix (261025): First page should be bullet-pointed too.
     def _get_neighboring_pages_formatted(self, page: WikipediaPage) -> list[str]:
