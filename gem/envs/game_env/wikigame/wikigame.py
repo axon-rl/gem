@@ -27,6 +27,11 @@ class WikiGameEnv(Env):
         "mw": MediaWikiTrawler,
         "kiwix": KiwixWikiTrawler
     }
+    VALID_SUMMARY_UNITS = [
+        'characters',
+        'words',
+        'sentences',
+    ]
 
     '''
     Implements a fully text-based Wikipedia Game environment.
@@ -90,11 +95,17 @@ class WikiGameEnv(Env):
         - -0.01 if the action was not parseable (format error)
         - 0 otherwise.
     '''
-    def __init__(self, max_turns: int = 10, backend = 'mw', trawler_kwargs = None, **_):
+    # QoL (311025): Add `page_summary_length` parameter to control length of page summaries.
+    def __init__(self, max_turns: int = 10, backend = 'mw', trawler_kwargs = None, page_summary_length: tuple[int, str] = (100, 'characters'), **_):
         super().__init__()
         # # Trivial rate-limiting in order to not get blocked by Wikimedia
         # wikipedia.set_rate_limiting(True, min_wait = datetime.timedelta(seconds = WIKIPEDIA_DELAY_SECONDS))
         self.max_turns = max_turns
+        self.page_summary_length, self.page_summary_length_unit = page_summary_length
+        assert self.page_summary_length_unit in self.VALID_SUMMARY_UNITS, (
+            f"Invalid page_summary_length unit '{self.page_summary_length_unit}'. "
+            f"Valid options are: {self.VALID_SUMMARY_UNITS}"
+        )
 
         try:
             self.trawler: BaseWikiTrawler = self.VALID_BACKENDS[backend](**(trawler_kwargs or {}))
@@ -127,7 +138,7 @@ class WikiGameEnv(Env):
             "A Wikipedia page is a webpage on Wikipedia containing articles on a specific topic, as identified by its title.\n"
             "A neighboring page is defined as any page accessible via a hyperlink from the current page.\n"
             "You will start at a random Wikipedia page, and must navigate to a target Wikipedia page by visiting neighboring pages.\n"
-            "To visit a neighboring page, enter its title wrapped in \\boxed{} tags (e.g., '\\boxed{Python (programming language)}').\n"
+            "To visit a neighboring page, enter its title wrapped in \\boxed{} tags (for example, \\boxed{Python (programming language)}).\n"
             f"You can visit up to {self.max_turns} neighboring pages (excluding the starting page) to reach the target page.\n"
             "As you play, the history of your moves will be appended below. Use the information to navigate to the target page before you run out of turns.\n"
             f"Lastly, you started at '{self.current_page.title}' and your target page is '{self.target_page.title}'.\n"
@@ -136,10 +147,21 @@ class WikiGameEnv(Env):
         )
 
     def _page_summary(self, page: WikipediaPage) -> str:
-        return page.content[:250]
-    
+        if self.page_summary_length_unit == 'characters':
+            summ_length = min(self.page_summary_length, len(page.content))
+            return page.content[:summ_length]
+        
+        elif self.page_summary_length_unit == 'words':
+            summ_length = min(self.page_summary_length, len(page.content.split()))
+            return ' '.join(page.content.split()[:summ_length])
+        
+        elif self.page_summary_length_unit == 'sentences':
+            summ_length = min(self.page_summary_length, len(page.content.split('.')))
+            return '.'.join(page.content.split('.')[:summ_length])
+
+    # aesthetic fix (261025): First page should be bullet-pointed too.
     def _get_neighboring_pages_formatted(self, page: WikipediaPage) -> list[str]:
-        return '\n- '.join(page.links)
+        return '\n- ' +  '\n- '.join(page.links)
 
     def _construct_current_page_summary(self) -> str:
         return (
@@ -215,62 +237,66 @@ class WikiGameEnv(Env):
                 {"suffix": self.get_task_suffix()},
             )
         
-        # Step 1: Check the title exists on the current page
-        if next_page_title not in self.current_page.links:
-            next_obs = f"At turn {self.turn_count}, you guessed '{next_page_title}', which is not a neighboring page of '{self.current_page}'."
-            reward = LanguageGameReward.invalid_action_reward
-        
-        # Step 2: Try to load the page
-        next_page = self.trawler.get_page(next_page_title)
-        
-        # Step 3a: Check for maximum turns reached
+        # Step 1: If we exhausted max turns, truncate the episode IMMEDIATELY.
         if self.turn_count >= self.max_turns:
-                    terminate_obs = f"At turn {self.turn_count}, you have reached the maximum number of turns without reaching the target page '{self.target_page.title}'."
-                    reward = LanguageGameReward.fail_reward
-                    return (
-                        terminate_obs,
-                        reward,
-                        True,
-                        True,
-                        {"suffix": self.get_task_suffix()},
-                    )
-        # Step 3b: Check if the page could not be loaded
-        elif next_page is None:
-            next_obs = f"At turn {self.turn_count}, you guessed '{next_page_title}', which could not be loaded due to repeated errors."
-            reward = LanguageGameReward.invalid_action_reward
-
-        # Step 3c: Check if we are on the target page.
-        elif next_page.title == self.target_page:
-            self.current_page = next_page
-            terminate_obs = f"Congratulations! You have reached the target page '{self.target_page.title}' in {self.turn_count} turns."
-            reward = LanguageGameReward.success_reward
-            return (
-                terminate_obs,
-                reward,
-                True,
-                False,
-                {"suffix": self.get_task_suffix()},
-            )
-        # Step 3d: Valid action, but dead-end page.
-        elif not next_page.links:
-            self.current_page = next_page
-            terminate_obs = f"At turn {self.turn_count}, you navigated to the '{self.current_page.title}' page, which is a dead-end page with no neighboring pages."
+            terminate_obs = f"At turn {self.turn_count}, you have reached the maximum number of turns without reaching the target page '{self.target_page.title}'."
             reward = LanguageGameReward.fail_reward
             return (
                 terminate_obs,
                 reward,
                 True,
-                False,
+                True,
                 {"suffix": self.get_task_suffix()},
             )
-        # Step 3d: Valid action, but not the target page.
+
+        # Step 2: If the title does not exist, it is an invalid action. Resolve immediately.
+        # bugfix (261025): Make sure we retrieve only the title to not waste tokens.
+        # bugfix (261025): Failure to terminate on invalid action caused model to always navigate to Python page.
+        if next_page_title not in self.current_page.links:
+            next_obs = f"At turn {self.turn_count}, you guessed '{next_page_title}', which is not a neighboring page of '{self.current_page.title}'."
+            reward = LanguageGameReward.invalid_action_reward
         else:
-            self.current_page = next_page
-            next_obs = (
-                f"At turn {self.turn_count}, you navigated to the '{self.current_page.title}' page. "
-                f"Here is a summary of the page:\n{self.current_page.content[:500]}...\n"
-            )
-            reward = LanguageGameReward.internal_step_reward
+            # Otherwise, we try to figure out the exact reward and next observation.
+            # Step 3: Try to load the page
+            next_page = self.trawler.get_page(next_page_title)
+            
+            # Step 4a: Check if the page could not be loaded
+            if next_page is None:
+                next_obs = f"At turn {self.turn_count}, you guessed '{next_page_title}', which could not be loaded due to repeated errors."
+                reward = LanguageGameReward.invalid_action_reward
+
+            # Step 4b: Check if we are on the target page.
+            elif next_page.title == self.target_page:
+                self.current_page = next_page
+                terminate_obs = f"Congratulations! You have reached the target page '{self.target_page.title}' in {self.turn_count} turns."
+                reward = LanguageGameReward.success_reward
+                return (
+                    terminate_obs,
+                    reward,
+                    True,
+                    False,
+                    {"suffix": self.get_task_suffix()},
+                )
+            # Step 4c: Valid action, but dead-end page.
+            elif not next_page.links:
+                self.current_page = next_page
+                terminate_obs = f"At turn {self.turn_count}, you navigated to the '{self.current_page.title}' page, which is a dead-end page with no neighboring pages."
+                reward = LanguageGameReward.fail_reward
+                return (
+                    terminate_obs,
+                    reward,
+                    True,
+                    False,
+                    {"suffix": self.get_task_suffix()},
+                )
+            # Step 4d: Valid action, but not the target page.
+            else:
+                self.current_page = next_page
+                next_obs = (
+                    f"At turn {self.turn_count}, you navigated to the '{self.current_page.title}' page. "
+                    f"Here is a summary of the page:\n{self._page_summary(self.current_page)}...\n"
+                )
+                reward = LanguageGameReward.internal_step_reward
         
         return next_obs, reward, False, False, {"suffix": self.get_task_suffix()}
 
