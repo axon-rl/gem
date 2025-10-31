@@ -98,8 +98,7 @@ class WikiGameEnv(Env):
     # QoL (311025): Add `page_summary_length` parameter to control length of page summaries.
     def __init__(self, max_turns: int = 10, backend = 'mw', trawler_kwargs = None, page_summary_length: tuple[int, str] = (100, 'characters'), **_):
         super().__init__()
-        # # Trivial rate-limiting in order to not get blocked by Wikimedia
-        # wikipedia.set_rate_limiting(True, min_wait = datetime.timedelta(seconds = WIKIPEDIA_DELAY_SECONDS))
+        
         self.max_turns = max_turns
         self.page_summary_length, self.page_summary_length_unit = page_summary_length
         assert self.page_summary_length_unit in self.VALID_SUMMARY_UNITS, (
@@ -138,7 +137,7 @@ class WikiGameEnv(Env):
             "A Wikipedia page is a webpage on Wikipedia containing articles on a specific topic, as identified by its title.\n"
             "A neighboring page is defined as any page accessible via a hyperlink from the current page.\n"
             "You will start at a random Wikipedia page, and must navigate to a target Wikipedia page by visiting neighboring pages.\n"
-            "To visit a neighboring page, enter its title wrapped in \\boxed{} tags (for example, \\boxed{Python (programming language)}).\n"
+            "To visit a neighboring page, enter its EXACT title, wrapped in \\boxed{} tags (for example, \\boxed{Python_(programming_language)}).\n"
             f"You can visit up to {self.max_turns} neighboring pages (excluding the starting page) to reach the target page.\n"
             "As you play, the history of your moves will be appended below. Use the information to navigate to the target page before you run out of turns.\n"
             f"Lastly, you started at '{self.current_page.title}' and your target page is '{self.target_page.title}'.\n"
@@ -159,9 +158,12 @@ class WikiGameEnv(Env):
             summ_length = min(self.page_summary_length, len(page.content.split('.')))
             return '. '.join(page.content.split('. ')[:summ_length])
 
-    # aesthetic fix (261025): First page should be bullet-pointed too.
+    # QoL (311025): Facilitate copying by formatting as \\boxed tags.
+    # This allows models to leverage their induction heads (which most LMs possess)
+    # and succeed at navigating to **some page** more often.
+    # https://transformer-circuits.pub/2022/in-context-learning-and-induction-heads/index.html
     def _get_neighboring_pages_formatted(self, page: WikipediaPage) -> list[str]:
-        return '\n- ' +  '\n- '.join(page.links)
+        return '\n- ' + '\n- '.join(f"\\boxed{{{link}}}" for link in page.links)
 
     def _construct_current_page_summary(self) -> str:
         return (
@@ -181,7 +183,7 @@ class WikiGameEnv(Env):
 
     def _random_page(self) -> WikipediaPage:
         '''
-        Returns a random, non-disambiguated Wikipedia page.
+        Returns a random, disambiguated Wikipedia page.
         '''
         page: WikipediaPage = None
         for _ in range(5):
@@ -250,10 +252,30 @@ class WikiGameEnv(Env):
             )
 
         # Step 2: If the title does not exist, it is an invalid action. Resolve immediately.
-        # bugfix (261025): Make sure we retrieve only the title to not waste tokens.
-        # bugfix (261025): Failure to terminate on invalid action caused model to always navigate to Python page.
         if next_page_title not in self.current_page.links:
-            next_obs = f"At turn {self.turn_count}, you guessed '{next_page_title}', which is not a neighboring page of '{self.current_page.title}'."
+
+            # QoL (311025): Try to fuzzy match for the cases where the model KIND OF
+            # knows the neighboring page's title, but made a small mistake which
+            # resulted in an invalid action.
+            fuzzy_matches = (
+                link for link in self.current_page.links
+                if next_page_title.lower() in link.lower()
+            )
+            try:
+                next_obs = (
+                    f"At turn {self.turn_count}, you guessed '{next_page_title}'. "
+                    f"which is not an exact match for any neighboring page of '{self.current_page.title}'. "
+                    f"Did you mean '{next(fuzzy_matches)}'? "
+                    f"You must match **exactly** one of the neighboring page titles to navigate there."
+                )
+            except StopIteration:
+                next_obs = (
+                    f"At turn {self.turn_count}, you guessed '{next_page_title}', "
+                    f"which is neither a neighboring page of '{self.current_page.title}', "
+                    f"nor could it be construed as a valid neighboring page title of it. "
+                    f"You must match **exactly** one of the neighboring page titles to navigate there."
+                )
+
             reward = LanguageGameReward.invalid_action_reward
         else:
             # Otherwise, we try to figure out the exact reward and next observation.
@@ -298,7 +320,13 @@ class WikiGameEnv(Env):
                 )
                 reward = LanguageGameReward.internal_step_reward
         
-        return next_obs, reward, False, False, {"suffix": self.get_task_suffix()}
+        return (
+            next_obs,
+            reward, 
+            False, 
+            False, 
+            {"suffix": self.get_task_suffix()},
+        )
 
     def sample_random_action(self) -> str:
         '''
