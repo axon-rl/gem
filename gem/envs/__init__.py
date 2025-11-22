@@ -284,6 +284,17 @@ register(
     max_turns=None,
     hardcore=None,
 )
+# wikigame
+register(
+    "game:WikiGame-v0-easy",
+    "gem.envs.game_env.wikigame:WikiGameEnv",
+    max_turns=30,
+)
+register(
+    "game:WikiGame-v0-hard",
+    "gem.envs.game_env.wikigame:WikiGameEnv",
+    max_turns=15,
+)
 
 # Register math dataset environments
 
