@@ -29,6 +29,11 @@ class WikiGameEnv(Env):
         "mw": MediaWikiTrawler,
         "kiwix": KiwixWikiTrawler
     }
+    VALID_SUMMARY_UNITS = [
+        'characters',
+        'words',
+        'sentences',
+    ]
 
     '''
     Implements a fully text-based Wikipedia Game environment.
@@ -92,11 +97,22 @@ class WikiGameEnv(Env):
         - -0.01 if the action was not parseable (format error)
         - 0 otherwise.
     '''
-    def __init__(self, max_turns: int = 10, backend = 'mw', trawler_kwargs = None, **_):
+    # QoL (311025): Add `page_summary_length` parameter to control length of page summaries.
+    def __init__(self, 
+        max_turns: int = 10, 
+        backend = 'mw', 
+        trawler_kwargs = None, 
+        page_summary_length: tuple[int, str] = (100, 'characters'), 
+        **_
+    ):
         super().__init__()
-        # # Trivial rate-limiting in order to not get blocked by Wikimedia
-        # wikipedia.set_rate_limiting(True, min_wait = datetime.timedelta(seconds = WIKIPEDIA_DELAY_SECONDS))
+        
         self.max_turns = max_turns
+        self.page_summary_length, self.page_summary_length_unit = page_summary_length
+        assert self.page_summary_length_unit in self.VALID_SUMMARY_UNITS, (
+            f"Invalid page_summary_length unit '{self.page_summary_length_unit}'. "
+            f"Valid options are: {self.VALID_SUMMARY_UNITS}"
+        )
 
         try:
             self.trawler: BaseWikiTrawler = self.VALID_BACKENDS[backend](**(trawler_kwargs or {}))
@@ -129,7 +145,7 @@ class WikiGameEnv(Env):
             "A Wikipedia page is a webpage on Wikipedia containing articles on a specific topic, as identified by its title.\n"
             "A neighboring page is defined as any page accessible via a hyperlink from the current page.\n"
             "You will start at a random Wikipedia page, and must navigate to a target Wikipedia page by visiting neighboring pages.\n"
-            "To visit a neighboring page, enter its title wrapped in \\boxed{} tags (e.g., '\\boxed{Python (programming language)}').\n"
+            "To visit a neighboring page, enter its EXACT title, wrapped in \\boxed{} tags (for example, \\boxed{Python_(programming_language)}).\n"
             f"You can visit up to {self.max_turns} neighboring pages (excluding the starting page) to reach the target page.\n"
             "As you play, the history of your moves will be appended below. Use the information to navigate to the target page before you run out of turns.\n"
             f"Lastly, you started at '{self.current_page.title}' and your target page is '{self.target_page.title}'.\n"
@@ -138,10 +154,24 @@ class WikiGameEnv(Env):
         )
 
     def _page_summary(self, page: WikipediaPage) -> str:
-        return page.content[:250]
-    
+        if self.page_summary_length_unit == 'characters':
+            summ_length = min(self.page_summary_length, len(page.content))
+            return page.content[:summ_length]
+        
+        elif self.page_summary_length_unit == 'words':
+            summ_length = min(self.page_summary_length, len(page.content.split()))
+            return ' '.join(page.content.split()[:summ_length])
+        
+        elif self.page_summary_length_unit == 'sentences':
+            summ_length = min(self.page_summary_length, len(page.content.split('.')))
+            return '. '.join(page.content.split('. ')[:summ_length])
+
+    # QoL (311025): Facilitate copying by formatting as \\boxed tags.
+    # This allows models to leverage their induction heads (which most LMs possess)
+    # and succeed at navigating to **some page** more often.
+    # https://transformer-circuits.pub/2022/in-context-learning-and-induction-heads/index.html
     def _get_neighboring_pages_formatted(self, page: WikipediaPage) -> list[str]:
-        return '\n- '.join(page.links)
+        return '\n- ' + '\n- '.join(f"\\boxed{{{link}}}" for link in page.links)
 
     def _construct_current_page_summary(self) -> str:
         return (
