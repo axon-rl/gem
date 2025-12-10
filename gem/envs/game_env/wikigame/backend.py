@@ -297,6 +297,13 @@ class KiwixWikiTrawler(BaseWikiTrawler):
             lambda lnk: lnk.replace('../', '') if lnk is not None else None,
             link_list
         )
+        # bugfix (241025): We do not want the LM to cheat using geospatial links
+        # This exhausts context window. Even if it didn't it would allow the LM to cheese
+        # the game by teleporting to its desired location.
+        link_list = filter(
+            lambda lnk: not (lnk is not None and lnk.startswith('geo:')),
+            link_list
+        )
         links = set(link_list)
 
         # Delete all textual content from first body para after references.
