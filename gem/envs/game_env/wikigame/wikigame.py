@@ -35,6 +35,15 @@ class WikiGameEnv(Env):
         'words',
         'sentences',
     ]
+    VALID_VARIANTS = [
+        # (Default) No backwards navigation; 
+        # can only click neighbor pages (may revisit pages)
+        'noregrets', 
+        # Allows backwards navigation (ONCE)
+        'oneback',
+        # Allows backwards navigation (free)
+        'freenav',
+    ]
 
     '''
     Implements a fully text-based Wikipedia Game environment.
@@ -102,6 +111,7 @@ class WikiGameEnv(Env):
         backend = 'mw', 
         trawler_kwargs = None, 
         page_summary_length: tuple[int, str] = (100, 'characters'), 
+        variant = 'noregrets',
         **_
     ):
         super().__init__()
@@ -121,6 +131,12 @@ class WikiGameEnv(Env):
         if not isinstance(self.trawler, BaseWikiTrawler):
             raise ValueError(f"Backend '{backend}' has to subclass BaseWikiTrawler.")
 
+        self.variant = variant
+        assert self.variant in self.VALID_VARIANTS, (
+            f"Invalid variant '{self.variant}'. "
+            f"Valid options are: {self.VALID_VARIANTS}"
+        )
+
         self.reset()
 
     def _get_instructions(self) -> str:
@@ -137,7 +153,7 @@ class WikiGameEnv(Env):
         - Wikipedia Game is not a game where pure navigation skills can let you excel,
             but rather, general knowledge and familiarity with Wikipedia's structure is key.
         '''
-        return (
+        instr = (
             f"You are playing the Wikipedia Game, and must reach the target Wikipedia page within {self.max_turns} turns.\n"
             "This game tests your general knowledge, as well as familiarity with how Wikipedia pages are interlinked.\n"
             "A page refers to a webpage.\n"
@@ -145,6 +161,28 @@ class WikiGameEnv(Env):
             "A neighboring page is defined as any page accessible via a hyperlink from the current page.\n"
             "You will start at a random Wikipedia page, and must navigate to a target Wikipedia page by visiting neighboring pages.\n"
             "To visit a neighboring page, enter its EXACT title, wrapped in \\boxed{} tags (for example, \\boxed{Python_(programming_language)}).\n"
+        )
+
+        if self.variant in ['oneback', 'freenav']:
+            instr += (
+                "If you wish, you may respond \\boxed{<PREV_PAGE>} to return "
+                "to the previous page. Do note, however, that this counts "
+                "towards your maximum number of turns. "
+            )
+            if self.variant == 'oneback':
+                instr += (
+                    "Note that you may NOT backtrack twice in a row. "
+                )
+            instr += "\n"
+        else:
+            instr += (
+                "Choose wisely, as you may not backtrack; "
+                "you can only visit neighboring pages (though you may revisit pages). "
+                "Note that trying to backtrack is an illegal move and will "
+                "still count towards your maximum number of turns.\n"
+            )
+
+        return instr + (
             f"You can visit up to {self.max_turns} neighboring pages (excluding the starting page) to reach the target page.\n"
             "As you play, the history of your moves will be appended below. Use the information to navigate to the target page before you run out of turns.\n"
             f"Lastly, you started at '{self.current_page.title}' and your target page is '{self.target_page.title}'.\n"
@@ -191,6 +229,10 @@ class WikiGameEnv(Env):
     def _random_page(self) -> WikipediaPage:
         '''
         Returns a random, disambiguated Wikipedia page.
+
+        Page is guaranteed not to be a dead end (i.e. has at least one outgoing link).
+        For obvious reasons, it is unfortunately not guaranteed 
+        that we can reach all pages from this one.
         '''
         page: WikipediaPage = None
         # Exponential backoff on backend failure to minimize errors.
@@ -216,6 +258,9 @@ class WikiGameEnv(Env):
         while self.start_page == self.target_page:
             self.start_page = self._random_page()
             self.target_page = self._random_page()
+
+        self.page_history: list[WikipediaPage] = [self.start_page]
+        self.backtracked: bool = False
 
         self.current_page: WikipediaPage = self.start_page
         self.turn_count: int = 0
@@ -248,9 +293,46 @@ class WikiGameEnv(Env):
                 {"suffix": self.get_task_suffix()},
             )
        
-        # Step 1: If the title does not exist, it is an invalid action. Resolve immediately.
-        if next_page_title not in self.current_page.links:
-
+        # Step 1: If allowed, handle backtracking.
+        if self.variant in ['oneback', 'freenav'] and next_page_title == '<PREV_PAGE>':
+            # Step 1a: If no last page (such as during 1st turn), invalid action.
+            if not len(self.page_history):
+                next_obs = (
+                    f"At turn {self.turn_count}, you attempted to backtrack "
+                    "to the previous page, but there is no previous page "
+                    "that you can return to."
+                )
+                reward = WikiGameReward.invalid_action_reward
+            # Step 1b: If already backtracked in 'oneback' variant, invalid action.
+            elif self.variant == 'oneback' and self.backtracked:
+                next_obs = (
+                    f"At turn {self.turn_count}, you attempted to backtrack "
+                    "to the previous page, but you have already backtracked "
+                    "once and cannot do so again."
+                )
+                reward = WikiGameReward.invalid_action_reward
+            # Step 1c: Valid backtrack.
+            else:
+                self.current_page = self.page_history.pop()
+                self.backtracked = True
+                next_obs = (
+                    f"At turn {self.turn_count}, you backtracked to the "
+                    f"previous page '{self.current_page.title}'. "
+                    f"Here is a summary of the page:\n{self._page_summary(self.current_page)}...\n"
+                )
+                reward = WikiGameReward.internal_step_reward
+        
+        # Step 2: If model attempted to backtrack on the wrong variant,
+        # treat as invalid action.
+        elif next_page_title == '<PREV_PAGE>':
+            next_obs = (
+                f"At turn {self.turn_count}, you attempted to backtrack "
+                "to the previous page, but backtracking is not allowed "
+                "in this variant of the Wikipedia Game."
+            )
+            reward = WikiGameReward.invalid_action_reward
+        # Step 2b: If the title does not exist, it is an invalid action. Resolve immediately.
+        elif next_page_title not in self.current_page.links:
             # We try to fuzzy match for the cases where the model KIND OF
             # knows the neighboring page's title, but made a small mistake which
             # resulted in an invalid action.
@@ -272,11 +354,11 @@ class WikiGameEnv(Env):
                     f"nor could it be construed as a valid neighboring page title of it. "
                     f"You must match **exactly** one of the neighboring page titles to navigate there."
                 )
-                
+
             reward = WikiGameReward.invalid_action_reward
         else:
             # Otherwise, we try to figure out the exact reward and next observation.
-            # Step 2: Try to load the page
+            # Step 3: Try to load the page
             next_page = self.trawler.get_page(next_page_title)
             
             # Step 3a: Check if the page could not be loaded
@@ -286,8 +368,13 @@ class WikiGameEnv(Env):
                 reward = WikiGameReward.invalid_action_reward
 
             # Step 3b: Check if we are on the target page.
+            # IMPORTANT NOTE FOR BACKTRACKING VARIANTS:
+            # We only remove the backtrack tag if the action is valid and
+            # the agent successfully navigates to a new page.
             elif next_page.title == self.target_page.title:
                 self.current_page = next_page
+                self.page_history.append(next_page)
+                self.backtracked = False
                 terminate_obs = f"Congratulations! You have reached the target page '{self.target_page.title}' in {self.turn_count} turns."
                 reward = WikiGameReward.success_reward
                 return (
@@ -300,28 +387,43 @@ class WikiGameEnv(Env):
             
             # Step 3c: Valid action, but dead-end page.
             elif not next_page.links:
-                self.current_page = next_page
-                terminate_obs = f"At turn {self.turn_count}, you navigated to the '{self.current_page.title}' page, which is a dead-end page with no neighboring pages."
+                if self.variant in ['oneback', 'freenav']:
+                    self.turn_count += 1
+                    self.backtracked = True
+                    next_obs = (
+                        f"At turn {self.turn_count}, you reached a dead-end page "
+                        f"'{next_page.title}' with no neighboring pages. "
+                        f"You have been automatically backtracked to the previous page "
+                        f"'{self.current_page.title}' at the cost of an additional turn. "
+                        f"Here is a summary of the page:\n{self._page_summary(self.current_page)}...\n"
+                    )
+                    reward = WikiGameReward.internal_step_reward
+                else:                    
+                    self.current_page = next_page
+                    terminate_obs = f"At turn {self.turn_count}, you navigated to the '{self.current_page.title}' page, which is a dead-end page with no neighboring pages."
 
-                reward = WikiGameReward.fail_reward
-                return (
-                    terminate_obs,
-                    reward,
-                    True,
-                    False,
-                    {"suffix": self.get_task_suffix()},
-                )
-
+                    reward = WikiGameReward.fail_reward
+                    return (
+                        terminate_obs,
+                        reward,
+                        True,
+                        False,
+                        {"suffix": self.get_task_suffix()},
+                    )
             # Step 3d: Valid action, but not the target page.
+            # IMPORTANT NOTE FOR BACKTRACKING VARIANTS:
+            # We only remove the backtrack tag if the action is valid and
+            # the agent successfully navigates to a new page.
             else:
                 self.current_page = next_page
+                self.page_history.append(next_page)
+                self.backtracked = False
                 next_obs = (
                     f"At turn {self.turn_count}, you navigated to the '{self.current_page.title}' page. "
                     f"Here is a summary of the page:\n{self._page_summary(self.current_page)}...\n"
                 )
                 reward = WikiGameReward.internal_step_reward
-               
- 
+        
         # Step 4: If we exhausted max turns, truncate the episode IMMEDIATELY.
         if self.turn_count >= self.max_turns:
             terminate_obs = f"At turn {self.turn_count}, you have reached the maximum number of turns without reaching the target page '{self.target_page.title}'."
