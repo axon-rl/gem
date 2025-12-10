@@ -94,11 +94,9 @@ class WikiGameEnv(Env):
             allowed turns without reaching the target page.
     
     Reward Function:
-        - +1 if the agent reaches the target page (success)
-        - -0.01 if the action was not parseable (format error)
-        - 0 otherwise.
+        - Customizable via `wikigame.rewards.WikiGameReward`.
     '''
-    # QoL (311025): Add `page_summary_length` parameter to control length of page summaries.
+    
     def __init__(self, 
         max_turns: int = 10, 
         backend = 'mw', 
@@ -167,7 +165,7 @@ class WikiGameEnv(Env):
             summ_length = min(self.page_summary_length, len(page.content.split('.')))
             return '. '.join(page.content.split('. ')[:summ_length])
 
-    # QoL (311025): Facilitate copying by formatting as \\boxed tags.
+    # Facilitate copying by formatting as \\boxed tags.
     # This allows models to leverage their induction heads (which most LMs possess)
     # and succeed at navigating to **some page** more often.
     # https://transformer-circuits.pub/2022/in-context-learning-and-induction-heads/index.html
@@ -189,14 +187,13 @@ class WikiGameEnv(Env):
             f"{self._construct_current_page_summary()}\n"
             "Enter the title of the neighboring page you want to navigate to."
         )
-
     
     def _random_page(self) -> WikipediaPage:
         '''
         Returns a random, disambiguated Wikipedia page.
         '''
         page: WikipediaPage = None
-        # (141125) Implement exponential backoff on backend failure to minimize errors.
+        # Exponential backoff on backend failure to minimize errors.
         for i in range(10):
             page = self.trawler.random()
             if not isinstance(page, WikipediaPage):
@@ -242,7 +239,6 @@ class WikiGameEnv(Env):
         
         if not next_page_title:
             next_obs = f"At turn {self.turn_count}, you did not provide a valid neighboring page title."
-            #reward = -0.2
             reward = WikiGameReward.format_error_reward
             return (
                 next_obs,
@@ -255,7 +251,7 @@ class WikiGameEnv(Env):
         # Step 1: If the title does not exist, it is an invalid action. Resolve immediately.
         if next_page_title not in self.current_page.links:
 
-            # QoL (311025): Try to fuzzy match for the cases where the model KIND OF
+            # We try to fuzzy match for the cases where the model KIND OF
             # knows the neighboring page's title, but made a small mistake which
             # resulted in an invalid action.
             fuzzy_matches = (
@@ -276,7 +272,7 @@ class WikiGameEnv(Env):
                     f"nor could it be construed as a valid neighboring page title of it. "
                     f"You must match **exactly** one of the neighboring page titles to navigate there."
                 )
-            #reward = -0.5
+                
             reward = WikiGameReward.invalid_action_reward
         else:
             # Otherwise, we try to figure out the exact reward and next observation.
@@ -286,7 +282,7 @@ class WikiGameEnv(Env):
             # Step 3a: Check if the page could not be loaded
             if next_page is None:
                 next_obs = f"At turn {self.turn_count}, you guessed '{next_page_title}', which could not be loaded due to repeated errors."
-                # reward = 0.0
+
                 reward = WikiGameReward.invalid_action_reward
 
             # Step 3b: Check if we are on the target page.
@@ -301,11 +297,12 @@ class WikiGameEnv(Env):
                     False,
                     {"suffix": self.get_task_suffix()},
                 )
+            
             # Step 3c: Valid action, but dead-end page.
             elif not next_page.links:
                 self.current_page = next_page
                 terminate_obs = f"At turn {self.turn_count}, you navigated to the '{self.current_page.title}' page, which is a dead-end page with no neighboring pages."
-                # reward = -1
+
                 reward = WikiGameReward.fail_reward
                 return (
                     terminate_obs,
@@ -314,6 +311,7 @@ class WikiGameEnv(Env):
                     False,
                     {"suffix": self.get_task_suffix()},
                 )
+
             # Step 3d: Valid action, but not the target page.
             else:
                 self.current_page = next_page
@@ -322,13 +320,11 @@ class WikiGameEnv(Env):
                     f"Here is a summary of the page:\n{self._page_summary(self.current_page)}...\n"
                 )
                 reward = WikiGameReward.internal_step_reward
-                # reward = -0.1
                
  
         # Step 4: If we exhausted max turns, truncate the episode IMMEDIATELY.
         if self.turn_count >= self.max_turns:
             terminate_obs = f"At turn {self.turn_count}, you have reached the maximum number of turns without reaching the target page '{self.target_page.title}'."
-            # reward = -1
             reward = WikiGameReward.fail_reward
             return (
                 terminate_obs,
