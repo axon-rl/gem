@@ -18,11 +18,12 @@ from time import sleep
 from typing import Any, Dict, Optional, Tuple
 
 from gem.core import Env
-from gem.utils.constants import LanguageGameReward
+# from gem.utils.constants import LanguageGameReward
 
 from .backend import BaseWikiTrawler, MediaWikiTrawler, KiwixWikiTrawler
 from .errors import BackendFailureException
 from .wikipage import WikipediaPage
+from .rewards import WikiGameReward
 
 class WikiGameEnv(Env):
     VALID_BACKENDS = {
@@ -241,7 +242,8 @@ class WikiGameEnv(Env):
         
         if not next_page_title:
             next_obs = f"At turn {self.turn_count}, you did not provide a valid neighboring page title."
-            reward = LanguageGameReward.format_error_reward
+            #reward = -0.2
+            reward = WikiGameReward.format_error_reward
             return (
                 next_obs,
                 reward,
@@ -249,65 +251,100 @@ class WikiGameEnv(Env):
                 self.turn_count == self.max_turns,
                 {"suffix": self.get_task_suffix()},
             )
-        
-        # Step 1: Check the title exists on the current page
+       
+        # Step 1: If the title does not exist, it is an invalid action. Resolve immediately.
         if next_page_title not in self.current_page.links:
-            next_obs = f"At turn {self.turn_count}, you guessed '{next_page_title}', which is not a neighboring page of '{self.current_page}'."
-            reward = LanguageGameReward.invalid_action_reward
-        
-        # Step 2: Try to load the page
-        next_page = self.trawler.get_page(next_page_title)
-        
-        # Step 3a: Check for maximum turns reached
-        if self.turn_count >= self.max_turns:
-                    terminate_obs = f"At turn {self.turn_count}, you have reached the maximum number of turns without reaching the target page '{self.target_page.title}'."
-                    reward = LanguageGameReward.fail_reward
-                    return (
-                        terminate_obs,
-                        reward,
-                        True,
-                        True,
-                        {"suffix": self.get_task_suffix()},
-                    )
-        # Step 3b: Check if the page could not be loaded
-        elif next_page is None:
-            next_obs = f"At turn {self.turn_count}, you guessed '{next_page_title}', which could not be loaded due to repeated errors."
-            reward = LanguageGameReward.invalid_action_reward
 
-        # Step 3c: Check if we are on the target page.
-        elif next_page.title == self.target_page:
-            self.current_page = next_page
-            terminate_obs = f"Congratulations! You have reached the target page '{self.target_page.title}' in {self.turn_count} turns."
-            reward = LanguageGameReward.success_reward
-            return (
-                terminate_obs,
-                reward,
-                True,
-                False,
-                {"suffix": self.get_task_suffix()},
+            # QoL (311025): Try to fuzzy match for the cases where the model KIND OF
+            # knows the neighboring page's title, but made a small mistake which
+            # resulted in an invalid action.
+            fuzzy_matches = (
+                link for link in self.current_page.links
+                if next_page_title.lower() in link.lower()
             )
-        # Step 3d: Valid action, but dead-end page.
-        elif not next_page.links:
-            self.current_page = next_page
-            terminate_obs = f"At turn {self.turn_count}, you navigated to the '{self.current_page.title}' page, which is a dead-end page with no neighboring pages."
-            reward = LanguageGameReward.fail_reward
-            return (
-                terminate_obs,
-                reward,
-                True,
-                False,
-                {"suffix": self.get_task_suffix()},
-            )
-        # Step 3d: Valid action, but not the target page.
+            try:
+                next_obs = (
+                    f"At turn {self.turn_count}, you guessed '{next_page_title}'. "
+                    f"which is not an exact match for any neighboring page of '{self.current_page.title}'. "
+                    f"Did you mean '{next(fuzzy_matches)}'? "
+                    f"You must match **exactly** one of the neighboring page titles to navigate there."
+                )
+            except StopIteration:
+                next_obs = (
+                    f"At turn {self.turn_count}, you guessed '{next_page_title}', "
+                    f"which is neither a neighboring page of '{self.current_page.title}', "
+                    f"nor could it be construed as a valid neighboring page title of it. "
+                    f"You must match **exactly** one of the neighboring page titles to navigate there."
+                )
+            #reward = -0.5
+            reward = WikiGameReward.invalid_action_reward
         else:
-            self.current_page = next_page
-            next_obs = (
-                f"At turn {self.turn_count}, you navigated to the '{self.current_page.title}' page. "
-                f"Here is a summary of the page:\n{self.current_page.content[:500]}...\n"
+            # Otherwise, we try to figure out the exact reward and next observation.
+            # Step 2: Try to load the page
+            next_page = self.trawler.get_page(next_page_title)
+            
+            # Step 3a: Check if the page could not be loaded
+            if next_page is None:
+                next_obs = f"At turn {self.turn_count}, you guessed '{next_page_title}', which could not be loaded due to repeated errors."
+                # reward = 0.0
+                reward = WikiGameReward.invalid_action_reward
+
+            # Step 3b: Check if we are on the target page.
+            elif next_page.title == self.target_page.title:
+                self.current_page = next_page
+                terminate_obs = f"Congratulations! You have reached the target page '{self.target_page.title}' in {self.turn_count} turns."
+                reward = WikiGameReward.success_reward
+                return (
+                    terminate_obs,
+                    reward,
+                    True,
+                    False,
+                    {"suffix": self.get_task_suffix()},
+                )
+            # Step 3c: Valid action, but dead-end page.
+            elif not next_page.links:
+                self.current_page = next_page
+                terminate_obs = f"At turn {self.turn_count}, you navigated to the '{self.current_page.title}' page, which is a dead-end page with no neighboring pages."
+                # reward = -1
+                reward = WikiGameReward.fail_reward
+                return (
+                    terminate_obs,
+                    reward,
+                    True,
+                    False,
+                    {"suffix": self.get_task_suffix()},
+                )
+            # Step 3d: Valid action, but not the target page.
+            else:
+                self.current_page = next_page
+                next_obs = (
+                    f"At turn {self.turn_count}, you navigated to the '{self.current_page.title}' page. "
+                    f"Here is a summary of the page:\n{self._page_summary(self.current_page)}...\n"
+                )
+                reward = WikiGameReward.internal_step_reward
+                # reward = -0.1
+               
+ 
+        # Step 4: If we exhausted max turns, truncate the episode IMMEDIATELY.
+        if self.turn_count >= self.max_turns:
+            terminate_obs = f"At turn {self.turn_count}, you have reached the maximum number of turns without reaching the target page '{self.target_page.title}'."
+            # reward = -1
+            reward = WikiGameReward.fail_reward
+            return (
+                terminate_obs,
+                reward,
+                True,
+                True,
+                {"suffix": self.get_task_suffix()},
             )
-            reward = LanguageGameReward.internal_step_reward
-        
-        return next_obs, reward, False, False, {"suffix": self.get_task_suffix()}
+
+        return (
+            next_obs,
+            reward, 
+            False, 
+            False, 
+            {"suffix": self.get_task_suffix()},
+        )
 
     def sample_random_action(self) -> str:
         '''
