@@ -14,12 +14,14 @@
 
 import random
 import re
+from time import sleep
 from typing import Any, Dict, Optional, Tuple
 
 from gem.core import Env
 from gem.utils.constants import LanguageGameReward
 
 from .backend import BaseWikiTrawler, MediaWikiTrawler, KiwixWikiTrawler
+from .errors import BackendFailureException
 from .wikipage import WikipediaPage
 
 class WikiGameEnv(Env):
@@ -157,21 +159,25 @@ class WikiGameEnv(Env):
             "Enter the title of the neighboring page you want to navigate to."
         )
 
+    
     def _random_page(self) -> WikipediaPage:
         '''
-        Returns a random, non-disambiguated Wikipedia page.
+        Returns a random, disambiguated Wikipedia page.
         '''
         page: WikipediaPage = None
-        for _ in range(5):
+        # (141125) Implement exponential backoff on backend failure to minimize errors.
+        for i in range(10):
             page = self.trawler.random()
-            if page and 'disambiguation' not in page.title.lower():
+            if not isinstance(page, WikipediaPage):
+                # Delay for factor of 1.2^i before retrying
+                sleep(0.2 * 1.2 ** i)
+            elif 'disambiguation' in page.title.lower():
+                sleep(0.2)
+            else:
                 break
 
         if not isinstance(page, WikipediaPage):
-            raise ValueError(
-                "Failed to fetch a valid Wikipedia page, "
-                "perhaps due to repeated backend failures."
-            )
+            raise BackendFailureException()
         return page
 
     def reset(self, seed: Optional[int] = None) -> Tuple[str, Dict[str, Any]]:
@@ -197,8 +203,7 @@ class WikiGameEnv(Env):
         reward = 0
 
         try:
-            action_search_pattern = re.compile(r"\\boxed{([^}]+)}")
-            matches = list(action_search_pattern.finditer(action))
+            matches = list(re.finditer(r"\\boxed{([^}]+)}", action))
             clean_action = matches[-1] if matches else None
             next_page_title = clean_action.group(1).strip()
         except AttributeError:
