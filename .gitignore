@@ -201,3 +201,4 @@ experiments/
 
 # Ignore data-heavy directories
 tests/test_env/kiwix_server/kiwix_volume
+.python-version

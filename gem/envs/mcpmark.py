@@ -24,7 +24,7 @@ from gem.utils.constants import TERMINAL_STATE
 
 
 class MCPMarkEnv(Env):
-    def __init__(self, mcp_service: str, tasks: str = "all", seed: int = 42):
+    def __init__(self, mcp_service: str, tasks: str = "all", seed: int = 42, **_: Any):
         """
         Args:
             mcp_service: The MCP service to use.
@@ -50,7 +50,7 @@ class MCPMarkEnv(Env):
             reward = 0.0
 
         self._cleanup()
-        return TERMINAL_STATE, reward, True, True, {}
+        return TERMINAL_STATE, reward, True, True, {"correct": bool(result.success)}
 
     def reset(self, seed: Optional[int] = None) -> Tuple[str, dict[str, Any]]:
         super().reset(seed)

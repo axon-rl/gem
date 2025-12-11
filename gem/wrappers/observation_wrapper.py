@@ -63,10 +63,10 @@ class ObservationWrapper(EnvWrapper):
                 tokenizer is not None
             ), "Tokenizer must be provided for chat template."
 
-    def reset(self, seed: Optional[int] = None) -> Tuple[str, dict[str, Any]]:
+    def reset(self, seed: Optional[int] = None, **kwargs) -> Tuple[str, dict[str, Any]]:
         self.act_queue.clear()
         self.obs_queue.clear()
-        obs, info = self.env.reset(seed=seed)
+        obs, info = self.env.reset(seed=seed, **kwargs)
         if self.apply_chat_template_on_reset:
             obs = self.tokenizer.apply_chat_template(
                 [{"role": "user", "content": obs}],

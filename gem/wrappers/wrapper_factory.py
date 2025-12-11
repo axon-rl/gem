@@ -96,10 +96,10 @@ def get_wrapper_fns(wrappers: str, tokenizer=None):
     print(f"Wrappers requested: {wrappers}")
     if wrappers:
         wrappers = wrappers.split(",")
-        print(f"Wrappers: {wrapper_fns}")
         for w in wrappers:
             wrapper_fn = WRAPPER_FACTORY[w]
             if w in TOKENIZER_REQUIRED and tokenizer is not None:
                 wrapper_fn = partial(wrapper_fn, tokenizer=tokenizer)
             wrapper_fns.append(wrapper_fn)
+        print(f"Wrappers: {wrapper_fns}")
     return wrapper_fns
