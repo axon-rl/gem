@@ -200,8 +200,8 @@ class WikiGameEnv(Env):
             return ' '.join(page.content.split()[:summ_length])
         
         elif self.page_summary_length_unit == 'sentences':
-            summ_length = min(self.page_summary_length, len(page.content.split('.')))
-            return '. '.join(page.content.split('. ')[:summ_length])
+            sentences = re.split(r'(?<=[.!?])\s+(?=[A-Z])', page.content)
+            return ' '.join(sentences[:self.page_summary_length])
 
     # Facilitate copying by formatting as \\boxed tags.
     # This allows models to leverage their induction heads (which most LMs possess)
