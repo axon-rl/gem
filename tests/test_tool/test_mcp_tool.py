@@ -19,7 +19,6 @@ import fire
 from dotenv import load_dotenv
 
 import gem
-from gem.envs.mcpmark import MCPMarkEnv
 from gem.tools.mcp_tool import MCPTool
 from gem.tools.tool_env_wrapper import ToolEnvWrapper
 from gem.utils.debug import run_and_print_episode
@@ -40,7 +39,7 @@ TEST_ACTIONS = [
 ]
 
 
-def test_single_action(mcp_url: str, env_name: str = "game:GuessTheNumber-v0"):
+def test_single_action(mcp_url: str, env_name: str = "game:GuessTheNumber-v0-hard"):
     """Run a few single-step tool calls against a running MCP server.
 
     Start the sample server (in another terminal) with for example:
@@ -319,6 +318,8 @@ def test_mcpmark_openai(
 
     import anthropic
     from openai import OpenAI
+
+    from gem.envs.mcpmark import MCPMarkEnv
 
     model_provider_map = {
         "openai": {

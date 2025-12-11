@@ -25,24 +25,35 @@ class ToolEnvWrapper(EnvWrapper):
         tools: List[BaseTool],
         tool_reward: float = 0.0,
         tool_success_reward: float = 0.0,
+        tool_execute_error_reward: float = 0.0,
         max_tool_uses: Optional[int] = 10,
     ):
         super().__init__(env)
         self.tools = tools
         self.tool_reward = tool_reward
         self.tool_success_reward = tool_success_reward
+        self.tool_execute_error_reward = tool_execute_error_reward
+        if self.tool_execute_error_reward != 0:
+            assert self.tool_execute_error_reward < 0, "Error reward should be negative"
+            assert (
+                self.tool_reward == 0
+            ), "tool reward is not compatible with tool execute error reward"
+            assert (
+                self.tool_success_reward == 0
+            ), "tool success reward is not compatible with tool execute error reward"
+
         self.max_tool_uses = (
             max_tool_uses if max_tool_uses is not None else float("inf")
         )
         self.tool_use_counter = 0
         self.tool_success_counter = 0
 
-    def reset(self, seed: Optional[int] = None) -> Tuple[str, dict[str, Any]]:
+    def reset(self, seed: Optional[int] = None, **kwargs) -> Tuple[str, dict[str, Any]]:
         prev_ep_tool_uses = self.tool_use_counter
         prev_ep_tool_success = self.tool_success_counter
         self.tool_use_counter = 0
         self.tool_success_counter = 0
-        obs, info = self.env.reset(seed=seed)
+        obs, info = self.env.reset(seed=seed, **kwargs)
         tool_instructions = "\n".join(
             [tool.instruction_string() for tool in self.tools]
         )
@@ -90,13 +101,19 @@ class ToolEnvWrapper(EnvWrapper):
                     print(
                         f"Tool executed: {tool.name}, tool use count: {self.tool_use_counter}"
                     )
+            elif self.tool_execute_error_reward != 0:
+                reward = self.tool_execute_error_reward
+        
+            info["use_tool"] = True
+            
         # if no tool was executed, step the environment
         else:
             observation, reward, terminated, truncated, info = self.env.step(action)
-
+            info["use_tool"] = False
+            
         info["tool_use_counter"] = self.tool_use_counter
         info["tool_success_counter"] = self.tool_success_counter
-        info["use_tool"] = True
+        
         return observation, reward, terminated, truncated, info
 
     def get_state(self) -> dict[str, Any]:

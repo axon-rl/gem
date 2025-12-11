@@ -28,7 +28,6 @@ def test_hello_world():
             TaskConfig(
                 task_name="test",
                 task_path=task_id,
-                instruction="Convert the file '/app/data.csv' into a Parquet file named '/app/data.parquet'. The CSV file contains sample data with headers.",
                 test_weights=json.load(
                     open(os.path.join(task_id, "test_weights.json"))
                 ),
@@ -68,7 +67,6 @@ def test_llm_inference(model: str = "Qwen/Qwen2.5-14B-Instruct"):
             TaskConfig(
                 task_name="test",
                 task_path=task_id,
-                instruction="Convert the file '/app/data.csv' into a Parquet file named '/app/data.parquet'. The CSV file contains sample data with headers.",
                 test_weights=json.load(
                     open(os.path.join(task_id, "test_weights.json"))
                 ),
