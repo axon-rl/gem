@@ -22,7 +22,7 @@ class QueryPageNotFoundException(Exception):
 
 
 class BackendFailureException(Exception):
-    def __init__(self, title):
+    def __init__(self):
         super().__init__(
             "ValueError("
                 "Failed to fetch a valid Wikipedia page, "
