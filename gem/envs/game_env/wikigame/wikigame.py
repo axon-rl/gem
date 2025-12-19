@@ -266,6 +266,24 @@ class WikiGameEnv(Env):
         self.turn_count: int = 0
         self.trawler.empty_cache()
         return (self._get_instructions(), {"suffix": self.get_task_suffix()})
+    
+    def _reset_fixed_page(self, start_page_title: str, target_page_title: str, seed: Optional[int] = None) -> Tuple[str, Dict[str, Any]]:
+        '''
+        Resets the environment to a fixed start and target page.
+        Mostly for testing purposes, not intended for general use.
+        '''
+        super().reset(seed)
+        self.start_page = self.trawler.get_page(start_page_title)
+        self.target_page = self.trawler.get_page(target_page_title)
+
+        self.page_history: list[WikipediaPage] = [self.start_page]
+        self.backtracked: bool = False
+
+        self.current_page: WikipediaPage = self.start_page
+        self.turn_count: int = 0
+        self.trawler.empty_cache()
+        return (self._get_instructions(), {"suffix": self.get_task_suffix()})
+
 
     def step(self, action: str) -> Tuple[str, float, bool, bool, Dict[str, Any]]:
         '''
@@ -296,7 +314,7 @@ class WikiGameEnv(Env):
         # Step 1: If allowed, handle backtracking.
         if self.variant in ['oneback', 'freenav'] and next_page_title == '<PREV_PAGE>':
             # Step 1a: If no last page (such as during 1st turn), invalid action.
-            if not len(self.page_history):
+            if len(self.page_history) < 2:
                 next_obs = (
                     f"At turn {self.turn_count}, you attempted to backtrack "
                     "to the previous page, but there is no previous page "
@@ -313,7 +331,8 @@ class WikiGameEnv(Env):
                 reward = WikiGameReward.invalid_action_reward
             # Step 1c: Valid backtrack.
             else:
-                self.current_page = self.page_history.pop()
+                self.page_history.pop()
+                self.current_page = self.page_history[-1]
                 self.backtracked = True
                 next_obs = (
                     f"At turn {self.turn_count}, you backtracked to the "
@@ -388,16 +407,17 @@ class WikiGameEnv(Env):
             # Step 3c: Valid action, but dead-end page.
             elif not next_page.links:
                 if self.variant in ['oneback', 'freenav']:
-                    self.turn_count += 1
                     self.backtracked = True
                     next_obs = (
                         f"At turn {self.turn_count}, you reached a dead-end page "
                         f"'{next_page.title}' with no neighboring pages. "
                         f"You have been automatically backtracked to the previous page "
                         f"'{self.current_page.title}' at the cost of an additional turn. "
+                        f"So now, you are at turn {self.turn_count + 1}. "
                         f"Here is a summary of the page:\n{self._page_summary(self.current_page)}...\n"
                     )
-                    reward = WikiGameReward.internal_step_reward
+                    self.turn_count += 1
+                    reward = 2 * WikiGameReward.internal_step_reward # This was two steps.
                 else:                    
                     self.current_page = next_page
                     terminate_obs = f"At turn {self.turn_count}, you navigated to the '{self.current_page.title}' page, which is a dead-end page with no neighboring pages."
