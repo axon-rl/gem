@@ -75,3 +75,18 @@ env = WikiGameEnv(
     }
 )
 ```
+
+## Customization Quick Reference
+| Parameter               | Description                                                  | Values                    |
+|-------------------------|--------------------------------------------------------------|------------------------------------|
+| `max_turns`             | Maximum number of turns per episode                          | Positive Integer                   |
+| `variant`               | Game variant (ruleset)                                  | `"freenav"`, `"oneback"`, `"noregrets"` |
+| `backend`               | Wikipedia data backend                                     | `"kiwix"`, `"mw"` (MediaWiki)        |
+| `page_summary_length`   | Length of page summaries        | (<Non-negative integer>, <'words', 'characters', 'sentences'>)  |
+| `trawler_kwargs`        | Keyword arguments for the trawler (data fetcher)            | See above for details               |
+
+### Variant Descriptions
+- **noregrets** (default): No backtracking allowed, the agent can only navigate via visible links.
+    - Note that if two pages reference each other, the agent can still "backtrack" by navigating forward through the link. This is not considered backtracking.
+- **oneback**: The agent cannot backtrack more than once consecutively.
+- **freenav**: The agent can backtrack freely without restrictions.
