@@ -82,7 +82,7 @@ env = WikiGameEnv(
 | `max_turns`             | Maximum number of turns per episode                          | Positive Integer                   |
 | `variant`               | Game variant (ruleset)                                  | `"freenav"`, `"oneback"`, `"noregrets"` |
 | `backend`               | Wikipedia data backend                                     | `"kiwix"`, `"mw"` (MediaWiki)        |
-| `page_summary_length`   | Length of page summaries        | (<Non-negative integer>, <'words', 'characters', 'sentences'>)  |
+| `page_summary_length`   | Length of page summaries        | (`<Non-negative integer>`, `<'words', 'characters', 'sentences'>`)  |
 | `trawler_kwargs`        | Keyword arguments for the trawler (data fetcher)            | See above for details               |
 
 ### Variant Descriptions
