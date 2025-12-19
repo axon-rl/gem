@@ -390,4 +390,18 @@ if __name__ == "__main__":
     Run with:
         python -m tests.test_env.test_wikigame test_transition
         python -m tests.test_env.test_wikigame <YOUR_FUNCTION_NAME>
+
+    FAIR WARNING:
+    Unfortunately, the Wikigame backends all rely on shaky assumptions about the layout
+    of either the live MediaWiki servers or the Kiwix ZIM files. 
+    - For MediaWiki, this is due to the API specification.
+    - For Kiwix, this is due to the fact that the ZIM files are periodically updated
+    and there is no guarantee that the link structure remains the same.
+
+    Therefore, it is difficult to write tests that will remain valid across time.
+    As of December '25, these tests are valid for the Simple English Wikipedia
+    as hosted on both the live MediaWiki servers and the Kiwix ZIM file
+    "wikipedia_en_simple_all_nopic_2025-11".
+    Future changes to either the live servers or the ZIM file may cause these tests to fail
+    even if the code is conceptually correct.
     '''
