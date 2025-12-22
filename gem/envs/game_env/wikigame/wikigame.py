@@ -190,7 +190,7 @@ class WikiGameEnv(Env):
     # and succeed at navigating to **some page** more often.
     # https://transformer-circuits.pub/2022/in-context-learning-and-induction-heads/index.html
     def _get_neighboring_pages_formatted(self, page: WikipediaPage) -> list[str]:
-        return '\n- ' + '\n- '.join(f"\\boxed{{{link}}}" for link in page.links)
+        return '\n- ' + '\n- '.join(f"\\boxed{{{link}}}" for link in self.dynamics.valid_pages(page))
 
     def _construct_current_page_summary(self) -> str:
         return (
@@ -299,7 +299,7 @@ class WikiGameEnv(Env):
 
         # Step 2: If the title does not exist, it is an invalid action. Resolve immediately.
         elif next_page_title not in self.dynamics.valid_pages(self.current_page):
-            
+
             next_obs = self.dynamics.construct_invalid_obs(
                 self.turn_count,
                 self.current_page,
