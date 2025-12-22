@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Tuple, Dict, Any
+from typing import Tuple, Dict, Any, List
 from .rewards import WikiGameReward
 
 class WikiGameDynamics(ABC):
@@ -9,9 +9,39 @@ class WikiGameDynamics(ABC):
     """
 
     @abstractmethod
+    def reset(self) -> None:
+        """Resets any dynamics-specific state if necessary."""
+        pass
+
+    @abstractmethod
     def get_instruction_snippet(self) -> str:
         """Returns the text describing the movement rules for the prompt."""
         pass
+
+    @abstractmethod
+    def valid_pages(self, current_page) -> List[str]:
+        """Returns the set of valid neighboring page titles from the current page."""
+        pass
+
+    def construct_invalid_obs(self, turn_count, current_page, next_page_title):
+        # We try to fuzzy match for the cases where the model KIND OF
+        # knows the neighboring page's title, but made a small mistake which
+        # resulted in an invalid action.
+        fuzzy_matches = (
+            link for link in self.valid_pages(current_page)
+            if next_page_title.lower() in link.lower()
+        )
+        snippet = None
+        try:
+            snippet = f"Did you mean '{next(fuzzy_matches)}'?"
+        except StopIteration:
+            snippet = "and neither could it be construed as a valid neighboring page title of it. "
+
+        return (
+            f"At turn {turn_count}, you guessed '{next_page_title}', "
+            f"which is neither a neighboring page of '{current_page.title}', {snippet}"
+            f"You must match **exactly** one of the neighboring page titles to navigate there."
+        )
 
     @abstractmethod
     def handle_backtrack(self, env) -> Tuple[str, float, bool, bool, Dict[str, Any]]:
@@ -31,14 +61,21 @@ class WikiGameDynamics(ABC):
 
 
 class NoRegretsDynamics(WikiGameDynamics):
+
+    def reset(self) -> None:
+        pass
+
+    def valid_pages(self, current_page) -> List[str]:
+        return current_page.links
+
     def get_instruction_snippet(self) -> str:
         return (
-            "Choose wisely, as you may not backtrack; "
+            "Choose wisely, as you may NOT backtrack; "
             "you can only visit neighboring pages (though you may revisit pages). "
             "Note that trying to backtrack is an illegal move and will "
             "still count towards your maximum number of turns.\n"
         )
-
+    
     def handle_backtrack(self, env) -> Tuple[str, float, bool, bool, Dict[str, Any]]:
         next_obs = (
             f"At turn {env.turn_count}, you attempted to backtrack "
@@ -64,8 +101,32 @@ class NoRegretsDynamics(WikiGameDynamics):
             {"suffix": env.get_task_suffix()}
         )
 
+class EideticDynamics(NoRegretsDynamics):
+    '''
+    Actually, none of the prompts need to change.
+    From the model's POV it can always see all the links it's seen before,
+    and doesn't know this is because we are keeping tabs for it. 
+    '''
+
+    def __init__(self):
+        super().__init__()
+        self.perfect_memory = set()
+
+    def reset(self) -> None:
+        self.perfect_memory.clear()
+
+    def valid_pages(self, current_page) -> List[str]:
+        self.perfect_memory.update(current_page.links)
+        return list(self.perfect_memory)
 
 class OneBackDynamics(WikiGameDynamics):
+
+    def reset(self) -> None:
+        pass
+    
+    def valid_pages(self, current_page) -> List[str]:
+        return current_page.links
+
     def get_instruction_snippet(self) -> str:
         return (
             "If you wish, you may respond \\boxed{<PREV_PAGE>} to return "
@@ -132,6 +193,13 @@ class OneBackDynamics(WikiGameDynamics):
 
 
 class FreeNavDynamics(OneBackDynamics):
+
+    def reset(self) -> None:
+        pass
+    
+    def valid_pages(self, current_page) -> List[str]:
+        return current_page.links
+
     def get_instruction_snippet(self) -> str:
         return (
             "If you wish, you may respond \\boxed{<PREV_PAGE>} to return "

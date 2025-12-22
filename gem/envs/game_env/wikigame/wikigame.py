@@ -18,13 +18,12 @@ from time import sleep
 from typing import Any, Dict, Optional, Tuple
 
 from gem.core import Env
-# from gem.utils.constants import LanguageGameReward
 
 from .backend import BaseWikiTrawler, MediaWikiTrawler, KiwixWikiTrawler
 from .errors import BackendFailureException
 from .wikipage import WikipediaPage
 from .rewards import WikiGameReward
-from .dynamics import WikiGameDynamics, NoRegretsDynamics, OneBackDynamics, FreeNavDynamics
+from .dynamics import WikiGameDynamics, NoRegretsDynamics, OneBackDynamics, FreeNavDynamics, EideticDynamics
 
 class WikiGameEnv(Env):
     VALID_BACKENDS = {
@@ -40,6 +39,7 @@ class WikiGameEnv(Env):
         'noregrets': NoRegretsDynamics,
         'oneback': OneBackDynamics,
         'freenav': FreeNavDynamics,
+        'eidetic': EideticDynamics,
     }
 
     '''
@@ -152,10 +152,10 @@ class WikiGameEnv(Env):
         '''
         instr = (
             f"You are playing the Wikipedia Game, and must reach the target Wikipedia page within {self.max_turns} turns.\n"
-            "This game tests your general knowledge, as well as familiarity with how Wikipedia pages are interlinked.\n"
+            "This game tests your general knowledge and navigation skills.\n"
             "A page refers to a webpage.\n"
             "A Wikipedia page is a webpage on Wikipedia containing articles on a specific topic, as identified by its title.\n"
-            "A neighboring page is defined as any page accessible via a hyperlink from the current page.\n"
+            "A neighboring page is any page accessible via a hyperlink from the current page.\n"
             "You will start at a random Wikipedia page, and must navigate to a target Wikipedia page by visiting neighboring pages.\n"
             "To visit a neighboring page, enter its EXACT title, wrapped in \\boxed{} tags (for example, \\boxed{Python_(programming_language)}).\n"
         )
@@ -163,10 +163,12 @@ class WikiGameEnv(Env):
         instr += self.dynamics.get_instruction_snippet()
 
         return instr + (
-            f"You can visit up to {self.max_turns} neighboring pages (excluding the starting page) to reach the target page.\n"
-            "As you play, the history of your moves will be appended below. Use the information to navigate to the target page before you run out of turns.\n"
-            f"Lastly, you started at '{self.current_page.title}' and your target page is '{self.target_page.title}'.\n"
+            f"You started at '{self.current_page.title}' and your target page is '{self.target_page.title}'.\n"
             f"Here is a summary of the target page:\n{self._page_summary(self.target_page)}...\n"
+            f"You can visit up to {self.max_turns} neighboring pages (excluding the starting page) to reach the target page.\n"
+            "Use the information to navigate to the target page before you run out of turns. "
+            "Before you make a guess, mention the pages you think will help you reach the target page quickly. "
+            "Then, justify which is the best and enter that page's title in \\boxed{} tags to navigate there.\n"
             "Enter your first guess to start the game.\n"
         )
 
@@ -281,7 +283,7 @@ class WikiGameEnv(Env):
             next_page_title = None
         
         if not next_page_title:
-            next_obs = f"At turn {self.turn_count}, you did not provide a valid neighboring page title."
+            next_obs = f"At turn {self.turn_count}, you did not provide a valid page title."
             reward = WikiGameReward.format_error_reward
             return (
                 next_obs,
@@ -296,28 +298,13 @@ class WikiGameEnv(Env):
             return self.dynamics.handle_backtrack(self)
 
         # Step 2: If the title does not exist, it is an invalid action. Resolve immediately.
-        elif next_page_title not in self.current_page.links:
-            # We try to fuzzy match for the cases where the model KIND OF
-            # knows the neighboring page's title, but made a small mistake which
-            # resulted in an invalid action.
-            fuzzy_matches = (
-                link for link in self.current_page.links
-                if next_page_title.lower() in link.lower()
+        elif next_page_title not in self.dynamics.valid_pages(self.current_page):
+            
+            next_obs = self.dynamics.construct_invalid_obs(
+                self.turn_count,
+                self.current_page,
+                next_page_title
             )
-            try:
-                next_obs = (
-                    f"At turn {self.turn_count}, you guessed '{next_page_title}'. "
-                    f"which is not an exact match for any neighboring page of '{self.current_page.title}'. "
-                    f"Did you mean '{next(fuzzy_matches)}'? "
-                    f"You must match **exactly** one of the neighboring page titles to navigate there."
-                )
-            except StopIteration:
-                next_obs = (
-                    f"At turn {self.turn_count}, you guessed '{next_page_title}', "
-                    f"which is neither a neighboring page of '{self.current_page.title}', "
-                    f"nor could it be construed as a valid neighboring page title of it. "
-                    f"You must match **exactly** one of the neighboring page titles to navigate there."
-                )
 
             reward = WikiGameReward.invalid_action_reward
         else:
@@ -350,7 +337,7 @@ class WikiGameEnv(Env):
                 )
             
             # Step 3c: Valid action, but dead-end page.
-            elif not next_page.links:
+            elif not self.dynamics.valid_pages(next_page):
                 return self.dynamics.handle_dead_end(self, next_page)
 
             # Step 3d: Valid action, but not the target page.
