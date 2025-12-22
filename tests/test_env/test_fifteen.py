@@ -28,7 +28,7 @@ from gem.envs.game_env.fifteen_puzzle import FifteenPuzzleEnv
 def classic_puzzle():
     # Returns the classic 4x4 fifteen puzzle environment.
     # You can edit this function to change parameters.
-    return FifteenPuzzleEnv(max_turns = 100, num_rows = 4)
+    return FifteenPuzzleEnv(max_turns = 100, num_rows = 4, init_algo = "monte_carlo", mc_rand_moves = 20)
 
 def fix_state(env: FifteenPuzzleEnv, board: List[List[Optional[int]]], steps: int = 0):
     env.reset()

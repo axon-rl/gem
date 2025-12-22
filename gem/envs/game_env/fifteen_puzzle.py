@@ -38,7 +38,7 @@ class FifteenPuzzleEnv(Env):
     '''
     VALID_INITIALIZATION_ALGOS = ["monte_carlo", "pure_random"]
 
-    def __init__(self, max_turns: Optional[int] = 20, num_rows: Optional[int] = 2, init_algo = "monte_carlo", **_):
+    def __init__(self, max_turns: Optional[int] = 20, num_rows: Optional[int] = 2, init_algo = "monte_carlo", mc_rand_moves = 100, **_):
         super().__init__()
         self.max_turns = max_turns
         self.num_rows = num_rows
@@ -47,6 +47,8 @@ class FifteenPuzzleEnv(Env):
             f"Initialization algorithm {init_algo} not recognized. "
             f"Valid options are: {self.VALID_INITIALIZATION_ALGOS}"
         )
+        self.mc_rand_moves = mc_rand_moves
+        assert mc_rand_moves > 0, "Number of random moves for Monte Carlo initialization must be positive."
         self._is_random = num_rows is None or max_turns is None
         self.greatest_num = self.num_rows**2 - 1
         self.reset()
@@ -198,7 +200,7 @@ class FifteenPuzzleEnv(Env):
         
         return self._get_board_parity(board) == self.goal_parity
 
-    def _generate_solvable_board(self, mc_rand_moves = 100) -> List[List[Optional[int]]]:
+    def _generate_solvable_board(self) -> List[List[Optional[int]]]:
 
         # Empirically speaking, pure random sampling produces extremely difficult boards.
         # An alternative is to perform a series of random valid moves
@@ -228,7 +230,7 @@ class FifteenPuzzleEnv(Env):
             board = self._generate_goal_board()
             opposite_moves = {"up": "down", "down": "up", "left": "right", "right": "left"}
             last_move = None
-            for _ in range(mc_rand_moves):
+            for _ in range(self.mc_rand_moves):
                 curr_empty_row, curr_empty_col = -1, -1
                 for i in range(self.num_rows):
                     for j in range(self.num_rows):
