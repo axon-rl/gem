@@ -17,7 +17,7 @@ import fire
 import gem
 
 
-def test_llm_episode(model_name: str = "Qwen/Qwen3-4B"):
+def test_e2e_llm_episode(model_name: str = "Qwen/Qwen3-4B"):
     from vllm import LLM, SamplingParams
 
     llm = LLM(
@@ -80,8 +80,89 @@ def test_action_sequence():
         print(f"Truncated: {truncated}")
         print(f"Info: {info}")
 
+def test_transitions():
+    env_set = [
+        "eval:QaOpen",
+        "eval:2Wiki",
+        "eval:PopQA",
+        "eval:TriviaQA",
+        "qa:HotpotQA", # Train split
+        "eval:HotpotQA", # Test split
+        "qa:NatualQuestions", # Train split
+        "eval:NaturalQuestions", # Test split
+        "eval:Bamboogle",
+    ]
 
-def evaluate(
+    for env_name in env_set:
+        print(f"Testing environment: {env_name}")
+        # All of these are episodic environments anyways so no need to track steps.
+
+        # Test 2 things: Boxed answers, and Tagged answers.
+
+        # Test 1: Boxed answers
+        env = gem.make(env_name, verbose=False, extract_boxed=True)
+        # Test 1A: Give valid boxed answer
+        obs, _ = env.reset()
+        answer = env.answer
+        ortti = env.step(f"\\boxed{{{answer}}}")
+        assert ortti[1] == 1.0, f"Failed boxed answer test in {env_name} with valid boxed answer."
+        print(f"Passed boxed answer test with valid boxed answer in {env_name}.")
+
+        # Test 1B: Give invalid boxed answer
+        obs, _ = env.reset()
+        wrong_answer = "This is definitely not the correct answer."
+        ortti = env.step(f"\\boxed{wrong_answer}")
+        assert ortti[1] == 0.0, f"Failed boxed answer test in {env_name} with invalid boxed answer."
+        print(f"Passed boxed answer test with invalid boxed answer in {env_name}.")
+
+        # Test 1C: Give malformed answer
+        obs, _ = env.reset()
+        malformed_answer = "This answer is missing the boxed tags."
+        ortti = env.step(malformed_answer)
+        assert ortti[1] == 0.0, f"Failed boxed answer test in {env_name} with malformed boxed answer."
+        print(f"Passed boxed answer test with malformed boxed answer in {env_name}.")
+
+        # Test 1D: Give tagged answer (supposed to be invalid)
+        obs, _ = env.reset()
+        tagged_answer = f"<answer>{env.answer}</answer>"
+        ortti = env.step(tagged_answer)
+        assert ortti[1] == 0.0, f"Failed boxed answer test in {env_name} with tagged answer."
+        print(f"Passed boxed answer test with tagged answer in {env_name}.")
+
+        # Test 2: Tagged answers
+        # Ditto the boxed answers.
+        env = gem.make(env_name, verbose=False, extract_boxed=False)
+        obs, _ = env.reset()
+        answer = env.answer
+        # Test 2A: Give valid tagged answer
+        ortti = env.step(f"<answer>{answer}</answer>")
+        assert ortti[1] == 1.0, f"Failed tagged answer test in {env_name} with valid tagged answer."
+        print(f"Passed tagged answer test with valid tagged answer in {env_name}.")
+
+        # Test 2B: Give invalid tagged answer
+        obs, _ = env.reset()
+        wrong_answer = "This is definitely not the correct answer." 
+        ortti = env.step(f"<answer>{wrong_answer}</answer>")
+        assert ortti[1] == 0.0, f"Failed tagged answer test in {env_name} with invalid tagged answer."
+        print(f"Passed tagged answer test with invalid tagged answer in {env_name}.")   
+
+        # Test 2C: Give malformed tagged answer
+        obs, _ = env.reset()
+        malformed_answer = "This answer is missing the answer tags."
+        ortti = env.step(malformed_answer)
+        assert ortti[1] == 0.0, f"Failed tagged answer test in {env_name} with malformed tagged answer."
+        print(f"Passed tagged answer test with malformed tagged answer in {env_name}.") 
+
+        # Test 2D: Give boxed answer (supposed to be invalid)
+        obs, _ = env.reset()
+        boxed_answer = f"\\boxed{{{env.answer}}}"
+        ortti = env.step(boxed_answer)
+        assert ortti[1] == 0.0, f"Failed tagged answer test in {env_name} with boxed answer."
+        print(f"Passed tagged answer test with boxed answer in {env_name}.")
+
+        print(f"Completed transition tests for environment: {env_name}\n")
+
+def evaluate_llm(
     model_name: str = "Qwen/Qwen3-4B",
     env_name: str = "eval:QaOpen",
     max_tokens: int = 16384,
@@ -172,7 +253,7 @@ def evaluate(
     return acc, episodes
 
 
-def benchmark(
+def benchmark_llm(
     env_names: str = "eval:2Wiki,eval:PopQA,eval:TriviaQA,eval:HotpotQA,eval:Bamboogle,eval:NaturalQuestions,eval:Musique",
     model_name: str = "Qwen/Qwen3-1.7B",
     output_dir: str = None,
@@ -217,7 +298,7 @@ def benchmark(
         print(f"\nEvaluating on {env_name}...")
 
         try:
-            acc, episodes = evaluate(model_name=model_name, env_name=env_name, **kwargs)
+            acc, episodes = evaluate_llm(model_name=model_name, env_name=env_name, **kwargs)
 
             result = {
                 "env_name": env_name,
@@ -274,16 +355,18 @@ if __name__ == "__main__":
 
     fire.Fire(
         {
-            "llm_episode": test_llm_episode,
+            "e2e_llm_episode": test_e2e_llm_episode,
             "action_sequence": test_action_sequence,
-            "evaluate": evaluate,
-            "benchmark": benchmark,
+            "test_transitions": test_transitions,
+            "evaluate_llm": evaluate_llm,
+            "benchmark_llm": benchmark_llm,
         }
     )
 
     """Run with:
-    python -m tests.test_env.test_qa llm_episode
+    python -m tests.test_env.test_qa e2e_llm_episode
     python -m tests.test_env.test_qa action_sequence
+    python -m tests.test_env.test_qa test_transitions
     python -m tests.test_env.test_qa evaluate
-    python -m tests.test_env.test_qa benchmark
+    python -m tests.test_env.test_qa benchmark_llm
     """
