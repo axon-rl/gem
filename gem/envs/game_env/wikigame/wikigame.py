@@ -23,6 +23,7 @@ from typing import (
 )
 
 from gem.core import Env
+from gem.utils.parsing import extract_last_boxed_answer
 
 from .backend import (
     BaseWikiTrawler,
@@ -322,12 +323,11 @@ class WikiGameEnv(Env):
         self.turn_count += 1
         reward = 0
 
-        try:
-            matches = list(re.finditer(r"\\boxed{([^}]+)}", action))
-            clean_action = matches[-1] if matches else None
-            next_page_title = clean_action.group(1).strip()
-        except AttributeError:
-            next_page_title = None
+        # TODO: Assumes \\boxed{} format within the environment.
+        #     Should decouple action formatting from instructions.
+        # Note that regex is incapable of parsing nested structures,
+        # so we simply extract the last boxed action.
+        next_page_title = extract_last_boxed_answer(action)
         
         if not next_page_title:
             next_obs = f"At turn {self.turn_count}, you did not provide a valid page title."
