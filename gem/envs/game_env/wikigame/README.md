@@ -11,6 +11,7 @@ This directory contains the implementation of the WikiGame environment, whose de
                 ├── __init__.py
                 ├── wikigame.py (abstract environment implementation)
                 ├── backend.py (actual interface with Wikipedia data)
+                ├── dynamics.py (environment dynamics fill-in-the-blanks)
                 ├── rewards.py (reward structure definitions)
                 ├── wikipage.py (page representation)
                 ├── errors.py (custom exceptions)
@@ -21,14 +22,16 @@ This directory contains the implementation of the WikiGame environment, whose de
 ## How to Use
 
 ### Quickstart
-[This repository](https://github.com/N00bcak/playing-wikigame) contains a **relatively** up-to-date project
+[This (somewhat disorganized) repository](https://github.com/N00bcak/playing-wikigame) contains a **relatively** up-to-date project
 which can run the WikiGame environment, though some hiccups may occur due to platform and hardware differences.
 
 ### Manual Setup
 
 #### Kiwix
 Go to [setup_kiwix.sh](./setup_kiwix.sh) for a script that automates the setup of the Kiwix backend on MacOS.
-For Linux, the [quickstart repository](https://github.com/N00bcak/playing-wikigame) contains a Linux flavor of the setup script.
+(You will also need this script for testing!)
+
+For Linux, there is a [quickstart repository](https://github.com/N00bcak/playing-wikigame) containing a Linux flavor of the setup script.
 
 Ensure that:
 - You have enough disk space to store the ZIM file.
@@ -80,13 +83,15 @@ env = WikiGameEnv(
 | Parameter               | Description                                                  | Values                    |
 |-------------------------|--------------------------------------------------------------|------------------------------------|
 | `max_turns`             | Maximum number of turns per episode                          | Positive Integer                   |
-| `variant`               | Game variant (ruleset)                                  | `"freenav"`, `"oneback"`, `"noregrets"` |
-| `backend`               | Wikipedia data backend                                     | `"kiwix"`, `"mw"` (MediaWiki)        |
-| `page_summary_length`   | Length of page summaries        | (`<Non-negative integer>`, `<'words', 'characters', 'sentences'>`)  |
-| `trawler_kwargs`        | Keyword arguments for the trawler (data fetcher)            | See above for details               |
+| `variant`               | Game variant (ruleset)                                       | `"freenav"`, `"oneback"`, `"noregrets"`, `"eidetic"` |
+| `backend`               | Wikipedia data backend                                       | `"kiwix"`, `"mw"` (MediaWiki)        |
+| `page_summary_length`   | Length of page summaries                                     | (`<Non-negative integer>`, `<'words', 'characters', 'sentences'>`)  |
+| `trawler_kwargs`        | Keyword arguments for the trawler (data fetcher)             | See above for details               |
 
 ### Variant Descriptions
 - **noregrets** (default): No backtracking allowed, the agent can only navigate via visible links.
     - Note that if two pages reference each other, the agent can still "backtrack" by navigating forward through the link. This is not considered backtracking.
 - **oneback**: The agent cannot backtrack more than once consecutively.
 - **freenav**: The agent can backtrack freely without restrictions.
+- **eidetic**: The agent can visit ANY page whose link it has ever seen before, regardless of current position.
+    - Note that the agent still cannot backtrack.

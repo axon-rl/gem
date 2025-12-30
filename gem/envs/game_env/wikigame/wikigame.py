@@ -15,15 +15,30 @@
 import random
 import re
 from time import sleep
-from typing import Any, Dict, Optional, Tuple
+from typing import (
+    Any, 
+    Dict, 
+    Optional, 
+    Tuple
+)
 
 from gem.core import Env
 
-from .backend import BaseWikiTrawler, MediaWikiTrawler, KiwixWikiTrawler
+from .backend import (
+    BaseWikiTrawler,
+    KiwixWikiTrawler,
+    MediaWikiTrawler
+)
 from .errors import BackendFailureException
 from .wikipage import WikipediaPage
 from .rewards import WikiGameReward
-from .dynamics import WikiGameDynamics, NoRegretsDynamics, OneBackDynamics, FreeNavDynamics, EideticDynamics
+from .dynamics import (
+    WikiGameDynamics, 
+    NoRegretsDynamics, 
+    OneBackDynamics, 
+    FreeNavDynamics, 
+    EideticDynamics
+)
 
 class WikiGameEnv(Env):
     VALID_BACKENDS = {
@@ -88,7 +103,7 @@ class WikiGameEnv(Env):
         - The title of a neighboring Wikipedia page, specified within \\boxed{} 
             tags.
         - p_current <- any Wikipedia page whose title matches that of the action.
-        - If the action does not correspond to a valid neighboring page, p_current 
+        - If the action doesn't correspond to a valid neighboring page, p_current 
             remains unchanged.
         - Regardless of the validity of the action, step_ct increments by 1.
 
@@ -121,26 +136,38 @@ class WikiGameEnv(Env):
         )
 
         try:
-            self.trawler: BaseWikiTrawler = self.VALID_BACKENDS[backend](**(trawler_kwargs or {}))
+            self.trawler: BaseWikiTrawler = self.VALID_BACKENDS[backend](
+                **(trawler_kwargs or {})
+            )
         except KeyError:
-            raise ValueError(f"Invalid backend '{backend}'. Valid options are: {list(self.VALID_BACKENDS.keys())}")
+            raise ValueError(
+                f"Invalid backend '{backend}'. "
+                f"Valid options are: {list(self.VALID_BACKENDS.keys())}"
+            )
         
         if not isinstance(self.trawler, BaseWikiTrawler):
-            raise ValueError(f"Backend '{backend}' has to subclass BaseWikiTrawler.")
+            raise ValueError(
+                f"Backend '{backend}' has to subclass BaseWikiTrawler."
+            )
 
         self.variant = variant
-        if self.variant not in self.VALID_VARIANTS:
-            raise ValueError(f"Invalid variant '{self.variant}'. Valid options are: {list(self.VALID_VARIANTS.keys())}")
+        try:
+            self.dynamics: WikiGameDynamics = self.VALID_VARIANTS[self.variant]()
+        except KeyError:
+            raise ValueError(
+                f"Invalid variant '{self.variant}'. "
+                f"Valid options are: {list(self.VALID_VARIANTS.keys())}"
+            )
         
-        self.dynamics: WikiGameDynamics = self.VALID_VARIANTS[self.variant]()
-
         self.reset()
 
     def _get_instructions(self) -> str:
         '''
-        Since the model's performance is being judged based on the number of steps taken to reach the target page,
-        we help the model perform by making it clear that the model should use its general knowledge
-        instead of inefficient backtracking or random exploration.
+        Since the model's performance is being judged based on the 
+        number of steps taken to reach the target page,
+        we help the model perform by making it clear that the model 
+        should use its general knowledge instead of 
+        inefficient backtracking or random exploration.
 
         Some preliminaries that guide prompting decisions:
         - Concise and least-ambiguous specification of the game
@@ -148,27 +175,38 @@ class WikiGameEnv(Env):
         - Clear instructions on how to provide actions
             - e.g. by specifying the format of the action (in box tags)
         - Wikipedia Game is not a game where pure navigation skills can let you excel,
-            but rather, general knowledge and familiarity with Wikipedia's structure is key.
+            but rather, general knowledge and familiarity with Wikipedia's structure are key.
         '''
+
+        # TODO: Assumes \\boxed{} format within the environment.
+        #     Should decouple action formatting from instructions.
         instr = (
-            f"You are playing the Wikipedia Game, and must reach the target Wikipedia page within {self.max_turns} turns.\n"
+            f"You are playing the Wikipedia Game, and must reach the target Wikipedia "
+            f"page within {self.max_turns} turns.\n"
             "This game tests your general knowledge and navigation skills.\n"
             "A page refers to a webpage.\n"
-            "A Wikipedia page is a webpage on Wikipedia containing articles on a specific topic, as identified by its title.\n"
-            "A neighboring page is any page accessible via a hyperlink from the current page.\n"
-            "You will start at a random Wikipedia page, and must navigate to a target Wikipedia page by visiting neighboring pages.\n"
-            "To visit a neighboring page, enter its EXACT title, wrapped in \\boxed{} tags (for example, \\boxed{Python_(programming_language)}).\n"
+            "A Wikipedia page is a webpage on Wikipedia containing articles "
+            "on a specific topic, as identified by its title.\nA neighboring page "
+            "is any page accessible via a hyperlink from the current page.\n"
+            "You will start at a random Wikipedia page, and must navigate to "
+            "a target Wikipedia page by visiting neighboring pages.\n"
+            "To visit a neighboring page, enter its EXACT title, wrapped in \\boxed{} tags "
+            "(for example, \\boxed{Python_(programming_language)}).\n"
         )
 
         instr += self.dynamics.get_instruction_snippet()
 
         return instr + (
-            f"You started at '{self.current_page.title}' and your target page is '{self.target_page.title}'.\n"
+            f"You started at '{self.current_page.title}' "
+            f"and your target page is '{self.target_page.title}'.\n"
             f"Here is a summary of the target page:\n{self._page_summary(self.target_page)}...\n"
-            f"You can visit up to {self.max_turns} neighboring pages (excluding the starting page) to reach the target page.\n"
-            "Use the information to navigate to the target page before you run out of turns. "
-            "Before you make a guess, mention the pages you think will help you reach the target page quickly. "
-            "Then, justify which is the best and enter that page's title in \\boxed{} tags to navigate there.\n"
+            f"You can visit up to {self.max_turns} neighboring pages "
+            "(excluding the starting page) to reach the target page.\n"
+            "Use the information to navigate to the target page "
+            "before you run out of turns. Before you make a guess, mention "
+            "the pages you think will help you reach the target page quickly. "
+            "Then, justify which is the best and enter that page's title "
+            "in \\boxed{} tags to navigate there.\n"
             "Enter your first guess to start the game.\n"
         )
 
@@ -185,6 +223,9 @@ class WikiGameEnv(Env):
             sentences = re.split(r'(?<=[.!?])\s+(?=[A-Z])', page.content)
             return ' '.join(sentences[:self.page_summary_length])
 
+
+    # TODO: Assumes \\boxed{} format within the environment.
+    #     Should decouple action formatting from instructions.
     # Facilitate copying by formatting as \\boxed tags.
     # This allows models to leverage their induction heads (which most LMs possess)
     # and succeed at navigating to **some page** more often.
@@ -203,7 +244,8 @@ class WikiGameEnv(Env):
         Maintain consistent terminology with the instructions to avoid confusion.
         '''
         return (
-            f"You are currently on the '{self.current_page.title}' page. Your target page is '{self.target_page.title}'.\n"
+            f"You are currently on the '{self.current_page.title}' page. "
+            f"Your target page is '{self.target_page.title}'.\n"
             f"{self._construct_current_page_summary()}\n"
             "Enter the title of the neighboring page you want to navigate to."
         )
@@ -249,7 +291,12 @@ class WikiGameEnv(Env):
         self.trawler.empty_cache()
         return (self._get_instructions(), {"suffix": self.get_task_suffix()})
     
-    def _reset_fixed_page(self, start_page_title: str, target_page_title: str, seed: Optional[int] = None) -> Tuple[str, Dict[str, Any]]:
+    def _reset_fixed_page(
+            self, 
+            start_page_title: str, 
+            target_page_title: str, 
+            seed: Optional[int] = None
+        ) -> Tuple[str, Dict[str, Any]]:
         '''
         Resets the environment to a fixed start and target page.
         Mostly for testing purposes, not intended for general use.
@@ -313,10 +360,11 @@ class WikiGameEnv(Env):
             next_page = self.trawler.get_page(next_page_title)
             
             # Step 3a: Check if the page could not be loaded
+            # We used to make this an invalid action on the model's part,
+            # but it doesn't make sense to penalize the model for
+            # a backend failure.
             if next_page is None:
-                next_obs = f"At turn {self.turn_count}, you guessed '{next_page_title}', which could not be loaded due to repeated errors."
-
-                reward = WikiGameReward.invalid_action_reward
+                raise BackendFailureException()
 
             # Step 3b: Check if we are on the target page.
             # IMPORTANT NOTE FOR BACKTRACKING VARIANTS:
@@ -326,7 +374,10 @@ class WikiGameEnv(Env):
                 self.current_page = next_page
                 self.page_history.append(next_page)
                 self.backtracked = False
-                terminate_obs = f"Congratulations! You have reached the target page '{self.target_page.title}' in {self.turn_count} turns."
+                terminate_obs = (
+                    "Congratulations! You have reached the target page "
+                    f"'{self.target_page.title}' in {self.turn_count} turns."
+                )
                 reward = WikiGameReward.success_reward
                 return (
                     terminate_obs,
@@ -349,14 +400,21 @@ class WikiGameEnv(Env):
                 self.page_history.append(next_page)
                 self.backtracked = False
                 next_obs = (
-                    f"At turn {self.turn_count}, you navigated to the '{self.current_page.title}' page. "
-                    f"Here is a summary of the page:\n{self._page_summary(self.current_page)}...\n"
+                    f"At turn {self.turn_count}, you navigated to "
+                    f"the '{self.current_page.title}' page. "
+                    "Here is a summary of the page:\n"
+                    f"{self._page_summary(self.current_page)}...\n"
                 )
                 reward = WikiGameReward.internal_step_reward
         
         # Step 4: If we exhausted max turns, truncate the episode IMMEDIATELY.
         if self.turn_count >= self.max_turns:
-            terminate_obs = f"At turn {self.turn_count}, you have reached the maximum number of turns without reaching the target page '{self.target_page.title}'."
+            terminate_obs = (
+                f"At turn {self.turn_count}, you have reached "
+                "the maximum number of turns without "
+                f"reaching the target page '{self.target_page.title}'."
+            )
+
             reward = WikiGameReward.fail_reward
             return (
                 terminate_obs,
@@ -374,6 +432,8 @@ class WikiGameEnv(Env):
             {"suffix": self.get_task_suffix()},
         )
 
+    # TODO: Assumes \\boxed{} format within the environment.
+    #     Should decouple action formatting from instructions.
     def sample_random_action(self) -> str:
         '''
         Samples a random neighboring page

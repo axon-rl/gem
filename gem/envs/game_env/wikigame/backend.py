@@ -12,6 +12,11 @@ from .errors import DisambiguationException, QueryPageNotFoundException
 from .wikipage import WikipediaPage
 
 class BaseWikiTrawler(ABC):
+    '''
+    Abstract class for Wikipedia backends.
+    Called trawlers since they trawl through some form of Wikipedia data.
+    (either website, or Kiwix ZIMfile)
+    '''
 
     def __init__(
             self, 
@@ -107,6 +112,8 @@ class BaseWikiTrawler(ABC):
                 else:
                     # Query again with "corrected" name.
                     result = self.get_page(result['search'][0]['title'])
+            
+            # TODO: Remove Pokemon exception handling.
             # APIError is deliberately unhandled because it should not occur
             except Exception as e:
                 warn(f"Unexpected exception {e} occurred while querying for page '{page_name}'.")
@@ -154,11 +161,13 @@ class MediaWikiTrawler(BaseWikiTrawler):
         Allows redirects for simplicity's sake.
         '''
         return next(self.site.query(
+            # We want to know if it's a disambiguation page
             prop = 'extracts|links|info|pageprops',
             titles = page_name,
             explaintext = True,
             redirects = True,
-            ppprop = 'disambiguation',
+            # We want to know if it's a disambiguation page
+            ppprop = 'disambiguation', 
             plnamespace = 0,
         ))
 
@@ -233,6 +242,9 @@ class KiwixWikiTrawler(BaseWikiTrawler):
         self.re_remove_space = re.compile(r'\s+')
         self.re_remove_newline = re.compile(r'\n+')
 
+    # TODO: Verify the scheme can generalize to non-wikipedia ZIM files.
+    #       This is likely not the case since ZIM files are not
+    #       created with ease of trawling in mind.
     def _direct_query(self, page_name: str) -> Optional[AttrDict]:
         try:
             response = requests.get(

@@ -3,6 +3,12 @@ Some nifty exceptions with reference from https://github.com/goldsmith/Wikipedia
 '''
 
 class DisambiguationException(Exception):
+    '''
+    Raised when a disambiguation page is encountered.
+
+    In the Wikipedia game, disambiguation pages are not allowed
+    since they are not considered articles. (https://en.wikipedia.org/wiki/Wikipedia:Wiki_Game)
+    '''
     def __init__(self, title, options):
         self.title = title
         self.options = options
@@ -13,6 +19,13 @@ class DisambiguationException(Exception):
         )
 
 class QueryPageNotFoundException(Exception):
+    '''
+    Raised when a requested Wikipedia page is not found
+    within the specified backend.
+
+    Basically a 404 for Wikipedia pages, and can 
+    potentially be used as a signal for future search-based policies.
+    '''
     def __init__(self, title):
         self.title = title
         super().__init__(
@@ -22,6 +35,12 @@ class QueryPageNotFoundException(Exception):
 
 
 class BackendFailureException(Exception):
+    '''
+    Raised when the backend itself appears to have failed.
+
+    Here we do NOT know whether the page exists or not,
+    just that the backend could not retrieve it.
+    '''
     def __init__(self):
         super().__init__(
             "ValueError("

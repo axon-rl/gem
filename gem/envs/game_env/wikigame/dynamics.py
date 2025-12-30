@@ -4,8 +4,10 @@ from .rewards import WikiGameReward
 
 class WikiGameDynamics(ABC):
     """
-    Strategy interface for Wikipedia Game dynamics (variants).
-    Handles instructions, backtracking rules, and dead-end behavior.
+    Fills in the blanks for different Wikipedia Game variants.
+
+    Handles instruction variation, and case-by-case behavior
+    such as backtracking, and hitting a dead-end.
     """
 
     @abstractmethod
@@ -61,6 +63,12 @@ class WikiGameDynamics(ABC):
 
 
 class NoRegretsDynamics(WikiGameDynamics):
+    '''
+    Default Wikipedia Game dynamics:
+    - Backtracking? Invalid.
+    - Dead End? Game over.
+    - Valid pages? Only what's linked on the current page.
+    '''
 
     def reset(self) -> None:
         pass
@@ -92,7 +100,11 @@ class NoRegretsDynamics(WikiGameDynamics):
 
     def handle_dead_end(self, env, next_page) -> Tuple[str, float, bool, bool, Dict[str, Any]]:
         env.current_page = next_page
-        terminate_obs = f"At turn {env.turn_count}, you navigated to the '{env.current_page.title}' page, which is a dead-end page with no neighboring pages."
+        terminate_obs = (
+            f"At turn {env.turn_count}, you navigated to the "
+            f"'{env.current_page.title}' page, which is a dead-end page" 
+            "with no neighboring pages."
+        )
         return (
             terminate_obs, 
             WikiGameReward.fail_reward, 
@@ -103,9 +115,10 @@ class NoRegretsDynamics(WikiGameDynamics):
 
 class EideticDynamics(NoRegretsDynamics):
     '''
-    Actually, none of the prompts need to change.
-    From the model's POV it can always see all the links it's seen before,
-    and doesn't know this is because we are keeping tabs for it. 
+    Eidetic Wikipedia Game dynamics:
+    - Backtracking? Invalid.
+    - Dead End? Game over.
+    - Valid pages? Any page EVER seen in the episode.
     '''
 
     def __init__(self):
@@ -120,6 +133,12 @@ class EideticDynamics(NoRegretsDynamics):
         return list(self.perfect_memory)
 
 class OneBackDynamics(WikiGameDynamics):
+    '''
+    One-Back Wikipedia Game dynamics:
+    - Backtracking? Only once in a row.
+    - Dead End? Auto-backtrack to previous page at cost of extra turn.
+    - Valid pages? Only what's linked on the current page.
+    '''
 
     def reset(self) -> None:
         pass
@@ -180,7 +199,8 @@ class OneBackDynamics(WikiGameDynamics):
             f"You have been automatically backtracked to the previous page "
             f"'{env.current_page.title}' at the cost of an additional turn. "
             f"So now, you are at turn {env.turn_count + 1}. "
-            f"Here is a summary of the page:\n{env._page_summary(env.current_page)}...\n"
+            "Here is a summary of the page:\n"
+            f"{env._page_summary(env.current_page)}...\n"
         )
         env.turn_count += 1
         return (
@@ -193,6 +213,12 @@ class OneBackDynamics(WikiGameDynamics):
 
 
 class FreeNavDynamics(OneBackDynamics):
+    '''
+    FreeNav Wikipedia Game dynamics:
+    - Backtracking? Go nuts.
+    - Dead End? Auto-backtrack to previous page at cost of extra turn.
+    - Valid pages? Only what's linked on the current page.
+    '''
 
     def reset(self) -> None:
         pass
@@ -223,7 +249,8 @@ class FreeNavDynamics(OneBackDynamics):
             next_obs = (
                 f"At turn {env.turn_count}, you backtracked to the "
                 f"previous page '{env.current_page.title}'. "
-                f"Here is a summary of the page:\n{env._page_summary(env.current_page)}...\n"
+                "Here is a summary of the page:\n"
+                f"{env._page_summary(env.current_page)}...\n"
             )
             reward = WikiGameReward.internal_step_reward
             
