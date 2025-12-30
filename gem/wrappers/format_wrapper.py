@@ -19,7 +19,6 @@ Each wrapper caters to a different kind of format enforcement,
 although for now only EncapsulateWrapper is implemented, where
 the response from the environment is encapsulated in some regexable syntax.
 """
-# import re
 from abc import abstractmethod
 from typing import Any, Optional, Tuple
 
@@ -104,7 +103,6 @@ class EncapsulateWrapper(FormatWrapper):
         super().__init__(env)
         self.prefix = prefix
         self.suffix = suffix
-        # self.regex = re.compile(f"{re.escape(self.prefix)}(.*?){re.escape(self.suffix)}", re.DOTALL)
 
     def find_last_encapsulated(self, text: str) -> Optional[str]:
         """

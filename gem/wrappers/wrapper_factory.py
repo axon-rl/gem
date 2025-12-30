@@ -86,6 +86,7 @@ WRAPPER_FACTORY = {
     ),
     ### 3. Optionally add the episode tracking wrapper
     "episode_tracking": EpisodeTrackingWrapper,
+    ### 4. (Optional for now) add format wrappers
     "answer_boxed": partial(
         EncapsulateWrapper,
         # We use r-strings to avoid issues with backslashes
