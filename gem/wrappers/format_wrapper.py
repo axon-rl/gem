@@ -153,7 +153,7 @@ class EncapsulateWrapper(FormatWrapper):
         new_obs = maybe_add_new_line(observation)
         new_obs += (
             f"Please give your FINAL response in the following format: {self.prefix}<your response>{self.suffix}\n"
-            "If you give multiple responses, only the last one will be considered."
+            "If you give multiple responses, only the last (and innermost) one will be considered. "
         )
         return new_obs
     

@@ -50,7 +50,7 @@ def test_encapsulate_wrapper():
     1. accepts only actions that follow the specified format,
     2. modifies sampled random actions to follow the specified format.
     """
-    print("Testing EncapsulateWrapper...")
+    print("Testing \\boxed{{}} variant...")
     env = DummyEnv()
     
     # 1. Test answer_boxed
@@ -104,6 +104,8 @@ def test_encapsulate_wrapper():
 
     # Ditto for `answer_tags`
     # TEST 2A: Expects action "x" to be rejected for incorrect format
+    print("Testing <answer></answer> variant...")
+    env = DummyEnv()
     tags_wrapper = get_wrapper_fns(
         "answer_tags"
     )[0]
