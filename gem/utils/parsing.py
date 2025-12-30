@@ -36,7 +36,7 @@ def last_boxed_only_string(string: str) -> Optional[str]:
                 break
         i += 1
 
-    if right_brace_idx == None:
+    if right_brace_idx is None:
         retval = None
     else:
         retval = string[idx : right_brace_idx + 1]
@@ -88,11 +88,15 @@ def extract_last_tagged_answer(model_response: str):
         str or None: The extracted answer, or None if not found.
     """
 
-    answer_pattern = r"<answer>(.*?)</answer>"
-    match = re.finditer(answer_pattern, model_response, re.DOTALL)
-    matches = list(match)
-
-    if len(matches) == 0:
+    # Note that regex is incapable of matching nested patterns (correctly and quickly).
+    # So instead we use the same approach as extract_last_boxed_only_string.
+    idx = model_response.rfind("<answer>")
+    if idx < 0:
         return None
-
-    return matches[-1].group(1).strip()
+    end_idx = len(model_response)
+    while True:
+        next_end_tag_idx = model_response.rfind("</answer>", 0, end_idx)
+        if next_end_tag_idx < idx:
+            break
+        end_idx = next_end_tag_idx
+    return model_response[idx + len("<answer>") : end_idx].strip()
