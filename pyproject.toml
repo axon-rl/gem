@@ -45,6 +45,7 @@ search = [
   "torchvision",
   "torchaudio",
   "pyserini",
+  "pywikiapi",
 ]
 
 mcp = ["fastmcp", "pyyaml>=6.0.0"]
