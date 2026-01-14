@@ -19,6 +19,7 @@ from gem.tools.search_tool import SearchTool
 from gem.tools.tool_env_wrapper import ToolEnvWrapper
 from gem.wrappers.episode_tracking_wrapper import EpisodeTrackingWrapper
 from gem.wrappers.observation_wrapper import ObservationWrapper
+from gem.wrappers.format_wrapper import EncapsulateWrapper
 
 # TODO refactor later
 
@@ -83,8 +84,20 @@ WRAPPER_FACTORY = {
         include_chat_template=False,
         apply_chat_template_on_reset=True,
     ),
-    ### 3. Finally, optionally add the episode tracking wrapper
+    ### 3. Optionally add the episode tracking wrapper
     "episode_tracking": EpisodeTrackingWrapper,
+    ### 4. (Optional for now) add format wrappers
+    "answer_boxed": partial(
+        EncapsulateWrapper,
+        # We use r-strings to avoid issues with backslashes
+        prefix=r"\boxed{",
+        suffix=r"}",
+    ),
+    "answer_tags": partial(
+        EncapsulateWrapper,
+        prefix=r"<answer>",
+        suffix=r"</answer>",
+    ),
 }
 
 TOKENIZER_REQUIRED = ["concat_chat", "concat_chat_on_reset"]
